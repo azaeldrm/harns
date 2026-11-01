@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-102 -260 860 860" width="860" height="860">
+  <defs>
+    <path id="panel" d="M0,36 Q0,0 31.2,18 L330.8,191 Q362,209 362,245 L362,523 Q362,559 330.8,541 L31.2,368 Q0,350 0,314 Z"/>
+    <linearGradient id="g-teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5CCFCB"/><stop offset="1" stop-color="#05B9C5"/>
+    </linearGradient>
+    <linearGradient id="g-mint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#B2DEC8"/><stop offset="1" stop-color="#72CABF"/>
+    </linearGradient>
+    <linearGradient id="g-sage" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#DCDDA9"/><stop offset="1" stop-color="#C2D8B2"/>
+    </linearGradient>
+    <linearGradient id="g-yellow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBD892"/><stop offset="1" stop-color="#F8C55E"/>
+    </linearGradient>
+    <linearGradient id="g-orange" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFA422"/><stop offset="1" stop-color="#FDAA2C"/>
+    </linearGradient>
+  </defs>
+
+  <style>
+    /* Each layer: (1) slides in from the front once, staggered, then (2) floats gently forever. */
+    .layer {
+      opacity: 0;
+      animation:
+        enter 0.7s cubic-bezier(.2,.8,.2,1) forwards,
+        float 3s ease-in-out infinite;
+    }
+    .l4 { animation-delay: 0.00s, 0.7s; }  /* teal (back) */
+    .l3 { animation-delay: 0.12s, 0.9s; }
+    .l2 { animation-delay: 0.24s, 1.1s; }
+    .l1 { animation-delay: 0.36s, 1.3s; }
+    .l0 { animation-delay: 0.48s, 1.5s; }  /* orange (front) */
+
+    @keyframes enter {
+      from { opacity: 0; transform: translate(-60px, 40px); }
+      to   { opacity: 1; transform: translate(0, 0); }
+    }
+    @keyframes float {
+      0%, 100% { opacity: 1; transform: translate(0, 0); }
+      50%      { opacity: 1; transform: translate(0, -18px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .layer { animation: none; opacity: 1; }
+    }
+  </style>
+
+  <!-- Outer <g> holds each layer's resting position; the inner <use> is what animates. -->
+  <g transform="translate(294,-204)"><use class="layer l4" href="#panel" fill="url(#g-teal)"/></g>
+  <g transform="translate(220.5,-153)"><use class="layer l3" href="#panel" fill="url(#g-mint)"/></g>
+  <g transform="translate(147,-102)"><use class="layer l2" href="#panel" fill="url(#g-sage)"/></g>
+  <g transform="translate(73.5,-51)"><use class="layer l1" href="#panel" fill="url(#g-yellow)"/></g>
+  <g><use class="layer l0" href="#panel" fill="url(#g-orange)"/></g>
+</svg>

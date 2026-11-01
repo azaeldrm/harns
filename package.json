@@ -1,0 +1,7 @@
+{
+  "name": "herdr-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Harness: a herdr layout with a machine-organized sidebar, agent and usage telemetry, and its own look"
+}

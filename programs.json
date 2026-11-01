@@ -1,0 +1,8 @@
+{
+  "programs": {
+    "codex": {
+      "icon": "brand-assets/chatgpt-knot.svg",
+      "tint": false
+    }
+  }
+}

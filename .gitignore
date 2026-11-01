@@ -1,0 +1,9 @@
+node_modules/
+config.json
+.env
+*.log
+__pycache__/
+*.pyc
+gpui-kit.d.ts
+jsconfig.json
+*.error
