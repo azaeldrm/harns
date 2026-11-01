@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-102 -260 860 860" width="860" height="860">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-77.5 -228 811 811" width="811" height="811">
   <defs>
+    <!-- One rounded isometric panel (parallelogram), reused 5 times -->
     <path id="panel" d="M0,36 Q0,0 31.2,18 L330.8,191 Q362,209 362,245 L362,523 Q362,559 330.8,541 L31.2,368 Q0,350 0,314 Z"/>
     <linearGradient id="g-teal" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#5CCFCB"/><stop offset="1" stop-color="#05B9C5"/>
@@ -19,34 +20,19 @@
   </defs>
 
   <style>
-    /* Each layer: (1) slides in from the front once, staggered, then (2) floats gently forever. */
-    .layer {
-      opacity: 0;
-      animation:
-        enter 0.7s cubic-bezier(.2,.8,.2,1) forwards,
-        float 3s ease-in-out infinite;
-    }
-    .l4 { animation-delay: 0.00s, 0.7s; }  /* teal (back) */
-    .l3 { animation-delay: 0.12s, 0.9s; }
-    .l2 { animation-delay: 0.24s, 1.1s; }
-    .l1 { animation-delay: 0.36s, 1.3s; }
-    .l0 { animation-delay: 0.48s, 1.5s; }  /* orange (front) */
-
-    @keyframes enter {
-      from { opacity: 0; transform: translate(-60px, 40px); }
-      to   { opacity: 1; transform: translate(0, 0); }
-    }
-    @keyframes float {
-      0%, 100% { opacity: 1; transform: translate(0, 0); }
-      50%      { opacity: 1; transform: translate(0, -18px); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .layer { animation: none; opacity: 1; }
-    }
+    /* Panels ripple back (teal) to front (orange), 0.2s apart, 3s per cycle.
+       Negative delays start every panel mid-cycle, so there is no jump on load. */
+    .layer { animation: bob 3s ease-in-out infinite; }
+    .l4 { animation-delay: -1.0s; }
+    .l3 { animation-delay: -0.8s; }
+    .l2 { animation-delay: -0.6s; }
+    .l1 { animation-delay: -0.4s; }
+    .l0 { animation-delay: -0.2s; }
+    @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-18px); } }
+    @media (prefers-reduced-motion: reduce) { .layer { animation: none; } }
   </style>
 
-  <!-- Outer <g> holds each layer's resting position; the inner <use> is what animates. -->
+  <!-- back to front; the outer <g> holds each panel's place, the inner <use> animates -->
   <g transform="translate(294,-204)"><use class="layer l4" href="#panel" fill="url(#g-teal)"/></g>
   <g transform="translate(220.5,-153)"><use class="layer l3" href="#panel" fill="url(#g-mint)"/></g>
   <g transform="translate(147,-102)"><use class="layer l2" href="#panel" fill="url(#g-sage)"/></g>

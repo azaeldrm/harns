@@ -1,6 +1,12 @@
 import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { theme, run, props, window, shared, setShared, updates, layout } from "herdr";
+import { theme, run, props, window, shared, setShared, updates, layout, agents } from "herdr";
+
+// The fade logo while any agent is working, the up-and-down (bob) logo otherwise.
+// render() reruns whenever agents change, so this swaps by itself.
+const logoSrc = () => agents().some(a => a.status === "working")
+  ? "mods/harness-chrome/harness-logo-fade.webp"
+  : "mods/harness-chrome/harness-logo-bob.webp";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -49,10 +55,10 @@ export default class WorkspaceChrome extends View {
     }
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 14).pr(10).gap(4).items_center().text_size(13.5)
       .when(collapsed, el => el.pl(0).pr(0).child(div().flex_1().flex().items_center().justify_center()
-        .child(this.button("sidebar-expand", image("mods/harness-chrome/logo-loop.webp").size(28).rounded(5), toggleSidebar, 34, "Expand sidebar").cursor_pointer())))
+        .child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 34, "Expand sidebar").cursor_pointer())))
       .when(window()?.platform === "macos" && !collapsed, el => el.pl(76))
       .when(!collapsed, el => el.child(h_flex().flex_1().gap(8).items_center()
-        .child(this.button("sidebar-collapse-logo", image("mods/harness-chrome/logo-loop.webp").size(28).rounded(5), toggleSidebar, 28, "Collapse sidebar"))
+        .child(this.button("sidebar-collapse-logo", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Collapse sidebar"))
         .child(div().text_size(16).font_semibold().text_color(t.foreground).child("Harness"))))
       .when(!collapsed, el => el.child(this.button("search", svg("mods/harness-chrome/search.svg").size(15), () => run("mod.open", { name: "picker" }))))
       // The compact rail expands through the logo above.
