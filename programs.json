@@ -1,8 +1,14 @@
 {
-  "programs": {
-    "codex": {
-      "icon": "brand-assets/chatgpt-knot.svg",
-      "tint": false
-    }
-  }
+    "programs":  {
+                     "codex":  {
+                                   "icon":  "brand-assets/chatgpt-knot.svg",
+                                   "tint":  true
+                               },
+                     "claude":  {
+                                    "tint":  true
+                                },
+                     "pi":  {
+                                "tint":  true
+                            }
+                 }
 }
