@@ -88,7 +88,7 @@ export default class NewMenu extends View {
         if (targeted && !space) run("space.new", { machine: this.machine });
         else run("tab.new", { space: space?.id });
       }, shortcut("tab.new"), !targeted || machine?.layout === "ready"))
-      .child(div().px(9).pt(8).pb(4).text_size(11).text_color(t.dim).child(targeted ? `Start on ${machine?.name ?? shared("machine.local-label") ?? "azael-pc"}` : "Start an agent"))
+      .child(div().px(9).pt(8).pb(4).text_size(11).text_color(t.dim).child(targeted ? `Start on ${machine?.name ?? shared("machine.local-label") ?? "This computer"}` : "Start an agent"))
       .child(v_flex().flex_1().min_h(0).overflow_y_scrollbar()
         .children(choices.map((a, i) => this.row(a.key, a.tint ? svg(a.icon).size(14).text_color(t.foreground) : image(a.icon).size(14), a.name,
           () => start(a), a.installed ? (i < 9 ? String(i + 1) : "") : "not installed", a.installed && (!targeted || machine?.layout === "ready"))))

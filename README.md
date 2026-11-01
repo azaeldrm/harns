@@ -54,14 +54,40 @@ Generated files: `scripts/build-mods.py` writes `mods/machine-agents/machine-met
 and `probes.js`, from `mods/machine-metrics`, `scripts/context-relay.py` and
 `mods/machine-stats`. Edit the sources, then run it (or `install.ps1`).
 
+## Your machine's name
+
+The sidebar and status bar call this computer by its own name (`hostname`; on macOS the
+Computer Name), or "This computer" if that can't be read. To show a nickname instead, put
+it in `~/.config/herdr-app/harness.json`, a per-person file that isn't part of the layout:
+
+```json
+{ "localMachineName": "my-pc" }
+```
+
+It's re-read every 30 seconds. Other machines show the names they have in herdr.
+
 ## How it measures
 
-Windows CPU load uses differences between performance counter samples; RAM uses
-operating-system memory counters. Linux uses `/proc`. NVIDIA load uses `nvidia-smi`,
-with one ring per reported GPU. Machine probes run every second without overlapping on a
-host; context snapshots refresh every two seconds; quota reads run every 30 seconds.
-Missing readings stay unknown. Quota values come from native account data, never terminal
-conversation text.
+Each machine is probed through herdr's own connection to it, with no listener. What runs
+depends on its platform (`mods/machine-stats/platforms.js`): this computer's comes from
+herdr; another machine is asked once with `uname -s`, and one without `uname` is Windows.
+
+| Platform | CPU and RAM | Python | Reading a home file | Name |
+|---|---|---|---|---|
+| Windows | PowerShell, CIM counters (CPU from two samples) | `python` | PowerShell `Get-Content` | `hostname` |
+| Linux | Python 3, `/proc` | `python3` | `sh` | `hostname` |
+| macOS | Python 3, `top`, `vm_stat`, `sysctl` (not yet run on a Mac) | `python3` | `sh` | `scutil --get ComputerName` |
+
+GPUs come from a registry of vendors (`mods/machine-stats/gpus.js`): each gives the
+command that lists its GPUs' load on each platform and a parser for its output, and every
+probe runs the commands its platform has. NVIDIA (`nvidia-smi`, Windows and Linux) is filled
+in; AMD, Intel and Apple have empty entries to fill in. One ring is shown per GPU.
+
+Machine probes run every second without overlapping on a host; context snapshots refresh
+every two seconds; quota reads run every 30 seconds. Missing readings stay unknown. Quota
+values come from native account data, never terminal conversation text: Claude Code's from
+`~/.claude/herdr-usage.json` (written by the status line `scripts/install-claude-usage.ps1`
+installs), Codex's from `codex app-server`.
 
 ## Validation
 

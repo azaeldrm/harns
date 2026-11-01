@@ -1,9 +1,9 @@
 import { View, div } from 'gpui-kit';
-import { machines, spaces, agents, focused, exec, hc, shared, setShared, window as appWindow } from 'herdr';
-import { windowsProbe, linuxProbe } from './probes.js';
+import { machines, spaces, agents, focused, shared, setShared } from 'herdr';
+import { PLATFORMS, platformOf, forgetPlatform, runOn, localMachineName } from './platforms.js';
+import { gpuLines } from './gpus.js';
 
 const key = name => name ?? '@local';
-const LOCAL_MACHINE_LABEL = 'azael-pc';
 const valid = n => typeof n === 'number' && Number.isFinite(n);
 export function activeMachine() {
   const focus = focused();
@@ -102,10 +102,14 @@ function usageFromClaude(result) {
 
 export default class MachineStats extends View {
   init(_props, cx) {
-    setShared('machine.local-label', LOCAL_MACHINE_LABEL);
+    const label = () => cx => cx.spawn(async () => {
+      const name = await localMachineName();
+      if (shared('machine.local-label') !== name) setShared('machine.local-label', name);
+    });
+    label()(cx);
+    cx.timer.every(30000, label());
     this.samples = {};
     this.pending = {};
-    this.providers = {};
     this.raw = {};
     this.usage = {};
     this.usageAt = {};
@@ -130,32 +134,28 @@ export default class MachineStats extends View {
       this.pending[id] = true;
       cx.spawn(async cx => {
         try {
-          const providers = this.providers[id] ? [this.providers[id]]
-            : machine.name === null && appWindow().platform === 'windows' ? ['windows'] : ['linux', 'windows'];
-          let sample;
-          for (const provider of providers) {
-            try {
-              const result = provider === 'windows'
-                ? await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', windowsProbe], { on: machine.name })
-                : await exec('python3', ['-c', linuxProbe], { on: machine.name });
-              if (result.code !== 0) throw new Error('Probe failed');
-              sample = JSON.parse(result.stdout.trim());
-              if (!valid(sample.memory) || !Array.isArray(sample.gpu)) throw new Error('Invalid sample');
-              if (sample.cpuRaw) {
-                const previous = this.raw[id];
-                const now = { idle: Number(sample.cpuRaw.idle), time: Number(sample.cpuRaw.time) };
-                const elapsed = previous ? now.time - previous.time : 0;
-                const idle = previous ? now.idle - previous.idle : -1;
-                sample.cpu = elapsed > 0 && idle >= 0 && idle <= elapsed
-                  ? Math.max(0, Math.min(100, 100 * (1 - idle / elapsed))) : null;
-                this.raw[id] = now;
-              }
-              this.providers[id] = provider;
-              break;
-            } catch { sample = null; }
-          }
-          this.samples[id] = sample ? { ...sample, at: Date.now() } : { error: 'Stats unavailable \u00b7 Windows or Linux + Python 3 required' };
-          if (!sample) delete this.providers[id];
+          const platform = await platformOf(machine.name);
+          let sample = null;
+          try {
+            const result = await runOn(machine.name, PLATFORMS[platform].probe());
+            if (result.code !== 0) throw new Error('Probe failed');
+            sample = JSON.parse(result.stdout.trim());
+            if (!valid(sample.memory)) throw new Error('Invalid sample');
+            sample.gpu = gpuLines(sample.gpus);
+            delete sample.gpus;
+            if (sample.cpuRaw) {
+              const previous = this.raw[id];
+              const now = { idle: Number(sample.cpuRaw.idle), time: Number(sample.cpuRaw.time) };
+              const elapsed = previous ? now.time - previous.time : 0;
+              const idle = previous ? now.idle - previous.idle : -1;
+              sample.cpu = elapsed > 0 && idle >= 0 && idle <= elapsed
+                ? Math.max(0, Math.min(100, 100 * (1 - idle / elapsed))) : null;
+              this.raw[id] = now;
+            }
+          } catch { sample = null; }
+          this.samples[id] = sample ? { ...sample, at: Date.now() }
+            : { error: platform === 'windows' ? 'Stats unavailable' : 'Stats unavailable \u00b7 Python 3 required' };
+          if (!sample) forgetPlatform(machine.name);
         } catch { this.samples[id] = { error: 'Machine unavailable' }; }
         finally {
           this.pending[id] = false;
@@ -179,18 +179,16 @@ export default class MachineStats extends View {
         const entries = await Promise.all(['Claude', 'Codex'].map(async tool => {
           if (tool === 'Claude') {
             try {
-              const result = machineName === null
-                ? await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-Content -LiteralPath (Join-Path $env:USERPROFILE ".claude\\herdr-usage.json") -Raw'])
-                : await hc(['exec', '--on', machineName, 'sh', '-lc', 'cat "$HOME/.claude/herdr-usage.json"']);
+              const platform = await platformOf(machineName);
+              const result = await runOn(machineName, PLATFORMS[platform].readHome('.claude/herdr-usage.json'));
               const usage = usageFromClaude(result);
               if (usage) return [tool, usage];
             } catch {}
           }
           if (tool === 'Codex') {
             try {
-              const result = machineName === null
-                ? await exec('python', ['-c', CODEX_USAGE_PROBE])
-                : await hc(['exec', '--on', machineName, 'python3', '-c', CODEX_USAGE_PROBE]);
+              const platform = await platformOf(machineName);
+              const result = await runOn(machineName, [PLATFORMS[platform].python, ['-c', CODEX_USAGE_PROBE]]);
               const usage = usageFromCodex(result);
               if (usage) return [tool, usage];
             } catch {}

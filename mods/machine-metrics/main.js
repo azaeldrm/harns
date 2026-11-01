@@ -5,7 +5,7 @@ import { shared, theme, props } from 'herdr';
 const valid = n => typeof n === 'number' && Number.isFinite(n);
 
 export function machineMetrics(machine, compact, t = theme()) {
-  const name = machine ?? shared('machine.local-label') ?? 'azael-pc';
+  const name = machine ?? shared('machine.local-label') ?? 'This computer';
   const sample = (shared('machine.stats') ?? {})[machine ?? '@local'];
   const fresh = sample && !sample.error && Date.now() - sample.at <= 15000;
   const gpus = (sample?.gpu ?? []).map(line => {

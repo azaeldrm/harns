@@ -20,6 +20,7 @@ for percent in range(101):
 (target / 'spinner.svg').write_text(head + track + '<path d="M12 2.6a9.4 9.4 0 0 1 9.4 9.4"/></svg>\n', encoding='utf-8')
 
 # The bottom bar owns collection now that the duplicate sidebar Usage UI is gone.
-for source, target in [('main.js', 'machine-data.js'), ('probes.js', 'probes.js')]:
+for source, target in [('main.js', 'machine-data.js'), ('probes.js', 'probes.js'),
+                       ('platforms.js', 'platforms.js'), ('gpus.js', 'gpus.js')]:
     (repo / 'mods/workspace-status-machine' / target).write_text(
         (repo / 'mods/machine-stats' / source).read_text(encoding='utf-8'), encoding='utf-8')

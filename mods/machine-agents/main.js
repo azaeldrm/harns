@@ -8,7 +8,7 @@ import { machines, agents, terminals, panes, focused, spaces, run, theme, shared
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
 
-const localMachineLabel = () => shared("machine.local-label") ?? "azael-pc";
+const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
 const statsFor = (machine, t, compact = false) => machineMetrics(machine, compact, t);
 
 function find(node, id) {
