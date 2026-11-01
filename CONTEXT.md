@@ -14,7 +14,7 @@ readings when the machine is unavailable.
 Run `python scripts/install-context.py` locally or
 `python scripts/install-context.py --on MACHINE` for a connected machine.
 The installer backs up Codex and Claude configuration before changing it.
-Apply sidebar files with `scripts/apply-style.ps1` as usual.
+Install the sidebar files with `install.ps1` as usual.
 
 - Pi: a separate global extension publishes `getContextUsage()` counters every
   second. Existing sessions need a literal `/reload` in their terminal. Do not

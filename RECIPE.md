@@ -15,7 +15,7 @@ Canonical generated-code inputs:
 
 Run `python scripts/build-mods.py` after changing these sources. Do not hand-edit
 `machine-agents/machine-metrics.js`, `context-probe.js`, or `context-rings/`.
-The apply-style script rebuilds these before deployment.
+`install.ps1` rebuilds these before installing.
 
 Preserve fixed footer rows in both sidebar widths, centered compact columns,
 per-machine grouping, matching context/spinner geometry and unknown readings.
