@@ -195,6 +195,7 @@
                     "color":  "#00000000"
                 },
     "titlebar":  "none",
+    "preview":  "layouts/herdr-harness.png",
     "traffic_lights":  [
                            12,
                            16

@@ -16,6 +16,7 @@
 !/layouts/
 /layouts/*
 !/layouts/herdr-harness.json
+!/layouts/herdr-harness.png
 !/mods/
 /mods/*
 !/mods/harness-chrome/

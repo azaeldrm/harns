@@ -42,6 +42,7 @@ if (-not $inPlace) {
 
   $layoutTarget = Join-Path $herdrHome 'layouts\herdr-harness.json'
   if (Test-Path -LiteralPath $layoutTarget) { Copy-Item -LiteralPath $layoutTarget -Destination "$layoutTarget.before-install-$stamp" }
+  Copy-Item -LiteralPath (Join-Path $repo 'layouts\herdr-harness.png') -Destination (Join-Path $herdrHome 'layouts\herdr-harness.png') -Force
   Copy-Item -LiteralPath (Join-Path $repo 'layouts\herdr-harness.json') -Destination $layoutTarget -Force
 
   $programsTarget = Join-Path $herdrHome 'programs.json'

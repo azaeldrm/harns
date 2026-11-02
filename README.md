@@ -1,98 +1,49 @@
 # Harness
 
-A herdr layout with a sidebar organized by machine: agent sessions with status and
-context rings, CPU/RAM/NVIDIA GPU load rings, Claude and Codex account usage in the
-status bar, and its own look (the `harness` theme, logo, tabs and pane headers).
-Everything uses herdr's existing machine connections; no HTTP endpoint is needed.
+A herdr layout organized by machine: each machine's CPU, RAM and GPU load and its agents
+in the sidebar, agent tabs as a chat or a terminal, and Claude Code and Codex quota in the
+status bar. Everything goes through herdr's own machine connections.
 
-## What's in this repository
+![Harness](preview.png)
 
-It is laid out like the herdr home (`~/.config/herdr-app`):
-
-| Path | What it is |
-|---|---|
-| `layouts/herdr-harness.json` | the layout |
-| `mods/harness-chrome`, `harness-tabs`, `harness-pane` | branding, sidebar toggle, tab and pane styling |
-| `mods/machine-agents` | machine groups, add-agent buttons, agent navigation, status and context rings |
-| `mods/machine-metrics` | CPU/RAM/per-GPU renderer (a built copy lives in `machine-agents`) |
-| `mods/machine-stats` | machine probes and Claude/Codex account quota collection |
-| `mods/workspace-status-machine` | the status bar: machine, folder and account usage bars |
-| `mods/machine-new-menu`, `machine-spaces` | agent creation and the optional Spaces list |
-| `themes/harness.json` | the theme |
-| `brand-assets/`, `programs.json` | program icons (Codex knot, tinting for Claude Code, Codex and Pi) |
-| `scripts/` | build and context-collection scripts |
-
-The layout's chat panel and Chat/Terminal toggle come from
-[herdr-chat](https://github.com/azaeldrm/herdr-chat), installed separately.
+[RECIPE.md](RECIPE.md) describes it in full, as a brief to build it from.
 
 ## Install
 
-Requires the Herdr app and Python 3 (for building, context collection and Linux probing).
+Needs the Herdr app, Python 3 on each machine, and
+[herdr-chat](https://github.com/azaeldrm/herdr-chat) installed first.
 
-1. Install herdr-chat first.
-2. From a clone of this repository, run `./install.ps1`. It builds the generated mod
-   files, copies the mods, theme, brand assets and layout into `~/.config/herdr-app`
-   (keeping a copy of any existing `herdr-harness` layout), merges the program icons into
-   your `programs.json`, checks every mod, and switches to the layout. It won't switch if
-   a mod the layout uses is missing, and says which. `-NoSwitch` installs without
-   switching.
+Ask your agent to add this layout, or run `./install.ps1` from a clone (Windows). It
+builds the generated files, copies the mods, theme, assets and layout into
+`~/.config/herdr-app`, merges the program icons into your `programs.json`, checks every
+mod and switches to `herdr-harness` (`-NoSwitch` to skip). `ctrl-shift-l` switches back.
 
-For per-session context rings, run `python scripts/install-context.py` locally and
-`python scripts/install-context.py --on MACHINE` for each connected machine. See
-[CONTEXT.md](CONTEXT.md) for hooks, reload requirements and limitations.
+Optional:
 
-## How this repository is kept
+- **Claude Code quota:** `scripts/install-claude-usage.ps1` adds a status line that
+  records it.
+- **Context rings:** `python scripts/install-context.py`, plus `--on MACHINE` for each
+  connected machine. See [CONTEXT.md](CONTEXT.md).
+- **This computer's name:** it shows the computer's own name. For a nickname, put
+  `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
-On the machine it's made on, the repository is the herdr home itself. Herdr reads and
-writes these files where it always does, and an allow-list `.gitignore` tracks only the
-harness files, so whatever changes there, by hand, by an agent or by herdr, shows up in
-`git status`. There is one copy and nothing to sync. Running `install.ps1` there only
-rebuilds the generated files and checks the mods.
+## Platforms
 
-Generated files: `scripts/build-mods.py` writes `mods/machine-agents/machine-metrics.js`,
-`context-probe.js` and `context-rings/`, and `mods/workspace-status-machine/machine-data.js`
-and `probes.js`, from `mods/machine-metrics`, `scripts/context-relay.py` and
-`mods/machine-stats`. Edit the sources, then run it (or `install.ps1`).
+| | CPU and RAM | GPUs |
+|---|---|---|
+| Windows | PowerShell counters | NVIDIA |
+| Linux | Python 3, `/proc` | NVIDIA |
+| macOS | Python 3, `top` and `vm_stat` (untested) | none yet |
 
-## Your machine's name
+Each machine's platform is detected once (`mods/machine-stats/platforms.js`). GPU vendors
+are entries in `mods/machine-stats/gpus.js`; AMD, Intel and Apple are there to fill in.
 
-The sidebar and status bar call this computer by its own name (`hostname`; on macOS the
-Computer Name), or "This computer" if that can't be read. To show a nickname instead, put
-it in `~/.config/herdr-app/harness.json`, a per-person file that isn't part of the layout:
+## Working on it
 
-```json
-{ "localMachineName": "my-pc" }
-```
+Here the repository is the herdr home itself: an allow-list `.gitignore` tracks only
+these files, so there's one copy and herdr's edits show up in `git status`.
 
-It's re-read every 30 seconds. Other machines show the names they have in herdr.
-
-## How it measures
-
-Each machine is probed through herdr's own connection to it, with no listener. What runs
-depends on its platform (`mods/machine-stats/platforms.js`): this computer's comes from
-herdr; another machine is asked once with `uname -s`, and one without `uname` is Windows.
-
-| Platform | CPU and RAM | Python | Reading a home file | Name |
-|---|---|---|---|---|
-| Windows | PowerShell, CIM counters (CPU from two samples) | `python` | PowerShell `Get-Content` | `hostname` |
-| Linux | Python 3, `/proc` | `python3` | `sh` | `hostname` |
-| macOS | Python 3, `top`, `vm_stat`, `sysctl` (not yet run on a Mac) | `python3` | `sh` | `scutil --get ComputerName` |
-
-GPUs come from a registry of vendors (`mods/machine-stats/gpus.js`): each gives the
-command that lists its GPUs' load on each platform and a parser for its output, and every
-probe runs the commands its platform has. NVIDIA (`nvidia-smi`, Windows and Linux) is filled
-in; AMD, Intel and Apple have empty entries to fill in. One ring is shown per GPU.
-
-Machine probes run every second without overlapping on a host; context snapshots refresh
-every two seconds; quota reads run every 30 seconds. Missing readings stay unknown. Quota
-values come from native account data, never terminal conversation text: Claude Code's from
-`~/.claude/herdr-usage.json` (written by the status line `scripts/install-claude-usage.ps1`
-installs), Codex's from `codex app-server`.
-
-## Validation
-
-Run `herdr-app check <absolute mod folder>` after edits, then inspect `herdr-app status`
-and `herdr-app shot`. Collector tests:
-`python -m unittest discover -s tests -p test_context_relay.py`.
-
-UI changes are hot-reloaded; there's no need to restart the app to apply them.
+- Edit the sources, then run `python scripts/build-mods.py`. It writes the copies herdr
+  needs (see RECIPE.md, Watch out).
+- Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
+- Collector tests: `python -m unittest discover -s tests -p test_context_relay.py`.
