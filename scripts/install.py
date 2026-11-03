@@ -13,7 +13,7 @@ import json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 
 MODS = ['harness-chrome', 'harness-pane', 'harness-tabs', 'machine-agents', 'machine-metrics',
-        'machine-new-menu', 'machine-spaces', 'machine-stats', 'workspace-status-machine']
+        'machine-new-menu', 'machine-stats', 'workspace-status-machine']
 LAYOUT = 'herdr-harness'
 
 
