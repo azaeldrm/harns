@@ -3,7 +3,7 @@
 
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout } from "herdr";
+import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
@@ -77,8 +77,14 @@ function icon(p, size, color) {
 
 export default class Agents extends View {
   init(_props, cx) {
-    if (props()?.sortMenu) return;
+    if (props()?.sortMenu || props()?.loginBar) return;
     this.folded = new Set();
+    // Other machines as hc sees them (state "needs_login", "reconnecting", ...), and
+    // which ones a retry is running for: name -> { busy }.
+    this.hosts = {};
+    this.retrying = {};
+    this.refreshHosts(cx);
+    cx.timer.every(15000, cx => this.refreshHosts(cx));
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
@@ -137,6 +143,99 @@ export default class Agents extends View {
     return sawDone ? RANK.done : RANK[a.status] ?? 0;
   }
 
+  refreshHosts(cx) {
+    cx.spawn(async cx => {
+      try {
+        const r = await hc(["machine", "ls", "--json"]);
+        if (r.code === 0) this.hosts = Object.fromEntries((JSON.parse(r.stdout).machines ?? []).map(m => [m.name, m]));
+      } catch {}
+      cx.notify();
+    });
+  }
+
+  // Retry a machine that isn't connected. `hc machine login` reconnects it; when the
+  // machine wants a password or code, it runs in a terminal in a dialog instead, and
+  // the dialog closes when the login ends.
+  retry(name, cx) {
+    if (this.retrying[name]?.busy) return;
+    this.retrying[name] = { busy: true };
+    cx.notify();
+    cx.spawn(async cx => {
+      const failed = message => notify({ title: `Couldn't reconnect to ${name}`, body: message, level: "error" });
+      try {
+        const r = await hc(["machine", "login", name, "--json"]);
+        let error = null;
+        if (r.code !== 0) {
+          try { error = JSON.parse(r.stdout || r.stderr).error ?? null; } catch {}
+          error ??= { message: (r.stderr || r.stdout || "hc machine login failed").trim() };
+        }
+        if (!error) notify({ title: `Reconnected to ${name}`, level: "success", timeout: 4000 });
+        else if (/terminal/i.test(error.message ?? "") || /types the password/i.test(error.hint ?? "")) await this.loginInTerminal(name, failed);
+        else failed(error.message);
+      } catch (e) {
+        failed(String(e?.message ?? e));
+      }
+      this.retrying[name] = { busy: false };
+      this.refreshHosts(cx);
+      cx.notify();
+    });
+  }
+
+  async loginInTerminal(name, failed) {
+    const slug = name.toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 20);
+    const r = await hc(["run", "--bg", "--json", "--no-parent", "--name", `login-${slug}-${Date.now().toString(36).slice(-5)}`,
+      "--", "hc", "machine", "login", name]).catch(() => null);
+    let address = null;
+    try { address = r?.code === 0 ? JSON.parse(r.stdout).address : null; } catch {}
+    if (!address) return failed(`Couldn't open a terminal for it. Run \`hc machine login ${name}\` in one.`);
+    openOverlay({
+      kind: "dialog",
+      key: `machine-login-${name}`,
+      width: 640,
+      height: 300,
+      layout: {
+        type: "column",
+        children: [
+          { type: "block", size: { px: 34 }, content: { mod: "machine-agents", props: { loginBar: name, terminal: address } } },
+          { type: "block", content: { terminal: address } },
+        ],
+      },
+    });
+  }
+
+  // The login dialog's title bar.
+  loginBar(t) {
+    const { loginBar: name, terminal } = props();
+    return h_flex()
+      .size_full()
+      .px(12)
+      .gap(8)
+      .items_center()
+      .bg(t.chrome ?? t.background)
+      .border_b(1)
+      .border_color(t.border)
+      .text_size(12)
+      .child(svg("mods/harness-chrome/server.svg").size(13).flex_none().text_color(t.dim))
+      .child(div().flex_none().text_color(t.foreground).font_medium().child(`Log in to ${name}`))
+      .child(div().flex_1().min_w(0).truncate().text_color(t.dim).child("Type the password or code below; this closes when it connects."))
+      .child(div()
+        .id("login-close")
+        .size(20)
+        .flex_none()
+        .rounded(5)
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(t.dim)
+        .hover(s => s.bg(t.hover).text_color(t.foreground))
+        .tooltip("Cancel")
+        .on_click(() => {
+          run("terminal.kill", { terminal });
+          closeOverlay(props().overlay);
+        })
+        .child(svg("mods/harness-chrome/x.svg").size(12)));
+  }
+
   sortMenu(t) {
     const on = sortOf().id;
     return v_flex()
@@ -173,8 +272,8 @@ export default class Agents extends View {
     return kids.flatMap((k, i) => {
       const last = i === kids.length - 1;
       return [
-        { t: k, lines: [...lead, last ? "â””" : "â”œ"] },
-        ...this.tree(all, k.address, [...lead, last ? "" : "â”‚"]),
+        { t: k, lines: [...lead, last ? "└" : "├"] },
+        ...this.tree(all, k.address, [...lead, last ? "" : "│"]),
       ];
     });
   }
@@ -199,7 +298,7 @@ export default class Agents extends View {
       .on_click(() => this.peek(k.address))
       .children(s.lines.map(l => div().self_start().mt(-4).w(9).h(17).mr(4).flex_none()
         .when(Boolean(l), el => el.border_l(1.5).border_color(t.input))
-        .when(l === "â””" || l === "â”œ", el => el.border_b(1.5).rounded_bl(6))))
+        .when(l === "└" || l === "├", el => el.border_b(1.5).rounded_bl(6))))
       .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
       .child(div().flex_1().truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
       .child(this.status(t, { status: st }, compact));
@@ -220,7 +319,7 @@ export default class Agents extends View {
     if (a.status === 'idle' && Number.isFinite(context?.percent)) {
       const percent = Math.max(0, Math.min(100, context.percent));
       const counts = Number.isFinite(context.tokens) && Number.isFinite(context.contextWindow)
-        ? ` Â· ${Math.round(context.tokens).toLocaleString()} / ${context.contextWindow.toLocaleString()} tokens` : '';
+        ? ` · ${Math.round(context.tokens).toLocaleString()} / ${context.contextWindow.toLocaleString()} tokens` : '';
       return ring(`ring-${Math.round(percent)}`, percent > 90 ? '#d88179' : t.muted, `Context: ${percent.toFixed(1)}% used${counts}`);
     }
     if (a.status === "idle") return ring('ring-0', t.idle ?? t.dim, 'Context unavailable');
@@ -230,6 +329,7 @@ export default class Agents extends View {
   render(cx) {
     const t = theme();
     if (props()?.sortMenu) return this.sortMenu(t);
+    if (props()?.loginBar) return this.loginBar(t);
     const collapsed = narrow();
     const sort = sortOf();
     let list = agents();
@@ -429,7 +529,28 @@ export default class Agents extends View {
             cx.stop_propagation();
             openOverlay({ mod: "machine-new-menu", kind: "popup", width: 280, height: 500, props: { machine: g.machine.name } });
           })
-          .child(svg("mods/harness-chrome/plus.svg").size(12))));
+          .child(svg("mods/harness-chrome/plus.svg").size(12))))
+        .when(byMachine && Boolean(g.machine?.name) && g.machine?.layout !== "ready", el => {
+          const name = g.machine.name;
+          const busy = Boolean(this.retrying[name]?.busy);
+          const state = (this.hosts[name]?.state ?? g.machine.layout).replace(/_/g, " ");
+          return el.child(div()
+            .id(`retry-${g.id}`)
+            .size(14)
+            .flex_none()
+            .rounded(5)
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(busy ? t.working ?? t.dim : t.dim)
+            .hover(s => s.bg(t.hover).text_color(t.foreground))
+            .tooltip(busy ? `Reconnecting to ${name}…` : `${name}: ${state}. Click to reconnect.`)
+            .on_click((_e, cx) => {
+              cx.stop_propagation();
+              this.retry(name, cx);
+            })
+            .child(svg(`mods/harness-chrome/${busy ? "spinner" : "rotate-cw"}.svg`).size(12)));
+        });
     };
     const rows = collapsed
       ? machines().filter(machine => !machine.temporary).flatMap((machine) => [
@@ -442,7 +563,7 @@ export default class Agents extends View {
         ...(byMachine && index > 0 ? [div().h(12).flex_none()] : []),
         header(g),
         ...(byMachine ? [statsFor(g.machine?.name ?? null, t)] : []),
-        ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids) : byMachine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : g.machine?.layout === "loading" ? "Connectingâ€¦" : "Offline")] : []),
+        ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids) : byMachine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
       ]);
 
     return v_flex()
