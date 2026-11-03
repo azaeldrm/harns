@@ -95,11 +95,12 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   `workspace-status-machine`, `context-relay.py` into `context-probe.js`. Edit the
   sources and run it.
 - The chat and the toggle need herdr-chat; without it those blocks show errors.
-- Claude quota needs the status line from `scripts/install-claude-usage.ps1`; context rings
-  need `scripts/install-context.py` on each machine. Without them those stay empty.
+- Claude quota and context rings need `scripts/install-context.py` on each machine (on
+  Windows, `scripts/install-claude-usage.ps1` also records quota). Without them those stay empty.
 - Remote machines need Python 3. GPUs are NVIDIA only (AMD, Intel and Apple are empty
   entries in `machine-stats/gpus.js`). The macOS probe has never run on a Mac.
-- `install.ps1` is PowerShell, so installing by script is Windows only.
+- The installer is `scripts/install.py`; `install.sh` and `install.ps1` only find Python and
+  run it, so keep install logic there.
 - `harness-pane` (a pane header) and `machine-spaces` (a Spaces list) are installed but
   the layout doesn't place them.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
