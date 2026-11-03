@@ -101,8 +101,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   entries in `machine-stats/gpus.js`). The macOS probe has never run on a Mac.
 - The installer is `scripts/install.py`; `install.sh` and `install.ps1` only find Python and
   run it, so keep install logic there.
-- `harness-pane` (a pane header) and `machine-spaces` (a Spaces list) are installed but
-  the layout doesn't place them.
+- `harness-pane` (a pane header) is installed but the layout doesn't place it.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
   its rail.
 
