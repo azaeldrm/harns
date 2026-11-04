@@ -22,8 +22,8 @@ configuration before changing it, and creates Claude's settings file if it has n
 - Claude: the status-line relay captures session ID and `context_window` fields.
   An existing custom status-line command is saved and forwarded the same input;
   its output is preserved. Early null percentages remain unknown. The same relay
-  records the quota the usage meter shows (`~/.claude/herdr-usage.json`); a window
-  whose reset time has passed reads as 0% until the next update.
+  records the quota the usage meter shows (`~/.claude/herdr-usage.json`), keeping the
+  newer reading of each window so an idle session's redraw can't replace it.
 - Codex: a notify hook captures the exact thread ID after a response. The reader
   follows that session's rollout token-count events using `last_token_usage`
   and `model_context_window`, never cumulative session token expenditure.
