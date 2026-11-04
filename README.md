@@ -49,4 +49,5 @@ these files, so there's one copy and herdr's edits show up in `git status`.
 - Edit the sources, then run `python scripts/build-mods.py`. It writes the copies herdr
   needs (see RECIPE.md, Watch out).
 - Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
-- Collector tests: `python -m unittest discover -s tests -p test_context_relay.py`.
+- Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs` and
+  `node tests/probes.mjs`.

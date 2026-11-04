@@ -14,6 +14,27 @@ def save(tool, payload):
     temp.write_text(json.dumps(dict(payload, address=address, tool=tool, updatedAt=time.time())), encoding='utf-8')
     temp.replace(target)
 
+def newer_window(a, b):
+    """The newer of two readings of one usage window: a later reset is a newer window, and within
+    one window usage only goes up, so an idle session's older reading never replaces a newer one."""
+    if not a or not b:
+        return a or b
+    if (a.get('resets_at') or 0) != (b.get('resets_at') or 0):
+        return a if (a.get('resets_at') or 0) > (b.get('resets_at') or 0) else b
+    return a if (a.get('used_percentage') or 0) >= (b.get('used_percentage') or 0) else b
+
+def save_quota(limits):
+    target = Path.home() / '.claude' / 'herdr-usage.json'
+    try:
+        before = json.loads(target.read_text(encoding='utf-8-sig'))
+    except (OSError, ValueError):
+        before = {}
+    temp = target.with_suffix('.tmp')
+    temp.write_text(json.dumps(dict(updatedAt=time.time(),
+                                    fiveHour=newer_window(limits.get('five_hour'), before.get('fiveHour')),
+                                    sevenDay=newer_window(limits.get('seven_day'), before.get('sevenDay')))), encoding='utf-8')
+    temp.replace(target)
+
 def codex_usage(snapshot):
     sid = snapshot.get('sessionId', '')
     if not re.fullmatch(r'[0-9a-fA-F-]{36}', sid):
@@ -62,10 +83,7 @@ if __name__ == '__main__':
                  contextWindow=context.get('context_window_size'), tokens=tokens if current else None))
             limits = data.get('rate_limits')
             if limits:
-                target = Path.home() / '.claude' / 'herdr-usage.json'
-                temp = target.with_suffix('.tmp')
-                temp.write_text(json.dumps(dict(updatedAt=time.time(), fiveHour=limits.get('five_hour'), sevenDay=limits.get('seven_day'))), encoding='utf-8')
-                temp.replace(target)
+                save_quota(limits)
             original = ROOT.parent / 'claude-statusline-original.json'
             if original.exists():
                 import subprocess

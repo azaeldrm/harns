@@ -3,8 +3,15 @@ import { h_flex } from "gpui-base";
 import { spaces, agents, panes, focused, theme, run, window, shared } from "herdr";
 
 import MachineData from "./machine-data.js";
+import { current } from "./usage.js";
 
 export default class WorkspaceStatus extends MachineData {
+  /** herdr redraws a mod only when it asks: once a second, for the shown machine, folder and branch (the probes run less often). */
+  init(props, cx) {
+    super.init(props, cx);
+    cx.timer.every(1000, cx => cx.notify());
+  }
+
   render() {
     const t = theme();
     const all = spaces();
@@ -19,15 +26,15 @@ export default class WorkspaceStatus extends MachineData {
     const pane = allPanes.find(p => p.pane === focus?.pane) ?? allPanes.find(p => p.focused);
     const cwd = focus?.cwd ?? pane?.cwd ?? space?.folder;
     const folder = String(cwd ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? "";
-    const usage = (shared('machine.usage') ?? {})[machine ?? '@local'] ?? {};
+    const usage = shared('machine.usage') ?? {};
+    const clock = epoch => new Date(epoch * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const usageGroup = name => {
-      const limits = [usage[name], usage[name]?.secondary].filter(Boolean);
-      const bar = (label, pattern, opacity) => {
-        const limit = limits.find(item => pattern.test(item.window ?? ''));
+      const bar = (label, windowName, opacity) => {
+        const limit = current(usage[name]?.[windowName]);
         const known = Number.isFinite(limit?.used);
-        const percent = known ? Math.max(0, Math.min(100, limit.used)) : 0;
+        const percent = known ? limit.used : 0;
         return h_flex().flex_none().gap(4).items_center()
-          .tooltip(`${name} ${label}: ${known ? `${Math.round(percent)}% used` : 'unavailable'}${limit?.reset ? ` · resets ${limit.reset}` : ''}`)
+          .tooltip(`${name} ${label}: ${known ? `${Math.round(percent)}% used` : 'unavailable'}${limit?.resetsAt ? ` · resets ${clock(limit.resetsAt)}` : ''}`)
           .child(div().w(14).flex_none().text_size(9).text_color(t.dim).child(label))
           .child(div().w(44).h(4).rounded(2).bg(t.border)
             .when(known, el => el.child(div().w(`${percent}%`).h(4).rounded(2).bg(percent > 90 ? '#d88179' : t.accent).opacity(percent > 90 ? 1 : opacity))));
@@ -40,7 +47,7 @@ export default class WorkspaceStatus extends MachineData {
           cx.notify();
         })
         .child(svg(name === 'Claude' ? 'icons/claude.svg' : 'brand-assets/chatgpt-knot.svg').size(14).flex_none().text_color(t.muted))
-        .child(weekly ? bar('7d', /^(7d|weekly)$/i, 0.5) : bar('5h', /^(5h|5-hour)$/i, 1));
+        .child(weekly ? bar('7d', 'sevenDay', 0.5) : bar('5h', 'fiveHour', 1));
     };
     const label = (icon, text) => h_flex().gap(6).items_center().child(svg(`mods/harness-chrome/${icon}.svg`).size(13)).child(text);
     return h_flex().size_full().px(14).gap(16).items_center().bg(t.surface).text_size(11.8).text_color(t.muted)
