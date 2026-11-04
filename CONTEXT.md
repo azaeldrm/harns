@@ -11,18 +11,19 @@ readings when the machine is unavailable.
 
 ## Installation
 
-Run `python scripts/install-context.py` locally or
-`python scripts/install-context.py --on MACHINE` for a connected machine.
-The installer backs up Codex and Claude configuration before changing it.
-Install the sidebar files with `install.sh` or `install.ps1` as usual.
+`install.sh` and `install.ps1` install the relays on this computer (`--no-relays` to skip).
+For a connected machine run `python scripts/install-context.py --on MACHINE`; it needs
+Python 3 there (`python3` or `python`). The installer backs up Codex and Claude
+configuration before changing it, and creates Claude's settings file if it has none.
 
 - Pi: a separate global extension publishes `getContextUsage()` counters every
   second. Existing sessions need a literal `/reload` in their terminal. Do not
   use `hc send` for slash commands: its sender envelope turns them into messages.
 - Claude: the status-line relay captures session ID and `context_window` fields.
   An existing custom status-line command is saved and forwarded the same input;
-  its output is preserved. Early null percentages remain unknown. Windows can
-  also use the updated original PowerShell usage relay.
+  its output is preserved. Early null percentages remain unknown. The same relay
+  records the quota the usage meter shows (`~/.claude/herdr-usage.json`); a window
+  whose reset time has passed reads as 0% until the next update.
 - Codex: a notify hook captures the exact thread ID after a response. The reader
   follows that session's rollout token-count events using `last_token_usage`
   and `model_context_window`, never cumulative session token expenditure.

@@ -78,9 +78,11 @@ function usageFromClaude(result) {
   if (result.code !== 0) return null;
   try {
     const snapshot = JSON.parse(result.stdout.trim());
+    const now = Date.now() / 1000;
+    const current = value => valid(value?.resets_at) && value.resets_at <= now ? { ...value, used_percentage: 0, resets_at: null } : value;
     const windows = [
-      { value: snapshot.fiveHour, window: '5h' },
-      { value: snapshot.sevenDay, window: '7d' },
+      { value: current(snapshot.fiveHour), window: '5h' },
+      { value: current(snapshot.sevenDay), window: '7d' },
     ].filter(item => valid(item.value?.used_percentage)).sort((a, b) => b.value.used_percentage - a.value.used_percentage);
     const primary = windows[0];
     const secondary = windows[1];
