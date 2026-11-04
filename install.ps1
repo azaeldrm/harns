@@ -10,8 +10,9 @@ it only regenerates the built files and checks the mods.
 The work is done by scripts/install.py, which install.sh runs on Linux and macOS.
 
 -NoSwitch installs without switching to the layout.
+-NoRelays leaves Claude Code's, Codex's and Pi's settings as they are.
 #>
-param([switch]$NoSwitch)
+param([switch]$NoSwitch, [switch]$NoRelays)
 $ErrorActionPreference = 'Stop'
 
 $python = (Get-Command python -ErrorAction SilentlyContinue).Source
@@ -20,5 +21,6 @@ if (-not $python) { throw 'Python 3 was not found. Install it first.' }
 
 $arguments = @((Join-Path $PSScriptRoot 'scripts\install.py'))
 if ($NoSwitch) { $arguments += '--no-switch' }
+if ($NoRelays) { $arguments += '--no-relays' }
 & $python @arguments
 if ($LASTEXITCODE -ne 0) { throw "Installing the Harness layout failed (exit code $LASTEXITCODE)." }
