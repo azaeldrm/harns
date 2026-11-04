@@ -75,6 +75,9 @@ function icon(p, size, color) {
   return p.icon.endsWith('.svg') ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
+/** How often each machine's context snapshots are read for the rings, in ms (the status bar probes as often). */
+const CONTEXT_EVERY = 10000;
+
 export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu || props()?.loginBar) return;
@@ -89,7 +92,7 @@ export default class Agents extends View {
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
     cx.timer.every(1000, (cx) => cx.notify());
-    cx.timer.every(2000, cx => refreshContext(this, cx));
+    cx.timer.every(CONTEXT_EVERY, cx => refreshContext(this, cx));
     refreshContext(this, cx);
   }
 

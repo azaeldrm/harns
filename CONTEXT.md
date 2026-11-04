@@ -6,7 +6,7 @@ available. Unknown readings stay muted; they are never displayed as 0%.
 
 Snapshots are keyed by `HC_TERMINAL_ID`, qualified with the machine name by the
 sidebar, and checked against the terminal creation time. Folder names are not
-used for session matching. The sidebar refreshes every two seconds and clears
+used for session matching. The sidebar refreshes every 10 seconds and clears
 readings when the machine is unavailable.
 
 ## Installation
