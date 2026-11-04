@@ -1,13 +1,17 @@
 """Install the Harness layout into herdr, on Windows, Linux or macOS.
 
 Builds the generated files, copies the mods, theme, brand assets and layout into the
-herdr home, merges the program icons into programs.json, checks every mod and switches
-to the herdr-harness layout. install.sh and install.ps1 both run this.
+herdr home, merges the program icons into programs.json, checks every mod, installs this
+machine's relays (scripts/install-context.py: Claude's usage and context, Codex's and
+Pi's context) and switches to the herdr-harness layout. install.sh and install.ps1 both
+run this.
 
 If this clone is the herdr home itself, nothing is copied: it only regenerates the
 built files and checks the mods.
 
   --no-switch   install without switching to the layout
+  --no-relays   leave Claude Code's, Codex's and Pi's settings as they are (the usage
+                meter and context rings then stay empty on this machine)
 """
 import json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
@@ -71,6 +75,7 @@ def merge_programs(ours_path, theirs_path):
 
 def main():
     switch = '--no-switch' not in sys.argv[1:] and '-NoSwitch' not in sys.argv[1:]
+    relays = '--no-relays' not in sys.argv[1:] and '-NoRelays' not in sys.argv[1:]
     repo = Path(__file__).resolve().parent.parent
     home = herdr_home()
     app = find_app()
@@ -102,6 +107,9 @@ def main():
             print(result.stdout + result.stderr, file=sys.stderr)
             fail(f'herdr-app check failed for mods/{mod}')
     print(f'Checked {len(MODS)} mods in {home / "mods"}')
+
+    if relays and subprocess.run([sys.executable, str(repo / 'scripts' / 'install-context.py')]).returncode != 0:
+        fail('Installing the relays failed (scripts/install-context.py). --no-relays skips them.')
 
     layout = (repo / 'layouts' / f'{LAYOUT}.json').read_text(encoding='utf-8')
     needed = sorted(set(re.findall(r'"mod":\s*"([^"]+)"', layout)))
