@@ -50,8 +50,13 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   pinned agents sit in a Pinned group on top. The sort button offers Priority (Needs you,
   Done, Working, Idle sections), Grouped by space and Grouped by machine. Group headers
   and parents with sub-agents fold. A machine's + opens the agents installed there.
-- **Rings:** CPU, RAM and GPU refresh every second; hover one for its percentage. Missing
+- **Rings:** CPU, RAM and GPU refresh every 10 seconds; hover one for its percentage. Missing
   readings stay empty, never 0%.
+- **Usage meters:** Claude's and Codex's limits belong to the account, so the bar shows one
+  reading per agent on every machine: the newest of each window (5h, 7d) across every
+  machine's last reading, kept in shared `machine.usage` across restarts. A later reset is a
+  newer window; within one window the higher reading is the newer. A window past its reset
+  reads 0%. A machine where an agent never ran adds nothing.
 - **Tab bar:** click selects, double-click renames, drag reorders, right-click opens the
   tab menu, the scroll wheel moves between tabs. Files and Changes toggle the right panel,
   remembered per space.
@@ -80,9 +85,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   - `herdr-chat` (separate repo): the chat panel and the pane header with the toggle.
   - Shipped: `files`, `changes`, `picker`, `machine-add`, `new-menu`, `menu`.
 - **Programs it runs** through `exec(..., {on: machine})`: per platform
-  (`machine-stats/platforms.js`) a PowerShell or Python 3 probe, `nvidia-smi`,
-  `uname -s`, `hostname`, `codex app-server` for Codex quota, and a read of
-  `~/.claude/herdr-usage.json` for Claude quota. Context rings read snapshots written by
+  (`machine-stats/platforms.js`) a PowerShell or Python 3 probe every 10 seconds, which
+  also reads the quota (`~/.claude/herdr-usage.json`, from the relay, and the `rate_limits`
+  of the newest event in Codex's latest session logs; nothing runs Codex), `nvidia-smi`,
+  `uname -s` and `hostname`. Context rings read snapshots written by
   `scripts/context-relay.py`.
 - **Art:** `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources), monochrome SVG
   icons in `harness-chrome` and `machine-stats`, 101 generated context rings, Windows
@@ -95,8 +101,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   `workspace-status-machine`, `context-relay.py` into `context-probe.js`. Edit the
   sources and run it.
 - The chat and the toggle need herdr-chat; without it those blocks show errors.
-- Claude quota and context rings need `scripts/install-context.py` on each machine (on
-  Windows, `scripts/install-claude-usage.ps1` also records quota). Without them those stay empty.
+- Claude quota and context rings need the relays (`scripts/install-context.py`) on each
+  machine: the installer sets them up on this computer, `--on MACHINE` on the others.
+  Without them those stay empty. Claude writes its quota only while a session redraws its
+  status line, so a window past its reset time reads as 0%.
 - Remote machines need Python 3. GPUs are NVIDIA only (AMD, Intel and Apple are empty
   entries in `machine-stats/gpus.js`). The macOS probe has never run on a Mac.
 - The installer is `scripts/install.py`; `install.sh` and `install.ps1` only find Python and

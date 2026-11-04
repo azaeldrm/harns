@@ -1,6 +1,7 @@
 #!/bin/sh
 # Installs the Harness layout into herdr (Linux and macOS). See scripts/install.py.
-# --no-switch installs without switching to the layout.
+# --no-switch installs without switching to the layout; --no-relays leaves Claude Code's,
+# Codex's and Pi's settings as they are.
 set -e
 for python in python3 python; do
   if command -v "$python" >/dev/null 2>&1; then

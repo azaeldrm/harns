@@ -2,34 +2,23 @@ import { exec, appHome, readTextFile, window as appWindow } from 'herdr';
 import { windowsProbe, linuxProbe, macosProbe } from './probes.js';
 import { gpuQueries } from './gpus.js';
 
-const home = path => `"$HOME/${path}"`;
-
 /**
  * What each platform runs for machine-stats. Every entry gives:
- * - `probe()`: the command (`[program, args]`) that prints a CPU/RAM/GPU sample (probes.js);
- * - `python`: the Python 3 command there;
- * - `readHome(path)`: the command that prints a file under the home folder;
+ * - `probe()`: the command (`[program, args]`) that prints a CPU/RAM/GPU and usage sample (probes.js);
  * - `hostname`: the command that prints the computer's name.
  * To support another platform, add an entry and teach `platformOf` to recognise it.
  */
 export const PLATFORMS = {
   windows: {
     probe: () => ['powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', windowsProbe(gpuQueries('windows'))]],
-    python: 'python',
-    readHome: path => ['powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-      `Get-Content -LiteralPath (Join-Path $env:USERPROFILE '${path.replace(/'/g, "''")}') -Raw`]],
     hostname: ['hostname', []],
   },
   linux: {
     probe: () => ['python3', ['-c', linuxProbe(gpuQueries('linux'))]],
-    python: 'python3',
-    readHome: path => ['sh', ['-lc', `cat ${home(path)}`]],
     hostname: ['hostname', []],
   },
   macos: {
     probe: () => ['python3', ['-c', macosProbe(gpuQueries('macos'))]],
-    python: 'python3',
-    readHome: path => ['sh', ['-lc', `cat ${home(path)}`]],
     hostname: ['scutil', ['--get', 'ComputerName']],
   },
 };

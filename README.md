@@ -17,14 +17,16 @@ Ask your agent to add this layout, or run the installer from a clone: `./install
 Linux and macOS, `./install.ps1` on Windows (both run `scripts/install.py`). It builds the
 generated files, copies the mods, theme, assets and layout into
 `~/.config/herdr-app`, merges the program icons into your `programs.json`, checks every
-mod and switches to `herdr-harness` (`--no-switch`, or `-NoSwitch` on Windows, to skip). `ctrl-shift-l` switches back.
+mod, installs this computer's relays (below) and switches to `herdr-harness`
+(`--no-switch`, or `-NoSwitch` on Windows, to skip). `ctrl-shift-l` switches back.
 
 Optional:
 
-- **Claude Code quota:** the context relay below records it on any platform. On Windows,
-  `scripts/install-claude-usage.ps1` adds a PowerShell status line that records only it.
-- **Context rings:** `python scripts/install-context.py`, plus `--on MACHINE` for each
-  connected machine. See [CONTEXT.md](CONTEXT.md).
+- **Claude Code quota and context rings** come from relays: Claude Code's status line,
+  Codex's notify hook and a Pi extension (`scripts/install-context.py`, on Windows, Linux and
+  macOS). The installer sets them up on this computer (`--no-relays`, or `-NoRelays`, to
+  skip); for each connected machine run `python scripts/install-context.py --on MACHINE`.
+  See [CONTEXT.md](CONTEXT.md).
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
@@ -47,4 +49,5 @@ these files, so there's one copy and herdr's edits show up in `git status`.
 - Edit the sources, then run `python scripts/build-mods.py`. It writes the copies herdr
   needs (see RECIPE.md, Watch out).
 - Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
-- Collector tests: `python -m unittest discover -s tests -p test_context_relay.py`.
+- Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs` and
+  `node tests/probes.mjs`.
