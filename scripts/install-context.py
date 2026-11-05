@@ -1,6 +1,7 @@
-"""Install the relays that feed the status bar and the context rings, locally or through
-hc exec --on MACHINE: Claude Code's status line (context, and the quota the usage meter shows),
-Codex's notify hook and Pi's extension. No session restarts. Runs on Windows, Linux and macOS."""
+"""Install the relays that feed the context rings, locally or through hc exec --on MACHINE:
+Claude Code's status line and Pi's extension. Codex needs none: its ring reads the context its
+footer shows. Takes out the Codex notify line earlier versions added. No session restarts. Runs
+on Windows, Linux and macOS."""
 import base64, json, os, shutil, subprocess, sys
 from pathlib import Path
 
@@ -19,21 +20,10 @@ extension=home/'.pi/agent/extensions/harness-context.ts'
 extension.parent.mkdir(parents=True,exist_ok=True)
 extension.write_bytes(base64.b64decode(sys.argv[2]))
 codex=home/'.codex/config.toml'
-try:
- import tomllib
-except ImportError:
- tomllib=None
-if codex.exists() and not tomllib:
- print('Codex notify not set: reading its config needs Python 3.11 or later.')
-elif codex.exists():
- text=codex.read_text(encoding='utf-8-sig')
- old=tomllib.loads(text).get('notify')
- if not old:
-  backup=codex.with_suffix('.toml.before-harness-context')
-  if not backup.exists(): shutil.copy2(codex,backup)
-  codex.write_text('notify = '+json.dumps([sys.executable,str(relay),'notify'])+'\n'+text,encoding='utf-8')
- elif str(relay) not in old:
-  print('Existing Codex notify preserved; merge context-relay.py notify into it.')
+if codex.exists():
+ lines=codex.read_text(encoding='utf-8-sig').splitlines(keepends=True)
+ kept=[l for l in lines if not (l.startswith('notify') and 'context-relay.py' in l)]
+ if len(kept)!=len(lines): codex.write_text(''.join(kept),encoding='utf-8')
 claude=home/'.claude/settings.json'
 if claude.parent.exists():
  settings=json.loads(claude.read_text(encoding='utf-8-sig')) if claude.exists() else {}
@@ -46,7 +36,7 @@ if claude.parent.exists():
  command=('"'+sys.executable+'" "'+str(relay)+'" claude') if os.name=='nt' else shlex.join([sys.executable,str(relay),'claude'])
  settings['statusLine']=dict(settings.get('statusLine') or {},type='command',command=command)
  claude.write_text(json.dumps(settings,indent=2),encoding='utf-8')
-print('Context relays installed. Pi: /reload existing sessions. Codex: hook applies on next start.')
+print('Context relays installed. Pi: /reload existing sessions.')
 '''
 args = [base64.b64encode(relay.encode()).decode(), base64.b64encode(extension.encode()).decode()]
 if len(sys.argv) > 2 and sys.argv[1] == '--on':

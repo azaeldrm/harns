@@ -1,24 +1,28 @@
 import { exec, appHome, readTextFile, window as appWindow } from 'herdr';
-import { windowsProbe, linuxProbe, macosProbe } from './probes.js';
+import { windowsProbe, linuxProbe, macosProbe, windowsAccountProbe, pythonAccountProbe } from './probes.js';
 import { gpuQueries } from './gpus.js';
 
 /**
  * What each platform runs for machine-stats. Every entry gives:
- * - `probe()`: the command (`[program, args]`) that prints a CPU/RAM/GPU and usage sample (probes.js);
+ * - `probe()`: the command (`[program, args]`) that prints a CPU/RAM/GPU sample (probes.js);
+ * - `usage(services)`: the command that prints the account's limits for those services (probes.js);
  * - `hostname`: the command that prints the computer's name.
  * To support another platform, add an entry and teach `platformOf` to recognise it.
  */
 export const PLATFORMS = {
   windows: {
     probe: () => ['powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', windowsProbe(gpuQueries('windows'))]],
+    usage: services => ['powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', windowsAccountProbe(services)]],
     hostname: ['hostname', []],
   },
   linux: {
     probe: () => ['python3', ['-c', linuxProbe(gpuQueries('linux'))]],
+    usage: services => ['python3', ['-c', pythonAccountProbe(services)]],
     hostname: ['hostname', []],
   },
   macos: {
     probe: () => ['python3', ['-c', macosProbe(gpuQueries('macos'))]],
+    usage: services => ['python3', ['-c', pythonAccountProbe(services)]],
     hostname: ['scutil', ['--get', 'ComputerName']],
   },
 };
