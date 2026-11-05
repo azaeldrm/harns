@@ -22,9 +22,9 @@ mod, installs this computer's relays (below) and switches to `herdr-harness`
 
 Optional:
 
-- **Claude Code quota and context rings** come from relays: Claude Code's status line,
-  Codex's notify hook and a Pi extension (`scripts/install-context.py`, on Windows, Linux and
-  macOS). The installer sets them up on this computer (`--no-relays`, or `-NoRelays`, to
+- **Context rings** come from relays: Claude Code's status line and a Pi extension
+  (`scripts/install-context.py`, on Windows, Linux and macOS); Codex's comes from its footer.
+  The Claude Code and Codex quota bars read the account from each service and need no relay. The installer sets them up on this computer (`--no-relays`, or `-NoRelays`, to
   skip); for each connected machine run `python scripts/install-context.py --on MACHINE`.
   See [CONTEXT.md](CONTEXT.md).
 - **This computer's name:** it shows the computer's own name. For a nickname, put
@@ -49,5 +49,5 @@ these files, so there's one copy and herdr's edits show up in `git status`.
 - Edit the sources, then run `python scripts/build-mods.py`. It writes the copies herdr
   needs (see RECIPE.md, Watch out).
 - Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
-- Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs` and
-  `node tests/probes.mjs`.
+- Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs`,
+  `node tests/turns.mjs`, `node tests/probes.mjs` and `node tests/snapshots.mjs`.
