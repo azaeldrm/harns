@@ -17,7 +17,7 @@ export default function (pi: any) {
         percent: usage?.percent ?? null, updatedAt: Date.now() / 1000 };
       fs.writeFileSync(target + '.tmp', JSON.stringify(value));
       fs.renameSync(target + '.tmp', target);
-    } catch { /* Missing context stays unknown. */ }
+    } catch { }
   }
   pi.on('session_start', (_event: any, ctx: any) => {
     if (timer) clearInterval(timer);

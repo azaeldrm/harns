@@ -4,15 +4,8 @@ import { hostOf } from './turns.js';
 import { contextProbe } from './context-probe.js';
 import { newestSnapshots } from './snapshots.js';
 
-/**
- * Reads the context of every machine's agents, or of `only`'s (a machine's name, null for this
- * computer), and publishes it in shared `agents.context`: Claude's and Pi's from their relays'
- * snapshots (this computer's read directly, readLocal; another machine's with the relay's
- * collect(), run there), Codex's from the "Context N% left" its footer shows (codexFooter). Footers are read
- * only with `footers` (after a turn ends: a footer changes then and only then); otherwise each
- * Codex terminal keeps its last. A read asked for a machine while one runs there runs again after it.
- */
 export function refreshContext(view, cx, only, { footers = true } = {}) {
+  // Reads the context of every machine's agents (or `only`'s) into shared `agents.context`: relay snapshots, and Codex footers with `footers`.
   view.contextPending ??= new Set();
   view.contextAgain ??= new Set();
   view.footersDue ??= new Set();
@@ -66,12 +59,8 @@ export function refreshContext(view, cx, only, { footers = true } = {}) {
   }
 }
 
-/**
- * The context a Codex terminal's footer says is left, in percent ("Context 77% left"), or null when
- * its footer doesn't show it: Codex's status line shows it when `context-remaining` is one of its
- * `tui.status_line` items.
- */
 export async function codexFooter(address) {
+  // The context left in percent, as a Codex terminal's footer says ("Context 77% left"), or null.
   try {
     const r = await hc(['read', address, '--lines', '4']);
     const found = r.code === 0 ? [...r.stdout.matchAll(/Context (\d+(?:\.\d+)?)% left/g)].at(-1) : null;
@@ -79,8 +68,8 @@ export async function codexFooter(address) {
   } catch { return null; }
 }
 
-/** This computer's snapshots, read from their folder without starting a process. */
 export async function readLocal() {
+  // This computer's snapshots, read from their folder without starting a process.
   const sep = home().includes('\\') ? '\\' : '/';
   const dir = [home(), '.config', 'harness', 'context'].join(sep);
   let names;

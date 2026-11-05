@@ -1,7 +1,3 @@
-"""Install the relays that feed the context rings, locally or through hc exec --on MACHINE:
-Claude Code's status line and Pi's extension. Codex needs none: its ring reads the context its
-footer shows. Takes out the Codex notify line earlier versions added. No session restarts. Runs
-on Windows, Linux and macOS."""
 import base64, json, os, shutil, subprocess, sys
 from pathlib import Path
 

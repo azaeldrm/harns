@@ -1,5 +1,3 @@
-// Which machines to read after a look at herdr's agent list (mods/machine-stats/turns.js).
-//   node tests/turns.mjs
 import { look, changedHosts, machinesChanged, hostOf, endedApps } from '../mods/machine-stats/turns.js';
 
 let failed = 0;

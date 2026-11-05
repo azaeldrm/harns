@@ -1,6 +1,3 @@
-// The Linux and macOS account probe, run offline against a stand-in home folder and a stand-in
-// codex, and the stats probe beside it.
-//   node tests/probes.mjs
 import { linuxProbe, pythonAccountProbe } from '../mods/machine-stats/probes.js';
 import { execFileSync } from 'child_process';
 import { chmodSync, mkdtempSync, mkdirSync, writeFileSync } from 'fs';
