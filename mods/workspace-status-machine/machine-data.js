@@ -7,11 +7,8 @@ import { look, endedApps } from './turns.js';
 
 const key = name => name ?? '@local';
 const valid = n => typeof n === 'number' && Number.isFinite(n);
-/** How often each machine's CPU, RAM and GPU are probed, in ms: they change all the time. */
 const PROBE_EVERY = 1000;
-/** After an agent's turn ends, when the account's usage is read (ms): the service has counted the turn by then. */
 const READ_AFTER = 2000;
-/** How often the account's usage is read with no turn ending (ms): it also counts use outside herdr (the web, a phone). */
 const USAGE_EVERY = 15 * 60 * 1000;
 const SERVICES = ['Claude', 'Codex'];
 
@@ -85,12 +82,8 @@ export default class MachineStats extends View {
     }
   }
 
-  /**
-   * Once a second: compares herdr's agent list with the last look (in memory, nothing runs on a
-   * machine), queues a read of the services each agent that stopped working spends (READ_AFTER
-   * later), and runs the reads due.
-   */
   noticeTurns(cx) {
+    // Once a second: queues an account read for the services each finished turn spent, and runs the reads due.
     const now = look(agents(), machines());
     for (const app of endedApps(this.seen, now))
       for (const service of servicesOf(app)) if (!this.usageDue.has(service)) this.usageDue.set(service, Date.now() + READ_AFTER);
@@ -100,12 +93,8 @@ export default class MachineStats extends View {
     if (ready.length) this.readUsage(cx, ready);
   }
 
-  /**
-   * Reads the account's limits for `services` and publishes them. Each is asked on the machine
-   * that answered for it last, else this computer, else each other ready machine in turn (it needs
-   * the service installed and signed in). Services asked during a read are read after it.
-   */
   readUsage(cx, services) {
+    // Reads the account's limits for `services` and publishes them.
     if (this.usageReading) { for (const s of services) this.usageAgain.add(s); return; }
     this.usageReading = true;
     cx.spawn(async cx => {
@@ -136,12 +125,8 @@ export default class MachineStats extends View {
     });
   }
 
-  /**
-   * Publishes the account's usage (shared `machine.usage`, kept across restarts): each service read
-   * replaces its last reading. One that couldn't be read keeps its last reading when nothing
-   * answered, and shows why when it's signed out or not installed anywhere.
-   */
   publishUsage(results) {
+    // Publishes the account's usage in shared `machine.usage`: each service read replaces its last reading.
     const before = shared('machine.usage') ?? {};
     const usage = { ...before };
     for (const [service, reading] of Object.entries(results)) {

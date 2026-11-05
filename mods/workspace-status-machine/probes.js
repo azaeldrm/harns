@@ -1,18 +1,8 @@
-/**
- * One CPU/RAM probe per platform, run through herdr's machine connection (no listener).
- * Each prints one JSON object: `cpu` (percent, or null with `cpuRaw` counters on Windows,
- * turned into a percent from two samples), `memory` (percent used) and `gpus`, the raw
- * output of every GPU command it was given, by vendor (see gpus.js).
- *
- * One account probe per platform prints the account's current Claude and Codex usage limits,
- * from each service itself (pythonAccountProbe).
- */
-
 const psString = s => `'${String(s).replace(/'/g, "''")}'`;
 const pyString = s => JSON.stringify(String(s));
 
-/** Windows: PowerShell with CIM counters. */
 export function windowsProbe(queries) {
+  // Windows: PowerShell with CIM counters.
   return `
 $ErrorActionPreference = 'Stop'
 $cpu = Get-CimInstance Win32_PerfRawData_PerfOS_Processor -Filter "Name='_Total'"
@@ -32,11 +22,8 @@ foreach ($q in @($queries)) {
 `;
 }
 
-/**
- * Windows: the account probe in PowerShell (see pythonAccountProbe). Claude's login is read from
- * .credentials.json; Codex is started through cmd.exe when npm installed it as a .cmd shim.
- */
 export function windowsAccountProbe(services) {
+  // Windows: the account probe in PowerShell (see pythonAccountProbe).
   return `
 $ErrorActionPreference = 'Stop'
 $wanted = ${psString(JSON.stringify(services))} | ConvertFrom-Json
@@ -110,16 +97,8 @@ for q in json.loads(${pyString(JSON.stringify(queries))}):
         pass
 `;
 
-/**
- * Linux and macOS: the account probe in Python 3. For each service in `services` it prints the
- * account's current limits, `{ fiveHour, sevenDay }` with `{ used, resetsAt }` (percent, epoch
- * seconds), or `{ error }`:
- * - Claude: Anthropic's OAuth usage endpoint, with the login Claude Code keeps
- *   (~/.claude/.credentials.json, or the macOS Keychain). The token goes only to that request.
- * - Codex: `codex app-server`'s account/rateLimits/read (codex from the PATH, ~/.local/bin, or a
- *   login shell's PATH, which a machine connection's commands don't get).
- */
 export function pythonAccountProbe(services) {
+  // Linux and macOS: the account probe in Python 3.
   return `
 import datetime, json, os, select, shutil, subprocess, sys, time, urllib.error, urllib.request
 wanted = json.loads(${pyString(JSON.stringify(services))})
@@ -226,8 +205,8 @@ print(json.dumps(out))
 `;
 }
 
-/** Linux: Python 3 reading /proc. */
 export function linuxProbe(queries) {
+  // Linux: Python 3 reading /proc.
   return `${pythonGpus(queries)}
 import time
 def cpu():
@@ -244,8 +223,8 @@ print(json.dumps(dict(cpu=100*(1-(j-i)/(b-a)) if b>a else None, memory=100*(1-me
 `;
 }
 
-/** macOS: Python 3 with top, vm_stat and sysctl. Not yet run on a Mac. */
 export function macosProbe(queries) {
+  // macOS: Python 3 with top, vm_stat and sysctl.
   return `${pythonGpus(queries)}
 import re
 cpu = None
