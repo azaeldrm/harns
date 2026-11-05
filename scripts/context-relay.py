@@ -1,4 +1,3 @@
-"""Session context relay. Stores identifiers and counters, never conversation text."""
 import json, os, re, sys, time
 from pathlib import Path
 

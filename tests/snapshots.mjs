@@ -1,5 +1,3 @@
-// This computer's context snapshots as the rings show them (mods/machine-agents/snapshots.js).
-//   node tests/snapshots.mjs
 import { newestSnapshots } from '../mods/machine-agents/snapshots.js';
 
 let failed = 0;

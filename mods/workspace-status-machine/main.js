@@ -6,8 +6,8 @@ import MachineData from "./machine-data.js";
 import { current } from "./usage.js";
 
 export default class WorkspaceStatus extends MachineData {
-  /** herdr redraws a mod only when it asks: once a second, for the shown machine, folder and branch (the probes run less often). */
   init(props, cx) {
+    // Redraws the bar once a second, for the shown machine, folder and branch.
     super.init(props, cx);
     cx.timer.every(1000, cx => cx.notify());
   }
@@ -16,7 +16,6 @@ export default class WorkspaceStatus extends MachineData {
     const t = theme();
     const all = spaces();
     const space = all.find(s => s.active);
-    // Agents belong to a space; count only those on the same machine as the shown space.
     const machine = space?.machine ?? null;
     const machineOf = new Map(all.map(s => [s.id, s.machine]));
     const list = agents().filter(a => machineOf.get(a.space) === machine);
