@@ -3,10 +3,11 @@
 
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify } from "herdr";
+import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
+import { look, changedHosts, machinesChanged } from "./turns.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
 const statsFor = (machine, t, compact = false) => machineMetrics(machine, compact, t);
@@ -75,8 +76,8 @@ function icon(p, size, color) {
   return p.icon.endsWith('.svg') ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
-/** How often each machine's context snapshots are read for the rings, in ms (the status bar probes as often). */
-const CONTEXT_EVERY = 10000;
+/** After an agent's turn ends, when its machine's context is read (ms): its relay may still be writing. */
+const READ_AFTER = [1000, 4000];
 
 export default class Agents extends View {
   init(_props, cx) {
@@ -87,13 +88,44 @@ export default class Agents extends View {
     this.hosts = {};
     this.retrying = {};
     this.refreshHosts(cx);
-    cx.timer.every(15000, cx => this.refreshHosts(cx));
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
-    cx.timer.every(1000, (cx) => cx.notify());
-    cx.timer.every(CONTEXT_EVERY, cx => refreshContext(this, cx));
-    refreshContext(this, cx);
+    cx.timer.every(1000, (cx) => { this.noticeTurns(cx); cx.notify(); });
+    this.noticeTurns(cx);
+    this.watchLocalContext(cx);
+  }
+
+  /**
+   * Once a second: compares herdr's agent list with the last look (in memory, nothing runs on a
+   * machine), queues a context read of each machine where a turn ended, an agent came or went, or
+   * that came online (READ_AFTER later: its relay may still be writing), and runs the reads due.
+   */
+  noticeTurns(cx) {
+    const now = look(agents(), machines());
+    const first = !this.seen;
+    if (!first && machinesChanged(this.seen, now)) this.refreshHosts(cx);
+    this.due ??= [];
+    for (const host of changedHosts(this.seen, now)) {
+      if (first) refreshContext(this, cx, host);
+      else for (const ms of READ_AFTER) this.due.push({ host, at: Date.now() + ms });
+    }
+    this.seen = now;
+    const ready = this.due.filter(d => d.at <= Date.now());
+    this.due = this.due.filter(d => d.at > Date.now());
+    for (const host of new Set(ready.map(d => d.host))) refreshContext(this, cx, host);
+  }
+
+  /** This computer's snapshots change as the relays write them: read on each change (turn ends cover it otherwise, and Codex's footers). */
+  watchLocalContext(cx) {
+    const sep = home().includes("\\") ? "\\" : "/";
+    const dir = [home(), ".config", "harness", "context"].join(sep);
+    cx.spawn(async cx => {
+      for (;;) {
+        try { await watchFolder(dir); } catch { return; }
+        refreshContext(this, cx, null, { footers: false });
+      }
+    });
   }
 
   // Stamps agents whose state changed. Done and idle count as one: looking at a
@@ -321,9 +353,7 @@ export default class Agents extends View {
     const context = (shared('agents.context') ?? {})[a.address];
     if (a.status === 'idle' && Number.isFinite(context?.percent)) {
       const percent = Math.max(0, Math.min(100, context.percent));
-      const counts = Number.isFinite(context.tokens) && Number.isFinite(context.contextWindow)
-        ? ` · ${Math.round(context.tokens).toLocaleString()} / ${context.contextWindow.toLocaleString()} tokens` : '';
-      return ring(`ring-${Math.round(percent)}`, percent > 90 ? '#d88179' : t.muted, `Context: ${percent.toFixed(1)}% used${counts}`);
+      return ring(`ring-${Math.round(percent)}`, percent > 90 ? '#d88179' : t.muted, `Context: ${Math.round(percent)}% used`);
     }
     if (a.status === "idle") return ring('ring-0', t.idle ?? t.dim, 'Context unavailable');
     return div().size(14).flex_none();

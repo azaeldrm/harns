@@ -1,28 +1,38 @@
 import { View, div } from 'gpui-kit';
-import { machines, shared, setShared } from 'herdr';
+import { machines, agents, shared, setShared } from 'herdr';
 import { PLATFORMS, platformOf, forgetPlatform, runOn, localMachineName } from './platforms.js';
 import { gpuLines } from './gpus.js';
-import { fromClaude, fromCodex, mergeReadings } from './usage.js';
+import { fromProbe, servicesOf } from './usage.js';
+import { look, endedApps } from './turns.js';
 
 const key = name => name ?? '@local';
 const valid = n => typeof n === 'number' && Number.isFinite(n);
-/** How often each machine is probed (stats and usage), in ms. */
-const PROBE_EVERY = 10000;
+/** How often each machine's CPU, RAM and GPU are probed, in ms: they change all the time. */
+const PROBE_EVERY = 1000;
+/** After an agent's turn ends, when the account's usage is read (ms): the service has counted the turn by then. */
+const READ_AFTER = 2000;
+/** How often the account's usage is read with no turn ending (ms): it also counts use outside herdr (the web, a phone). */
+const USAGE_EVERY = 15 * 60 * 1000;
+const SERVICES = ['Claude', 'Codex'];
 
 export default class MachineStats extends View {
   init(_props, cx) {
-    const label = () => cx => cx.spawn(async () => {
+    cx.spawn(async () => {
       const name = await localMachineName();
       if (shared('machine.local-label') !== name) setShared('machine.local-label', name);
     });
-    label()(cx);
-    cx.timer.every(30000, label());
     this.samples = {};
     this.pending = {};
     this.raw = {};
-    this.readings = {};
+    this.seen = null;
+    this.usageDue = new Map();
+    this.usageFrom = {};
+    this.usageAgain = new Set();
     cx.timer.every(PROBE_EVERY, cx => this.refresh(cx));
     this.refresh(cx);
+    cx.timer.every(1000, cx => this.noticeTurns(cx));
+    cx.timer.every(USAGE_EVERY, cx => this.readUsage(cx, SERVICES));
+    this.readUsage(cx, SERVICES);
   }
 
   refresh(cx) {
@@ -46,9 +56,6 @@ export default class MachineStats extends View {
             if (result.code !== 0) throw new Error('Probe failed');
             sample = JSON.parse(result.stdout.trim());
             if (!valid(sample.memory)) throw new Error('Invalid sample');
-            this.readings[id] = { Claude: fromClaude(sample.usage?.claude), Codex: fromCodex(sample.usage?.codex) };
-            delete sample.usage;
-            this.publishUsage();
             sample.gpu = gpuLines(sample.gpus);
             delete sample.gpus;
             if (sample.cpuRaw) {
@@ -79,15 +86,67 @@ export default class MachineStats extends View {
   }
 
   /**
-   * The account's usage, one reading per agent: the newest of each window across every machine's
-   * reading and the one already published (kept across restarts in herdr's shared state).
+   * Once a second: compares herdr's agent list with the last look (in memory, nothing runs on a
+   * machine), queues a read of the services each agent that stopped working spends (READ_AFTER
+   * later), and runs the reads due.
    */
-  publishUsage() {
+  noticeTurns(cx) {
+    const now = look(agents(), machines());
+    for (const app of endedApps(this.seen, now))
+      for (const service of servicesOf(app)) if (!this.usageDue.has(service)) this.usageDue.set(service, Date.now() + READ_AFTER);
+    this.seen = now;
+    const ready = [...this.usageDue].filter(([, at]) => at <= Date.now()).map(([service]) => service);
+    for (const service of ready) this.usageDue.delete(service);
+    if (ready.length) this.readUsage(cx, ready);
+  }
+
+  /**
+   * Reads the account's limits for `services` and publishes them. Each is asked on the machine
+   * that answered for it last, else this computer, else each other ready machine in turn (it needs
+   * the service installed and signed in). Services asked during a read are read after it.
+   */
+  readUsage(cx, services) {
+    if (this.usageReading) { for (const s of services) this.usageAgain.add(s); return; }
+    this.usageReading = true;
+    cx.spawn(async cx => {
+      const results = {};
+      try {
+        let left = [...services];
+        const others = machines().filter(m => m.name && m.layout === 'ready').map(m => m.name);
+        const hosts = [...new Set([...left.map(s => this.usageFrom[s]).filter(h => h !== undefined), null, ...others])];
+        for (const host of hosts) {
+          if (!left.length) break;
+          let raw = {};
+          try {
+            const result = await runOn(host, PLATFORMS[await platformOf(host)].usage(left));
+            raw = result.code === 0 ? JSON.parse(result.stdout.trim() || '{}') : {};
+          } catch {}
+          for (const service of left) {
+            const reading = fromProbe(raw[service]);
+            if (!reading.error) { results[service] = reading; this.usageFrom[service] = host; }
+            else if (!results[service] || results[service].error === 'No answer') results[service] = reading;
+          }
+          left = left.filter(s => results[s]?.error);
+        }
+        this.publishUsage(results);
+      } finally {
+        this.usageReading = false;
+        if (this.usageAgain.size) { const again = [...this.usageAgain]; this.usageAgain.clear(); this.readUsage(cx, again); }
+      }
+    });
+  }
+
+  /**
+   * Publishes the account's usage (shared `machine.usage`, kept across restarts): each service read
+   * replaces its last reading. One that couldn't be read keeps its last reading when nothing
+   * answered, and shows why when it's signed out or not installed anywhere.
+   */
+  publishUsage(results) {
     const before = shared('machine.usage') ?? {};
-    const usage = {};
-    for (const tool of ['Claude', 'Codex']) {
-      const merged = mergeReadings([before[tool], ...Object.values(this.readings).map(r => r[tool])]);
-      if (merged) usage[tool] = merged;
+    const usage = { ...before };
+    for (const [service, reading] of Object.entries(results)) {
+      if (reading.error === 'No answer' && before[service] && !before[service].error) continue;
+      usage[service] = reading;
     }
     if (JSON.stringify(usage) !== JSON.stringify(before)) setShared('machine.usage', usage);
   }

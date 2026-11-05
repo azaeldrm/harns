@@ -1,13 +1,14 @@
 """Agent spinner and context rings share one circle geometry."""
-import math
+import json, math
 from pathlib import Path
 
 repo = Path(__file__).resolve().parent.parent
 # Herdr forbids imports outside a mod directory. Keep runtime bundles generated.
 metrics = (repo / 'mods/machine-metrics/main.js').read_text(encoding='utf-8')
 (repo / 'mods/machine-agents/machine-metrics.js').write_text(metrics, encoding='utf-8')
+(repo / 'mods/machine-agents/turns.js').write_text((repo / 'mods/machine-stats/turns.js').read_text(encoding='utf-8'), encoding='utf-8')
 probe = (repo / 'scripts/context-relay.py').read_text(encoding='utf-8')
-(repo / 'mods/machine-agents/context-probe.js').write_text('export const contextProbe = String.raw`' + probe + '`;\n', encoding='utf-8')
+(repo / 'mods/machine-agents/context-probe.js').write_text('export const contextProbe = ' + json.dumps(probe) + ';\n', encoding='utf-8')
 target = repo / 'mods/machine-agents/context-rings'
 target.mkdir(parents=True, exist_ok=True)
 radius = 9.4
@@ -21,6 +22,7 @@ for percent in range(101):
 
 # The bottom bar owns collection now that the duplicate sidebar Usage UI is gone.
 for source, target in [('main.js', 'machine-data.js'), ('probes.js', 'probes.js'),
-                       ('platforms.js', 'platforms.js'), ('gpus.js', 'gpus.js'), ('usage.js', 'usage.js')]:
+                       ('platforms.js', 'platforms.js'), ('gpus.js', 'gpus.js'), ('usage.js', 'usage.js'),
+                       ('turns.js', 'turns.js')]:
     (repo / 'mods/workspace-status-machine' / target).write_text(
         (repo / 'mods/machine-stats' / source).read_text(encoding='utf-8'), encoding='utf-8')

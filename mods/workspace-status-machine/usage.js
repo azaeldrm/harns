@@ -1,51 +1,30 @@
 /**
- * Claude's and Codex's usage limits belong to the account, not to a machine: each machine only
- * holds the last reading an agent made there. These turn each agent's raw reading into two
- * windows (5h and 7d, each `{ used, resetsAt }` in percent and epoch seconds) and keep the newest
- * reading of each window across machines. No herdr imports: tested alone (tests/usage.mjs).
+ * Claude's and Codex's usage limits belong to the account, so one reading from either service
+ * stands for every machine. These turn the account probe's answer (probes.js) into the two
+ * windows the bar shows (5h and 7d, each `{ used, resetsAt }` in percent and epoch seconds). No
+ * herdr imports: tested alone (tests/usage.mjs).
  */
 
 const valid = n => typeof n === 'number' && Number.isFinite(n);
 const windowOf = (used, resetsAt) => valid(used) ? { used: Math.max(0, Math.min(100, used)), resetsAt: valid(resetsAt) ? resetsAt : null } : null;
 
-/** Claude's reading: the snapshot the status-line relay writes (~/.claude/herdr-usage.json). */
-export function fromClaude(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object') return null;
-  const five = windowOf(snapshot.fiveHour?.used_percentage, snapshot.fiveHour?.resets_at);
-  const week = windowOf(snapshot.sevenDay?.used_percentage, snapshot.sevenDay?.resets_at);
-  return five || week ? { fiveHour: five, sevenDay: week } : null;
-}
-
-/** Codex's reading: the `rate_limits` of a token_count event in its session log. */
-export function fromCodex(limits) {
-  if (!limits || typeof limits !== 'object') return null;
-  const windows = [limits.primary, limits.secondary].filter(w => w && typeof w === 'object');
-  const pick = minutes => windows.find(w => w.window_minutes === minutes);
-  const five = pick(300), week = pick(10080);
-  const result = { fiveHour: five ? windowOf(five.used_percent, five.resets_at) : null, sevenDay: week ? windowOf(week.used_percent, week.resets_at) : null };
-  return result.fiveHour || result.sevenDay ? result : null;
-}
-
 /**
- * The newer of two readings of one window: a later reset is a newer window, and within one window
- * usage only goes up, so the higher reading is the newer one.
+ * One service's reading from the probe: `{ fiveHour, sevenDay }` (each a window or null) when it
+ * answered, `{ error }` when it couldn't be read (not installed, signed out, no answer).
  */
-export function newerWindow(a, b) {
-  if (!a) return b ?? null;
-  if (!b) return a;
-  if ((a.resetsAt ?? 0) !== (b.resetsAt ?? 0)) return (a.resetsAt ?? 0) > (b.resetsAt ?? 0) ? a : b;
-  return a.used >= b.used ? a : b;
+export function fromProbe(part) {
+  if (!part || typeof part !== 'object') return { error: 'No answer' };
+  if (typeof part.error === 'string') return { error: part.error };
+  const five = windowOf(part.fiveHour?.used, part.fiveHour?.resetsAt);
+  const week = windowOf(part.sevenDay?.used, part.sevenDay?.resetsAt);
+  return five || week ? { fiveHour: five, sevenDay: week } : { error: 'No limits reported' };
 }
 
-/** The newest of each window across readings (null ones skipped). */
-export function mergeReadings(readings) {
-  let fiveHour = null, sevenDay = null;
-  for (const r of readings) {
-    if (!r) continue;
-    fiveHour = newerWindow(fiveHour, r.fiveHour);
-    sevenDay = newerWindow(sevenDay, r.sevenDay);
-  }
-  return fiveHour || sevenDay ? { fiveHour, sevenDay } : null;
+/** The services an agent's ended turn spends: Claude Code and Codex their own; Pi and others either. */
+export function servicesOf(app) {
+  if (app === 'claude-code') return ['Claude'];
+  if (app === 'codex') return ['Codex'];
+  return ['Claude', 'Codex'];
 }
 
 /** A window as the bar shows it at `now` (epoch seconds): past its reset, nothing is used yet. */

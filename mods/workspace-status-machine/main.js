@@ -34,7 +34,7 @@ export default class WorkspaceStatus extends MachineData {
         const known = Number.isFinite(limit?.used);
         const percent = known ? limit.used : 0;
         return h_flex().flex_none().gap(4).items_center()
-          .tooltip(`${name} ${label}: ${known ? `${Math.round(percent)}% used` : 'unavailable'}${limit?.resetsAt ? ` · resets ${clock(limit.resetsAt)}` : ''}`)
+          .tooltip(`${name} ${label}: ${known ? `${Math.round(percent)}% used` : `unavailable${usage[name]?.error ? ` · ${usage[name].error.toLowerCase()}` : ''}`}${limit?.resetsAt ? ` · resets ${clock(limit.resetsAt)}` : ''}`)
           .child(div().w(14).flex_none().text_size(9).text_color(t.dim).child(label))
           .child(div().w(44).h(4).rounded(2).bg(t.border)
             .when(known, el => el.child(div().w(`${percent}%`).h(4).rounded(2).bg(percent > 90 ? '#d88179' : t.accent).opacity(percent > 90 ? 1 : opacity))));
