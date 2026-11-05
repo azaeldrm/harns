@@ -1,12 +1,11 @@
 /**
  * One CPU/RAM probe per platform, run through herdr's machine connection (no listener).
  * Each prints one JSON object: `cpu` (percent, or null with `cpuRaw` counters on Windows,
- * turned into a percent from two samples), `memory` (percent used), `gpus`, the raw
- * output of every GPU command it was given, by vendor (see gpus.js), and `usage`: the last
- * usage-limit reading Claude and Codex made on the machine (`claude`: the status-line relay's
- * snapshot; `codex`: the `rate_limits` of the newest token_count event in its session logs,
- * from the 3 most recently written logs of the last 7 day folders). A part that can't be read
- * is left out; it never fails the probe.
+ * turned into a percent from two samples), `memory` (percent used) and `gpus`, the raw
+ * output of every GPU command it was given, by vendor (see gpus.js).
+ *
+ * One account probe per platform prints the account's current Claude and Codex usage limits,
+ * from each service itself (pythonAccountProbe).
  */
 
 const psString = s => `'${String(s).replace(/'/g, "''")}'`;
@@ -24,38 +23,80 @@ foreach ($q in @($queries)) {
   $exe, $rest = @($q.argv)
   try { $gpus[$q.vendor] = @( & $exe @($rest) 2>$null ) } catch {}
 }
-$usage = @{}
-try { $usage.claude = Get-Content -Raw -LiteralPath (Join-Path $env:USERPROFILE '.claude\herdr-usage.json') | ConvertFrom-Json } catch {}
-try {
-  $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
-  $days = @(Get-ChildItem -LiteralPath (Join-Path $codexHome 'sessions') -Directory | Get-ChildItem -Directory | Get-ChildItem -Directory |
-    Sort-Object FullName -Descending | Select-Object -First 7)
-  $logs = @($days | Get-ChildItem -Filter 'rollout-*.jsonl' -File | Sort-Object LastWriteTime -Descending | Select-Object -First 3)
-  $best = $null
-  foreach ($log in $logs) {
-    $stream = [System.IO.File]::Open($log.FullName, 'Open', 'Read', 'ReadWrite')
-    try {
-      [void]$stream.Seek([Math]::Max(0, $stream.Length - 1048576), 'Begin')
-      $lines = (New-Object System.IO.StreamReader($stream)).ReadToEnd() -split "\n"
-    } finally { $stream.Dispose() }
-    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
-      if ($lines[$i] -notlike '*"rate_limits"*' -or $lines[$i] -notlike '*"token_count"*') { continue }
-      try { $event = $lines[$i] | ConvertFrom-Json } catch { continue }
-      if ($event.payload.rate_limits) {
-        if (-not $best -or [string]$event.timestamp -gt [string]$best.timestamp) { $best = $event }
-        break
-      }
-    }
-  }
-  if ($best) { $usage.codex = $best.payload.rate_limits }
-} catch {}
 @{
   cpu = $null
   cpuRaw = @{idle=$cpu.PercentProcessorTime.ToString();time=$cpu.Timestamp_Sys100NS.ToString()}
   memory = 100 * (1 - $os.FreePhysicalMemory / $os.TotalVisibleMemorySize)
   gpus = $gpus
-  usage = $usage
-} | ConvertTo-Json -Compress -Depth 8
+} | ConvertTo-Json -Compress -Depth 4
+`;
+}
+
+/**
+ * Windows: the account probe in PowerShell (see pythonAccountProbe). Claude's login is read from
+ * .credentials.json; Codex is started through cmd.exe when npm installed it as a .cmd shim.
+ */
+export function windowsAccountProbe(services) {
+  return `
+$ErrorActionPreference = 'Stop'
+$wanted = ${psString(JSON.stringify(services))} | ConvertFrom-Json
+$out = @{}
+function Win($used, $resets) { if ($null -eq $used) { return $null }; @{ used = [double]$used; resetsAt = $resets } }
+if ($wanted -contains 'Claude') {
+  try {
+    $dir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
+    $login = (Get-Content -Raw -LiteralPath (Join-Path $dir '.credentials.json') | ConvertFrom-Json).claudeAiOauth
+    if (-not $login.accessToken) { $out.Claude = @{ error = 'Signed out' } }
+    else {
+      $r = Invoke-RestMethod -Uri 'https://api.anthropic.com/api/oauth/usage' -TimeoutSec 10 -Headers @{ Authorization = 'Bearer ' + $login.accessToken; 'anthropic-beta' = 'oauth-2025-04-20'; Accept = 'application/json' }
+      $at = { param($s) if ($s) { [DateTimeOffset]::Parse($s).ToUnixTimeSeconds() } else { $null } }
+      $out.Claude = @{ fiveHour = (Win $r.five_hour.utilization (& $at $r.five_hour.resets_at)); sevenDay = (Win $r.seven_day.utilization (& $at $r.seven_day.resets_at)) }
+    }
+  } catch { $out.Claude = @{ error = $(if ($_.Exception.Response.StatusCode.value__ -eq 401) { 'Signed out' } else { 'No answer' }) } }
+}
+if ($wanted -contains 'Codex') {
+  $proc = $null
+  try {
+    $cmd = Get-Command codex -ErrorAction SilentlyContinue
+    if (-not $cmd) { $out.Codex = @{ error = 'Not installed' } }
+    else {
+      $path = $cmd.Source
+      if ($path -like '*.ps1') { $path = [IO.Path]::ChangeExtension($path, '.cmd') }
+      $info = New-Object Diagnostics.ProcessStartInfo
+      if ($path -like '*.cmd') { $info.FileName = 'cmd.exe'; $info.Arguments = '/d /c "' + $path + '" app-server' } else { $info.FileName = $path; $info.Arguments = 'app-server' }
+      $info.UseShellExecute = $false; $info.RedirectStandardInput = $true; $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+      $proc = [Diagnostics.Process]::Start($info)
+      function Ask($id, $method) {
+        $proc.StandardInput.WriteLine((@{ id = $id; method = $method; params = @{ clientInfo = @{ name = 'herdr-harness'; version = '1' } } } | ConvertTo-Json -Compress -Depth 4))
+        $proc.StandardInput.Flush()
+        $deadline = (Get-Date).AddSeconds(10)
+        while ((Get-Date) -lt $deadline) {
+          $line = $proc.StandardOutput.ReadLineAsync()
+          if (-not $line.Wait([int][Math]::Max(1, ($deadline - (Get-Date)).TotalMilliseconds))) { break }
+          if ($null -eq $line.Result) { break }
+          try { $m = $line.Result | ConvertFrom-Json } catch { continue }
+          if ($m.id -eq $id) { return $m }
+        }
+        return $null
+      }
+      [void](Ask 1 'initialize')
+      $proc.StandardInput.WriteLine('{"method":"initialized","params":{}}'); $proc.StandardInput.Flush()
+      $m = Ask 2 'account/rateLimits/read'
+      $limits = $m.result.rateLimits
+      if (-not $limits) { $out.Codex = @{ error = $(if ($m.error) { 'Signed out' } else { 'No answer' }) } }
+      else {
+        $c = @{}
+        foreach ($w in @($limits.primary, $limits.secondary)) {
+          if ($w.windowDurationMins -eq 300) { $c.fiveHour = Win $w.usedPercent $w.resetsAt }
+          if ($w.windowDurationMins -eq 10080) { $c.sevenDay = Win $w.usedPercent $w.resetsAt }
+        }
+        $out.Codex = $c
+      }
+    }
+  } catch { $out.Codex = @{ error = 'No answer' } }
+  finally { if ($proc -and -not $proc.HasExited) { try { $proc.Kill() } catch {} } }
+}
+$out | ConvertTo-Json -Compress -Depth 6
 `;
 }
 
@@ -69,47 +110,125 @@ for q in json.loads(${pyString(JSON.stringify(queries))}):
         pass
 `;
 
-const pythonUsage = `
-import glob, os
-def read_usage():
-    usage = {}
-    home = os.path.expanduser('~')
+/**
+ * Linux and macOS: the account probe in Python 3. For each service in `services` it prints the
+ * account's current limits, `{ fiveHour, sevenDay }` with `{ used, resetsAt }` (percent, epoch
+ * seconds), or `{ error }`:
+ * - Claude: Anthropic's OAuth usage endpoint, with the login Claude Code keeps
+ *   (~/.claude/.credentials.json, or the macOS Keychain). The token goes only to that request.
+ * - Codex: `codex app-server`'s account/rateLimits/read (codex from the PATH, ~/.local/bin, or a
+ *   login shell's PATH, which a machine connection's commands don't get).
+ */
+export function pythonAccountProbe(services) {
+  return `
+import datetime, json, os, select, shutil, subprocess, sys, time, urllib.error, urllib.request
+wanted = json.loads(${pyString(JSON.stringify(services))})
+out = {}
+def window(used, resets):
+    return None if used is None else {'used': float(used), 'resetsAt': resets}
+def epoch(text):
     try:
-        with open(os.path.join(home, '.claude', 'herdr-usage.json'), encoding='utf-8-sig') as f:
-            usage['claude'] = json.load(f)
-    except Exception:
-        pass
+        return int(datetime.datetime.fromisoformat(str(text).replace('Z', '+00:00')).timestamp()) if text else None
+    except ValueError:
+        return None
+def claude_login():
+    folder = os.path.expanduser(os.environ.get('CLAUDE_CONFIG_DIR') or '~/.claude')
     try:
-        sessions = os.path.join(os.environ.get('CODEX_HOME') or os.path.join(home, '.codex'), 'sessions')
-        days = sorted(glob.glob(os.path.join(sessions, '[0-9]' * 4, '[0-9]' * 2, '[0-9]' * 2)), reverse=True)[:7]
-        logs = sorted((p for d in days for p in glob.glob(os.path.join(d, 'rollout-*.jsonl'))), key=os.path.getmtime, reverse=True)[:3]
-        best = None
-        for path in logs:
-            with open(path, 'rb') as f:
-                f.seek(max(0, os.path.getsize(path) - 1048576))
-                lines = f.read().decode('utf-8', 'replace').splitlines()
-            for line in reversed(lines):
-                if '"rate_limits"' not in line or '"token_count"' not in line:
-                    continue
-                try:
-                    event = json.loads(line)
-                except ValueError:
-                    continue
-                limits = (event.get('payload') or {}).get('rate_limits')
-                if limits:
-                    if best is None or str(event.get('timestamp', '')) > best[0]:
-                        best = (str(event.get('timestamp', '')), limits)
-                    break
-        if best:
-            usage['codex'] = best[1]
-    except Exception:
+        with open(os.path.join(folder, '.credentials.json'), encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
         pass
-    return usage
+    if sys.platform == 'darwin':
+        try:
+            found = subprocess.run(['security', 'find-generic-password', '-s', 'Claude Code-credentials', '-w'], capture_output=True, text=True, timeout=5)
+            return json.loads(found.stdout) if found.returncode == 0 else None
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            return None
+    return None
+if 'Claude' in wanted:
+    login = (claude_login() or {}).get('claudeAiOauth') or {}
+    if not login.get('accessToken'):
+        out['Claude'] = {'error': 'Signed out'}
+    else:
+        request = urllib.request.Request('https://api.anthropic.com/api/oauth/usage', headers={
+            'Authorization': 'Bearer ' + login['accessToken'], 'anthropic-beta': 'oauth-2025-04-20', 'Accept': 'application/json'})
+        try:
+            with urllib.request.urlopen(request, timeout=10) as r:
+                d = json.load(r)
+            part = lambda k: d.get(k) or {}
+            out['Claude'] = {'fiveHour': window(part('five_hour').get('utilization'), epoch(part('five_hour').get('resets_at'))),
+                             'sevenDay': window(part('seven_day').get('utilization'), epoch(part('seven_day').get('resets_at')))}
+        except urllib.error.HTTPError as e:
+            out['Claude'] = {'error': 'Signed out' if e.code == 401 else 'No answer'}
+        except (OSError, ValueError):
+            out['Claude'] = {'error': 'No answer'}
+def find_codex():
+    found = shutil.which('codex') or shutil.which('codex', path=os.path.expanduser('~/.local/bin'))
+    if found:
+        return found
+    try:
+        shell = os.environ.get('SHELL') or '/bin/sh'
+        line = subprocess.run([shell, '-lc', 'command -v codex'], capture_output=True, text=True, timeout=5).stdout.strip().splitlines()
+        return line[-1] if line and os.path.isabs(line[-1]) else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+if 'Codex' in wanted:
+    codex = find_codex()
+    if not codex:
+        out['Codex'] = {'error': 'Not installed'}
+    else:
+        proc = None
+        try:
+            proc = subprocess.Popen([codex, 'app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            pending = [b'']
+            def ask(i, method, params=None):
+                proc.stdin.write((json.dumps({'id': i, 'method': method, 'params': params or {}}) + '\\n').encode())
+                proc.stdin.flush()
+                end = time.time() + 10
+                while time.time() < end:
+                    while b'\\n' in pending[0]:
+                        line, pending[0] = pending[0].split(b'\\n', 1)
+                        try:
+                            m = json.loads(line)
+                        except ValueError:
+                            continue
+                        if m.get('id') == i:
+                            return m
+                    if select.select([proc.stdout], [], [], 0.2)[0]:
+                        chunk = os.read(proc.stdout.fileno(), 65536)
+                        if not chunk:
+                            return None
+                        pending[0] += chunk
+                return None
+            ask(1, 'initialize', {'clientInfo': {'name': 'herdr-harness', 'version': '1'}})
+            proc.stdin.write((json.dumps({'method': 'initialized', 'params': {}}) + '\\n').encode())
+            proc.stdin.flush()
+            m = ask(2, 'account/rateLimits/read') or {}
+            limits = (m.get('result') or {}).get('rateLimits')
+            if not limits:
+                out['Codex'] = {'error': 'Signed out' if m.get('error') else 'No answer'}
+            else:
+                c = {}
+                for w in (limits.get('primary'), limits.get('secondary')):
+                    if not isinstance(w, dict):
+                        continue
+                    if w.get('windowDurationMins') == 300:
+                        c['fiveHour'] = window(w.get('usedPercent'), w.get('resetsAt'))
+                    if w.get('windowDurationMins') == 10080:
+                        c['sevenDay'] = window(w.get('usedPercent'), w.get('resetsAt'))
+                out['Codex'] = c
+        except OSError:
+            out['Codex'] = {'error': 'No answer'}
+        finally:
+            if proc:
+                proc.kill()
+print(json.dumps(out))
 `;
+}
 
 /** Linux: Python 3 reading /proc. */
 export function linuxProbe(queries) {
-  return `${pythonGpus(queries)}${pythonUsage}
+  return `${pythonGpus(queries)}
 import time
 def cpu():
     a = list(map(int, open('/proc/stat').readline().split()[1:9]))
@@ -121,13 +240,13 @@ memory = {}
 for line in open('/proc/meminfo'):
     key, value = line.split(':', 1)
     memory[key] = int(value.strip().split()[0])
-print(json.dumps(dict(cpu=100*(1-(j-i)/(b-a)) if b>a else None, memory=100*(1-memory['MemAvailable']/memory['MemTotal']), gpus=gpus, usage=read_usage())))
+print(json.dumps(dict(cpu=100*(1-(j-i)/(b-a)) if b>a else None, memory=100*(1-memory['MemAvailable']/memory['MemTotal']), gpus=gpus)))
 `;
 }
 
 /** macOS: Python 3 with top, vm_stat and sysctl. Not yet run on a Mac. */
 export function macosProbe(queries) {
-  return `${pythonGpus(queries)}${pythonUsage}
+  return `${pythonGpus(queries)}
 import re
 cpu = None
 try:
@@ -146,6 +265,6 @@ try:
     memory = 100 * used / total
 except Exception:
     pass
-print(json.dumps(dict(cpu=cpu, memory=memory, gpus=gpus, usage=read_usage())))
+print(json.dumps(dict(cpu=cpu, memory=memory, gpus=gpus)))
 `;
 }

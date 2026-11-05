@@ -49,5 +49,24 @@ class InstallContextTests(unittest.TestCase):
             self.assertTrue((home / '.config/harness/context-relay.py').exists())
 
 
+    def test_codex_gets_no_hook_and_an_earlier_relay_notify_is_taken_out(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            (home / '.codex').mkdir()
+            config = home / '.codex/config.toml'
+            config.write_text('notify = ["/usr/bin/python3", "/h/.config/harness/context-relay.py", "notify"]\nmodel = "x"\n')
+            install(home)
+            self.assertEqual(config.read_text(), 'model = "x"\n')
+            self.assertFalse((home / '.codex/hooks.json').exists())
+
+    def test_someone_elses_codex_notify_is_kept(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            (home / '.codex').mkdir()
+            config = home / '.codex/config.toml'
+            config.write_text('notify = ["notify-send", "done"]\nmodel = "x"\n')
+            install(home)
+            self.assertEqual(config.read_text(), 'notify = ["notify-send", "done"]\nmodel = "x"\n')
+
 if __name__ == '__main__':
     unittest.main()

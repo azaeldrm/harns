@@ -15,7 +15,7 @@ spec.loader.exec_module(relay)
 
 
 class ContextRelayTests(unittest.TestCase):
-    def test_claude_statusline_captures_native_percent_and_preserves_quota(self):
+    def test_claude_statusline_captures_native_percent_and_nothing_else(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
             (home / '.claude').mkdir()
@@ -28,38 +28,14 @@ class ContextRelayTests(unittest.TestCase):
                 runpy.run_path(str(Path(__file__).parents[1] / 'scripts/context-relay.py'), run_name='__main__')
             snapshot = json.loads((home / '.config/harness/context/t3.claude.json').read_text())
             self.assertEqual(snapshot['percent'], 42)
-            self.assertEqual(snapshot['tokens'], 84000)
-            quota = json.loads((home / '.claude/herdr-usage.json').read_text())
-            self.assertEqual(quota['fiveHour']['used_percentage'], 12)
+            self.assertNotIn('tokens', snapshot)
+            self.assertFalse((home / '.claude/herdr-usage.json').exists())
 
-    def test_an_idle_sessions_older_quota_does_not_replace_a_newer_one(self):
-        with tempfile.TemporaryDirectory() as directory:
-            home = Path(directory)
-            (home / '.claude').mkdir()
-            def statusline(limits):
-                data = {'session_id': 's', 'context_window': {}, 'rate_limits': limits}
-                with patch.object(Path, 'home', return_value=home), patch.dict(os.environ, {'HC_TERMINAL_ID': ''}), \
-                     patch.object(sys, 'stdin', io.StringIO(json.dumps(data))), patch.object(sys, 'argv', ['relay', 'claude']):
-                    runpy.run_path(str(Path(__file__).parents[1] / 'scripts/context-relay.py'), run_name='__main__')
-                return json.loads((home / '.claude/herdr-usage.json').read_text())
-            statusline({'five_hour': {'used_percentage': 44, 'resets_at': 100}})
-            quota = statusline({'five_hour': {'used_percentage': 30, 'resets_at': 100}})
-            self.assertEqual(quota['fiveHour']['used_percentage'], 44)
-            quota = statusline({'five_hour': {'used_percentage': 3, 'resets_at': 200}})
-            self.assertEqual(quota['fiveHour'], {'used_percentage': 3, 'resets_at': 200})
-
-    def test_codex_uses_latest_context_after_compaction_not_session_total(self):
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'CODEX_HOME': directory}):
-            sid = '12345678-1234-1234-1234-123456789abc'
-            sessions = Path(directory) / 'sessions'
-            sessions.mkdir()
-            events = []
-            for current in (180000, 25000):
-                events.append({'type': 'event_msg', 'payload': {'type': 'token_count', 'info': {
-                    'model_context_window': 200000, 'last_token_usage': {'total_tokens': current},
-                    'total_token_usage': {'total_tokens': 9000000}}}})
-            (sessions / f'rollout-{sid}.jsonl').write_text('\n'.join(map(json.dumps, events)))
-            self.assertEqual(relay.codex_usage({'sessionId': sid})['percent'], 12.5)
+    def test_a_reused_address_keeps_its_newest_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(relay, 'ROOT', Path(directory)):
+            (Path(directory) / 't12.claude.json').write_text(json.dumps({'address': 't12', 'tool': 'claude', 'percent': 19, 'updatedAt': 200}))
+            (Path(directory) / 't12.pi.json').write_text(json.dumps({'address': 't12', 'tool': 'pi', 'percent': 70, 'updatedAt': 100}))
+            self.assertEqual(relay.collect()['t12']['tool'], 'claude')
 
     def test_unknown_context_is_not_zero(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(relay, 'ROOT', Path(directory)):
