@@ -1,6 +1,3 @@
-// Agents in grouped or priority views; parents take their most urgent sub-agent's place.
-// A viewed done agent stays in Done until left.
-
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
@@ -21,7 +18,6 @@ function find(node, id) {
   return null;
 }
 
-// The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
 
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
@@ -47,9 +43,8 @@ function harnessSessionTitle(l) {
 }
 const folderName = path => String(path ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? "";
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
-// A sub-agent without a pane isn't in agents(): its raw word, error counting as
-// blocked. It's never done: it reports to its parent, and the parent's done is the news.
 const kidStatus = (k, listed) => {
+  // A sub-agent without a pane isn't in agents(): its raw word, error counting as blocked.
   const s = listed.get(k.address) ?? k.status;
   return s === "error" ? "blocked" : s === "done" ? "idle" : s;
 };
@@ -70,25 +65,21 @@ function duration(ms) {
   return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 
-// The agent's icon from the app's program table: a one-color glyph or a picture.
 function icon(p, size, color) {
+  // The agent's icon from the app's program table: a one-color glyph or a picture.
   if (!p?.icon) return null;
   return p.icon.endsWith('.svg') ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
-/** After an agent's turn ends, when its machine's context is read (ms): its relay may still be writing. */
 const READ_AFTER = [1000, 4000];
 
 export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu || props()?.loginBar) return;
     this.folded = new Set();
-    // Other machines as hc sees them (state "needs_login", "reconnecting", ...), and
-    // which ones a retry is running for: name -> { busy }.
     this.hosts = {};
     this.retrying = {};
     this.refreshHosts(cx);
-    // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
     cx.timer.every(1000, (cx) => { this.noticeTurns(cx); cx.notify(); });
@@ -96,12 +87,8 @@ export default class Agents extends View {
     this.watchLocalContext(cx);
   }
 
-  /**
-   * Once a second: compares herdr's agent list with the last look (in memory, nothing runs on a
-   * machine), queues a context read of each machine where a turn ended, an agent came or went, or
-   * that came online (READ_AFTER later: its relay may still be writing), and runs the reads due.
-   */
   noticeTurns(cx) {
+    // Once a second: reads the context of machines where a turn ended, an agent came or went, or that came online.
     const now = look(agents(), machines());
     const first = !this.seen;
     if (!first && machinesChanged(this.seen, now)) this.refreshHosts(cx);
@@ -116,8 +103,8 @@ export default class Agents extends View {
     for (const host of new Set(ready.map(d => d.host))) refreshContext(this, cx, host);
   }
 
-  /** This computer's snapshots change as the relays write them: read on each change (turn ends cover it otherwise, and Codex's footers). */
   watchLocalContext(cx) {
+    // Reads this computer's context each time its relays write a snapshot.
     const sep = home().includes("\\") ? "\\" : "/";
     const dir = [home(), ".config", "harness", "context"].join(sep);
     cx.spawn(async cx => {
@@ -128,9 +115,8 @@ export default class Agents extends View {
     });
   }
 
-  // Stamps agents whose state changed. Done and idle count as one: looking at a
-  // finished agent turns done into idle, and looking isn't the agent doing anything.
   track(list, now) {
+    // Stamps agents whose state changed.
     let dirty = false;
     for (const a of list) {
       const s = a.status === "done" ? "idle" : a.status;
@@ -139,7 +125,6 @@ export default class Agents extends View {
       dirty = true;
     }
     if (!dirty) return;
-    // Gone and old: the list alone is empty right after a start.
     const listed = new Set(list.map((a) => a.address));
     for (const [k, c] of Object.entries(this.changed)) if (!listed.has(k) && now - c.at > 30 * 86400000) delete this.changed[k];
     localStorage.setItem("changed", JSON.stringify(this.changed));
@@ -150,9 +135,8 @@ export default class Agents extends View {
     localStorage.setItem("pins", JSON.stringify(pins));
   }
 
-  // Drops pins of agents that ended. Only for machines the list has heard from:
-  // right after a start, or while a machine connects, its agents aren't listed yet.
   prunePins(all) {
+    // Drops pins of agents that ended.
     const machine = (addr) => (addr.includes("/") ? addr.split("/")[0] : "");
     const heard = new Set(all.map((k) => machine(k.address)));
     const live = new Set(all.filter((k) => k.state === "live").map((k) => k.address));
@@ -164,12 +148,10 @@ export default class Agents extends View {
     return this.changed[a.address]?.at ?? 0;
   }
 
-  // Looking at a done agent makes it idle; it stays with Done until you leave
-  // it rather than drop away under you. Any other change moves it at once.
   hold(list) {
+    // Looking at a done agent makes it idle; it stays with Done until you leave it rather than drop away under you.
     const cur = list.find((a) => a.focused);
     const same = cur && cur.address === this.held?.address;
-    // Arriving, or any change but done turning idle, sets what it was.
     if (!same || cur.status !== "idle") this.held = cur ? { address: cur.address, rank: RANK[cur.status] ?? 0 } : null;
   }
 
@@ -188,10 +170,8 @@ export default class Agents extends View {
     });
   }
 
-  // Retry a machine that isn't connected. `hc machine login` reconnects it; when the
-  // machine wants a password or code, it runs in a terminal in a dialog instead, and
-  // the dialog closes when the login ends.
   retry(name, cx) {
+    // Retry a machine that isn't connected.
     if (this.retrying[name]?.busy) return;
     this.retrying[name] = { busy: true };
     cx.notify();
@@ -238,8 +218,8 @@ export default class Agents extends View {
     });
   }
 
-  // The login dialog's title bar.
   loginBar(t) {
+    // The login dialog's title bar.
     const { loginBar: name, terminal } = props();
     return h_flex()
       .size_full()
@@ -301,8 +281,8 @@ export default class Agents extends View {
     run("terminal.peek", { terminal: addr });
   }
 
-  // Live sub-agents of `addr`, depth first, each with the tree lines in front of it.
   tree(all, addr, lead = []) {
+    // Live sub-agents of `addr`, depth first, each with the tree lines in front of it.
     const kids = all.filter((k) => k.parent === addr && k.state === "live");
     return kids.flatMap((k, i) => {
       const last = i === kids.length - 1;
@@ -339,8 +319,8 @@ export default class Agents extends View {
       .child(this.status(t, { status: st }, compact));
   }
 
-  // compact: a ! for blocked where a header already says "Needs you".
   status(t, a, compact = false) {
+    // An agent's status: its ring, spinner or mark (compact: a ! for blocked, under a "Needs you" header).
     const ring = (asset, tint, detail, spinning = false) => div().size(14).flex_none()
       .flex().items_center().justify_center().tooltip(detail)
       .child(svg(`mods/machine-agents/context-rings/${asset}.svg`).size(12).flex_none().text_color(tint)
@@ -390,8 +370,8 @@ export default class Agents extends View {
       return [r, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
     };
 
-    // The fold chevron; folded, the count too, colored by the most urgent one.
     const fold = (a, subs) => {
+      // The fold chevron; folded, the count too, colored by the most urgent one.
       const sts = subs.map((s) => kidStatus(s.t, this.listed));
       const top = sts.reduce((m, s) => ((RANK[s] ?? 0) > (RANK[m] ?? 0) ? s : m), null);
       const open = !this.folded.has(a.address);
@@ -416,8 +396,6 @@ export default class Agents extends View {
         .when(!open, (el) => el.child(String(subs.length)));
     };
 
-    // Prefer the harness's own session title, then its working folder, and use
-    // the Herdr tab name only when neither is available.
     const tabs = spaces().flatMap(s => s.tabs);
     const label = (a) => {
       const tab = tabs.find(tab => tab.id === a.tab);
@@ -458,12 +436,10 @@ export default class Agents extends View {
         .on_click((_e, cx) => {
           cx.stop_propagation();
           this.setPins(isPinned ? this.pins.filter((p) => p !== a.address) : [...this.pins, a.address]);
-          // The row moves away from under the pointer, and no hover-out comes.
           this.hovered = null;
           cx.notify();
         })
         .child(svg(`mods/harness-chrome/${isPinned ? "pin-off" : "pin"}.svg`).size(13));
-      // Show the session's tab/title in every sort; priority and pinned rows add the space as context.
       const full = byPriority || isPinned;
       const name = label(a) || a.space_name || "";
       return h_flex()
@@ -499,8 +475,6 @@ export default class Agents extends View {
         .child(this.status(t, a, byPriority && !isPinned));
     };
 
-    // Groups in list order: spaces (grouped) or priority sections. Agents of a
-    // space are next to each other in agents(), so neighbours make a group.
     const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
     if (byMachine) {
       for (const machine of machines()) {
@@ -521,8 +495,8 @@ export default class Agents extends View {
       else groups.push({ id, label: byPriority ? SECTION[r] : byMachine ? machine || localMachineLabel() : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a] });
     }
 
-    // A group's header; it folds the group. Folded, it says how many and the most urgent state.
     const header = (g) => {
+      // A group's header; it folds the group.
       const open = !this.folded.has(g.id);
       const top = g.members.reduce((m, a) => ((RANK[a.status] ?? 0) > (RANK[m] ?? 0) ? a.status : m), null);
       return h_flex()

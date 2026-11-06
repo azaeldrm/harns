@@ -1,17 +1,3 @@
-<#
-.SYNOPSIS
-Installs the Harness layout into herdr: its mods, theme, brand assets and program
-icons, then the herdr-harness layout itself, and switches to it.
-
-Run it from a clone of this repository. If the clone is the herdr home itself (the
-way this repository is kept on the machine it was made on), there is nothing to copy:
-it only regenerates the built files and checks the mods.
-
-The work is done by scripts/install.py, which install.sh runs on Linux and macOS.
-
--NoSwitch installs without switching to the layout.
--NoRelays leaves Claude Code's, Codex's and Pi's settings as they are.
-#>
 param([switch]$NoSwitch, [switch]$NoRelays)
 $ErrorActionPreference = 'Stop'
 

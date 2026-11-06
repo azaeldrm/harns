@@ -1,5 +1,3 @@
-// The account's usage as the bar shows it (mods/machine-stats/usage.js).
-//   node tests/usage.mjs
 import { fromProbe, servicesOf, current } from '../mods/machine-stats/usage.js';
 
 let failed = 0;

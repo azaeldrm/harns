@@ -1,18 +1,3 @@
-"""Install the Harness layout into herdr, on Windows, Linux or macOS.
-
-Builds the generated files, copies the mods, theme, brand assets and layout into the
-herdr home, merges the program icons into programs.json, checks every mod, installs this
-machine's relays (scripts/install-context.py: Claude's usage and context, Codex's and
-Pi's context) and switches to the herdr-harness layout. install.sh and install.ps1 both
-run this.
-
-If this clone is the herdr home itself, nothing is copied: it only regenerates the
-built files and checks the mods.
-
-  --no-switch   install without switching to the layout
-  --no-relays   leave Claude Code's, Codex's and Pi's settings as they are (the usage
-                meter and context rings then stay empty on this machine)
-"""
 import json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 
