@@ -2,8 +2,6 @@ import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { theme, run, props, window, shared, setShared, updates, layout, agents } from "herdr";
 
-// The fade logo while any agent is working, the up-and-down (bob) logo otherwise.
-// render() reruns whenever agents change, so this swaps by itself.
 const logoSrc = () => agents().some(a => a.status === "working")
   ? "mods/harness-chrome/harness-logo-fade.webp"
   : "mods/harness-chrome/harness-logo-bob.webp";
@@ -17,14 +15,12 @@ function find(node, id) {
   return null;
 }
 
-// The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
 
-// To the rail (on macOS wide enough for the traffic lights), or back to the width it had.
 function toggleSidebar() {
+  // To the rail (on macOS wide enough for the traffic lights), or back to the width it had.
   const width = find(layout(), "sidebar")?.size?.px;
   if (!narrow()) setShared("sidebar.width", width);
-  // Mods edited before the rail went by width still read the flag.
   setShared("sidebar.collapsed", !narrow());
   run("layout.resize", { id: "sidebar", px: narrow() ? (shared("sidebar.width") ?? 268) : window()?.platform === "macos" ? 76 : 56 });
 }
@@ -47,7 +43,6 @@ export default class WorkspaceChrome extends View {
         .when(!collapsed, el => el.child(label));
       const settings = row("settings", "settings", "Settings", false, () => run("app.settings"))
         .when(Boolean(updates().app.ready), el => el.child(div().size(6).rounded_full().bg(t.accent)));
-      // Keep the bottom actions in identical rows at either sidebar width.
       return v_flex().size_full().bg(t.surface).justify_end().px(8).pt(4).pb(8).text_size(13)
         .when(collapsed, el => el.px(0))
         .child(settings)
@@ -61,7 +56,6 @@ export default class WorkspaceChrome extends View {
         .child(this.button("sidebar-collapse-logo", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Collapse sidebar"))
         .child(div().text_size(16).font_semibold().text_color(t.foreground).child("Harness"))))
       .when(!collapsed, el => el.child(this.button("search", svg("mods/harness-chrome/search.svg").size(15), () => run("mod.open", { name: "picker" }))))
-      // The compact rail expands through the logo above.
       .when(!collapsed, el => el.child(this.button("sidebar-toggle", svg("mods/harness-chrome/sidebar.svg").size(15), toggleSidebar)));
   }
 }

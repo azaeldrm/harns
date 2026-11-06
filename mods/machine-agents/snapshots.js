@@ -1,10 +1,3 @@
-/**
- * The relays' context snapshots (~/.config/harness/context/<address>.<tool>.json, written by
- * scripts/context-relay.py and the Pi extension) as context.js publishes them: the newest per
- * terminal, by address, leaving out unreadable ones and ones with no percentage (unknown isn't
- * 0%). The same rule as the relay's own collect(), which other machines run. No herdr imports:
- * tested alone (tests/snapshots.mjs).
- */
 export function newestSnapshots(texts) {
   const result = {};
   for (const text of texts) {
