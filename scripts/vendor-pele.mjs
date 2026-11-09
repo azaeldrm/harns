@@ -1,6 +1,10 @@
 import { readFileSync, existsSync, mkdirSync, copyFileSync, rmSync, readdirSync, statSync, writeFileSync } from "fs";
-import { dirname, join, relative, resolve } from "path";
+import { dirname, join, relative as nativeRelative, resolve } from "path";
 import { fileURLToPath } from "url";
+
+// Paths inside the copy, always with "/": on Windows path.relative answers with "\", which
+// wouldn't match the "diagrams/x.js" entries below.
+const relative = (from, to) => nativeRelative(from, to).split("\\").join("/");
 
 export const DIAGRAMS = ["flowchart", "sequence", "state", "class", "er", "gantt", "pie", "mindmap", "timeline", "gitGraph"];
 
