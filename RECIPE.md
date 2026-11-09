@@ -45,8 +45,14 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 - **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
   blocked is a "Needs you" badge (a "!" in the rail); done is a 7 px teal dot; idle is a
-  ring filled to the share of the context window used (red `#d88179` above 90%, an empty
-  ring when unknown). Tabs show the same spinner, or a dot for blocked and done.
+  ring filled to the share of the context window used at the latest reading, with the
+  percentage on hover (red `#d88179` above 90%, an empty ring until the first reading).
+  Tabs show the same spinner, or a dot for blocked and done.
+- **Context readings:** Claude Code and Pi report through the relays (Watch out). Codex's
+  ring is its footer's "Context N% left", so it shows when `context-remaining` is one of
+  Codex's `tui.status_line` items. A machine's readings are fetched when one of its agents
+  finishes a turn, appears or goes away, or the machine comes online, and cleared while it's
+  unavailable.
 - **Logo:** it fades in and out while any agent is working and bobs up and down otherwise.
   Clicking it folds or unfolds the sidebar.
 - **Sidebar:** clicking an agent focuses it; hovering a row swaps its age for a pin, and
@@ -113,7 +119,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   keychain item on macOS) and sends its token only to Anthropic's usage endpoint,
   `https://api.anthropic.com/api/oauth/usage`. That request and `codex app-server` are its only
   network use beyond herdr's own machine connections;
-- reads the context snapshots the relays write in `~/.config/harness/context/`, and files and Markdown
+- reads the context snapshots the relays write in `~/.config/harness/context/` (session
+  identifiers and context counts only; the relays send nothing anywhere), and files and Markdown
   shown in the Files panel (images beside a Markdown file are read from its machine; web images
   show as links and are never fetched);
 - reads `harness.json` in the Herdr home for an optional nickname, and keeps its readings in
@@ -131,14 +138,20 @@ files they add or change.
 - The chat and the toggle need herdr-chat; without it those blocks show errors. The installer
   adds it from its repository when it's missing and never replaces an installed copy.
 - Claude's and Pi's context rings come from the relays (`scripts/install-context.py`) on each
-  machine: the installer sets them up on this computer, and `--on MACHINE` on the others. The
-  usage meters need only a machine where Claude Code and Codex are signed in. Claude's usage
+  machine: the installer sets them up on this computer, and `--on MACHINE` on the others.
+  Pi's is a global extension publishing `getContextUsage()` every second; Claude's is the
+  status line, keeping the session ID and `context_window` fields and passing the same input
+  to a status line that was there before. Snapshots are keyed by `HC_TERMINAL_ID`, qualified
+  with the machine name and checked against the terminal's creation time, never matched by
+  folder. Claude reports no percentage early in a session; keep it unknown rather than 0%.
+  `/reload` sent to Pi with `hc send` arrives as a message, so it's typed. The usage meters need only a machine where Claude Code and Codex are signed in. Claude's usage
   comes from Anthropic's OAuth usage endpoint with the `anthropic-beta: oauth-2025-04-20`
   header.
 - Other machines need Python 3. GPU rings read NVIDIA cards through `nvidia-smi`; other vendors
   go in `machine-stats/gpus.js`, which has an entry for each.
-- The installer is `scripts/install.py`; `install.sh` and `install.ps1` find Python and run it,
-  so install logic belongs in `install.py`.
+- The installer is `scripts/install.py`; `install.sh` runs it with the first Python 3 that
+  starts (on Windows, `python3` can be the Store placeholder), so install logic belongs in
+  `install.py`.
 - `harness-files` replaces herdr's `files` block (same block id, so its clicks survive). It is
   herdr's Files plus a Markdown view, and `vendor/pele` comes from `npm run vendor:pele`. Don't
   edit the vendored copy. With props `{ file }` it is a viewer for that one file.

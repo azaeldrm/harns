@@ -107,9 +107,9 @@ def install_chat(home, source=CHAT_REPO):
 
 
 def main():
-    switch = '--no-switch' not in sys.argv[1:] and '-NoSwitch' not in sys.argv[1:]
-    relays = '--no-relays' not in sys.argv[1:] and '-NoRelays' not in sys.argv[1:]
-    chat = '--no-chat' not in sys.argv[1:] and '-NoChat' not in sys.argv[1:]
+    switch = '--no-switch' not in sys.argv[1:]
+    relays = '--no-relays' not in sys.argv[1:]
+    chat = '--no-chat' not in sys.argv[1:]
     repo = Path(__file__).resolve().parent.parent
     home = herdr_home()
     app = find_app()
