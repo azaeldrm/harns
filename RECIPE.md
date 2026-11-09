@@ -11,6 +11,12 @@ A status bar shows where you are and how much Claude Code and Codex quota is lef
 Needs [herdr-chat](https://github.com/azaeldrm/herdr-chat) for the chat and the toggle: the
 installer adds it, and adding this layout by hand means adding that repository's mod too.
 
+To add it, run `./install.sh` from a clone (or `python scripts/install.py`). By hand, copy
+more than the layout and its mods: `layouts/herdr-harness.json` with its picture
+`layouts/herdr-harness.png`, every folder in `mods/` (the rings' images live in
+`machine-stats`), `themes/harness.json` and `brand-assets/`, and merge `programs.json`'s
+entries into yours.
+
 ## What you see
 
 Left to right: a sidebar, then the work column. There's no system title bar.
@@ -81,7 +87,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 - **Layout** `layouts/herdr-harness.json`, cloned from `main`: root `row` (`titlebar:
   none`, theme `harness`, `terminal_padding [14, 12]`) → `sidebar` column [`brand`
-  block, `agents` block, `sidebar-footer` block] and `work` column [`tabs` block,
+  block, `sidebar-lists` column with the `agents` block, `sidebar-footer` block] and `work` column [`tabs` block,
   `work-body` row [`chat-view` stack of `chat-panel` and `terminal-panel`, hidden
   `panel` column with a `panel-body` stack of `files` and `changes`], `status` block].
 - **Mods:**
@@ -96,7 +102,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
     `machine-stats` publishes shared `machine.stats`, `machine.usage` and
     `machine.local-label`.
   - `herdr-chat` (separate repo): the chat panel and the pane header with the toggle.
-  - Shipped: `files`, `changes`, `picker`, `machine-add`, `new-menu`, `menu`.
+  - Shipped: the `changes` block; `picker`, `machine-add`, `new-menu`, `menu` and
+    `worktree` as overlays; icons from `pane`, `files` and `changes`.
 - **Programs it runs** through `exec(..., {on: machine})`: per platform
   (`machine-stats/platforms.js`) a PowerShell or Python 3 stats probe every second, the
   account probe above (an HTTPS request to Anthropic and a short-lived `codex app-server`),
@@ -126,8 +133,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - reads `harness.json` in the Herdr home for an optional nickname, and keeps its readings in
   shared `machine.*` values.
 
-The installer writes only in the Herdr home, apart from the relays: see the README for the
-files they add or change.
+The installer writes only in the Herdr home, apart from the relays (see the README for the
+files they add or change), and downloads herdr-chat from GitHub when it isn't installed.
 
 **Notes for building it:**
 

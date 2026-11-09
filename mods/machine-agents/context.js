@@ -37,7 +37,8 @@ export function refreshContext(view, cx, only, { footers = true } = {}) {
         let values = {};
         if (host === null) values = await readLocal();
         else {
-          const result = await exec('python3', ['-c', contextProbe], { on: host });
+          let result = await exec('python3', ['-c', contextProbe], { on: host });
+          if (result.code !== 0) result = await exec('python', ['-c', contextProbe], { on: host });
           values = result.code === 0 ? JSON.parse(result.stdout) : {};
         }
         const codex = agents().filter(a => a.app === 'codex' && hostOf(a.address) === host);
