@@ -37,18 +37,16 @@ Optional:
 |---|---|---|
 | Windows | PowerShell counters | NVIDIA |
 | Linux | Python 3, `/proc` | NVIDIA |
-| macOS | Python 3, `top` and `vm_stat` (untested) | none yet |
+| macOS | Python 3, `top` and `vm_stat` | — |
 
 Each machine's platform is detected once (`mods/machine-stats/platforms.js`). GPU vendors
-are entries in `mods/machine-stats/gpus.js`; AMD, Intel and Apple are there to fill in.
+are entries in `mods/machine-stats/gpus.js`, with a place for AMD, Intel and Apple.
 
 ## Working on it
 
-Here the repository is the herdr home itself: an allow-list `.gitignore` tracks only
-these files, so there's one copy and herdr's edits show up in `git status`.
-
-- Edit the sources, then run `python scripts/build-mods.py`. It writes the copies herdr
-  needs (see RECIPE.md, Watch out).
+- Edit the sources in a clone, then run the installer (`--no-switch --no-relays` while
+  developing). It runs `scripts/build-mods.py`, which writes the copies herdr needs (see
+  RECIPE.md, Watch out), and copies the result into `~/.config/herdr-app`.
 - Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
 - Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs`,
   `node tests/turns.mjs`, `node tests/probes.mjs` and `node tests/snapshots.mjs`.
