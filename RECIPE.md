@@ -104,7 +104,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 ## Watch out
 
-**What it accesses** (herdr asks every shared mod to say so):
+**What it accesses:**
 
 - runs programs on this computer and on connected machines (`exec(…, { on })`): a PowerShell
   or Python 3 stats probe every second, `nvidia-smi`, `uname -s`, `hostname`, `hc read`, and
