@@ -8,6 +8,9 @@ A status bar shows where you are and how much Claude Code and Codex quota is lef
 
 ![Harness](preview.png)
 
+Needs [herdr-chat](https://github.com/azaeldrm/herdr-chat) for the chat and the toggle: the
+installer adds it, and adding this layout by hand means adding that repository's mod too.
+
 ## What you see
 
 Left to right: a sidebar, then the work column. There's no system title bar.
@@ -28,7 +31,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, and the window buttons on Windows and Linux.
-- **Work area** (12 px padding): the shown tab, as a chat or as terminal cards (10 px
+- **Work area** (12 px padding): the shown tab, as a chat (where a new agent session starts) or as terminal cards (10 px
   radius, 1 px `border`, a 42 px header with the Chat / Terminal toggle). Files or
   Changes open in a 368 px panel on the right.
 - **Status bar** (42 px, `surface`): the shown space's machine and branch, the focused
@@ -111,8 +114,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   machine: the installer sets them up on this computer, `--on MACHINE` on the others.
   Without them those stay empty. The usage meters need no relay, only a machine where
   Claude Code and Codex are signed in. Anthropic's usage endpoint is undocumented (it
-  needs the `anthropic-beta: oauth-2025-04-20` header); the Windows account probe has never
-  run on Windows.
+  needs the `anthropic-beta: oauth-2025-04-20` header).
 - Remote machines need Python 3. GPUs are NVIDIA only (AMD, Intel and Apple are empty
   entries in `machine-stats/gpus.js`). The macOS probe has never run on a Mac.
 - The installer is `scripts/install.py`; `install.sh` and `install.ps1` only find Python and
@@ -128,4 +130,6 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   under it; a working agent spins and the logo fades.
 - Folding the sidebar leaves icons, rings and statuses centered in the rail.
 - The status bar names the focused pane's machine and folder and fills the quota bars.
-- A Claude Code tab toggles between Chat and Terminal from its header.
+- A new Claude Code tab opens on its chat and toggles to Terminal from its header.
+- Running the installer where herdr-chat isn't installed adds it; running it again leaves no layout
+  backup behind.
