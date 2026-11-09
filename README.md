@@ -17,16 +17,26 @@ installed yet (`--no-chat`, or `-NoChat`, to skip) and never replaces a copy you
 Ask your agent to add this layout, or run the installer from a clone: `./install.sh` on
 Linux and macOS, `./install.ps1` on Windows (both run `scripts/install.py`). It builds the
 generated files, copies the mods, theme, assets and layout into
-`~/.config/herdr-app`, merges the program icons into your `programs.json`, checks every
-mod, installs this computer's relays (below) and switches to `herdr-harness`
-(`--no-switch`, or `-NoSwitch` on Windows, to skip). `ctrl-shift-l` switches back.
+`~/.config/herdr-app` (or `HERDR_APP_HOME` when it's set), sets the icon and tint for Codex,
+Claude Code and Pi in your `programs.json` (its other entries stay as they are), checks every mod,
+installs this computer's relays (below) and switches to `herdr-harness` (`--no-switch`, or
+`-NoSwitch` on Windows, to skip). `ctrl-shift-l` switches back. A `herdr-harness` layout you
+changed is kept beside the new one as `herdr-harness.json.before-install-<time>`.
 
 Optional:
 
 - **Context rings** come from relays: Claude Code's status line and a Pi extension
   (`scripts/install-context.py`, on Windows, Linux and macOS); Codex's comes from its footer.
-  The Claude Code and Codex quota bars read the account from each service and need no relay. The installer sets them up on this computer (`--no-relays`, or `-NoRelays`, to
-  skip); for each connected machine run `python scripts/install-context.py --on MACHINE`.
+  The Claude Code and Codex quota bars read the account from each service and need no relay.
+  The installer sets the relays up on this computer (`--no-relays`, or `-NoRelays`, to skip);
+  for each connected machine run `python scripts/install-context.py --on MACHINE`. They write:
+  - `~/.config/harness/context-relay.py`, and the snapshots it keeps in `context/` beside it;
+  - `~/.pi/agent/extensions/harness-context.ts`;
+  - `statusLine` in `~/.claude/settings.json`, after copying the file to
+    `settings.json.before-harness-context` once. A status line you had is kept in
+    `~/.config/harness/claude-statusline-original.json`, and the relay still runs it;
+  - in `~/.codex/config.toml`, only removing a `notify` line an older relay added.
+
   See [CONTEXT.md](CONTEXT.md).
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
