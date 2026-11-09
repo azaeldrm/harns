@@ -105,7 +105,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   `machine-metrics` into `machine-agents`, `machine-stats` into
   `workspace-status-machine`, `context-relay.py` into `context-probe.js`. Edit the
   sources and run it.
-- The chat and the toggle need herdr-chat; without it those blocks show errors.
+- The chat and the toggle need herdr-chat; without it those blocks show errors. The installer
+  adds it from its repository when it's missing and never replaces an installed copy.
 - Claude's and Pi's context rings need the relays (`scripts/install-context.py`) on each
   machine: the installer sets them up on this computer, `--on MACHINE` on the others.
   Without them those stay empty. The usage meters need no relay, only a machine where
