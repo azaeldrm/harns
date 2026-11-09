@@ -119,6 +119,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   go in `machine-stats/gpus.js`, which has an entry for each.
 - The installer is `scripts/install.py`; `install.sh` and `install.ps1` find Python and run it,
   so install logic belongs in `install.py`.
+- `harness-files` replaces herdr's `files` block (same block id, so its clicks survive). It is
+  herdr's Files plus a Markdown view, and `vendor/pele` comes from `npm run vendor:pele`. Don't
+  edit the vendored copy. With props `{ file }` it is a viewer for that one file.
 - `harness-pane` is a pane header for layouts that want one; Harness itself uses herdr-chat's.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
   its rail.
