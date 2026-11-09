@@ -1,9 +1,11 @@
-import json, os, re, shutil, subprocess, sys, time
+import io, json, os, re, shutil, subprocess, sys, tarfile, tempfile, time, urllib.request
 from pathlib import Path
 
 MODS = ['harness-chrome', 'harness-pane', 'harness-tabs', 'machine-agents', 'machine-metrics',
         'machine-new-menu', 'machine-stats', 'workspace-status-machine']
 LAYOUT = 'herdr-harness'
+CHAT = 'herdr-chat'
+CHAT_REPO = 'https://github.com/azaeldrm/herdr-chat'
 
 
 def fail(message):
@@ -58,9 +60,56 @@ def merge_programs(ours_path, theirs_path):
     temp.replace(theirs_path)
 
 
+def back_up_if_changed(target, new, backup):
+    """Keeps a copy of `target` as `backup` before `new` replaces it, only when their contents differ."""
+    if not target.exists():
+        return False
+    if target.read_bytes().replace(b'\r\n', b'\n') == new.read_bytes().replace(b'\r\n', b'\n'):
+        return False
+    shutil.copy2(target, backup)
+    return True
+
+
+def fetch_chat(source, into):
+    """The herdr-chat repository at `source` in the folder `into`: cloned with git, else downloaded."""
+    if shutil.which('git'):
+        clone = into / 'clone'
+        if subprocess.run(['git', 'clone', '--quiet', '--depth', '1', source, str(clone)],
+                          capture_output=True).returncode == 0:
+            return clone
+    if source.startswith('https://github.com/'):
+        with urllib.request.urlopen(f'{source}/archive/refs/heads/main.tar.gz', timeout=60) as response:
+            data = response.read()
+        with tarfile.open(fileobj=io.BytesIO(data)) as archive:
+            if hasattr(tarfile, 'data_filter'):
+                archive.extractall(into / 'download', filter='data')
+            else:
+                archive.extractall(into / 'download')
+        return next((into / 'download').iterdir())
+    raise RuntimeError(f'could not get {source}')
+
+
+def install_chat(home, source=CHAT_REPO):
+    """Installs the herdr-chat mod the layout uses when it isn't installed; an installed copy is kept. Returns what happened."""
+    target = home / 'mods' / CHAT
+    if target.is_dir():
+        return 'kept'
+    with tempfile.TemporaryDirectory() as directory:
+        repo = fetch_chat(source, Path(directory))
+        mod = repo / 'mods' / CHAT
+        if not (mod / 'main.js').is_file():
+            raise RuntimeError(f'{source} has no mods/{CHAT}')
+        staging = home / 'mods' / f'.{CHAT}.new'
+        shutil.rmtree(staging, ignore_errors=True)
+        shutil.copytree(mod, staging)
+        staging.rename(target)
+    return 'installed'
+
+
 def main():
     switch = '--no-switch' not in sys.argv[1:] and '-NoSwitch' not in sys.argv[1:]
     relays = '--no-relays' not in sys.argv[1:] and '-NoRelays' not in sys.argv[1:]
+    chat = '--no-chat' not in sys.argv[1:] and '-NoChat' not in sys.argv[1:]
     repo = Path(__file__).resolve().parent.parent
     home = herdr_home()
     app = find_app()
@@ -79,12 +128,19 @@ def main():
         layouts = home / 'layouts'
         layouts.mkdir(parents=True, exist_ok=True)
         layout_target = layouts / f'{LAYOUT}.json'
-        if layout_target.exists():
-            shutil.copy2(layout_target, layouts / f'{LAYOUT}.json.before-install-{stamp}')
+        back_up_if_changed(layout_target, repo / 'layouts' / f'{LAYOUT}.json',
+                           layouts / f'{LAYOUT}.json.before-install-{stamp}')
         shutil.copy2(repo / 'layouts' / f'{LAYOUT}.png', layouts / f'{LAYOUT}.png')
         shutil.copy2(repo / 'layouts' / f'{LAYOUT}.json', layout_target)
 
         merge_programs(repo / 'programs.json', home / 'programs.json')
+
+    if chat:
+        try:
+            if install_chat(home) == 'installed':
+                print(f'Installed {CHAT} from {CHAT_REPO}')
+        except Exception as error:
+            print(f'warning: could not install {CHAT} ({error}).', file=sys.stderr)
 
     for mod in MODS:
         result = subprocess.run([app, 'check', str(home / 'mods' / mod)], capture_output=True, text=True)
@@ -100,9 +156,12 @@ def main():
     needed = sorted(set(re.findall(r'"mod":\s*"([^"]+)"', layout)))
     missing = [mod for mod in needed if not (home / 'mods' / mod).is_dir()]
     if missing:
-        print('warning: the layout also uses mods that are not installed: ' + ', '.join(missing) +
-              '. herdr-chat comes from https://github.com/azaeldrm/herdr-chat; install it, then run '
-              'this again. Not switching, or the layout would show errors in their place.', file=sys.stderr)
+        where = f' {CHAT} comes from {CHAT_REPO}.' if CHAT in missing else ''
+        if any(mod != CHAT for mod in missing):
+            where += ' The others are Herdr\'s own: open Herdr once so it writes them.'
+        print('warning: the layout also uses mods that are not installed: ' + ', '.join(missing) + '.' + where +
+              ' Install them, then run this again. Not switching, or the layout would show errors in their place.',
+              file=sys.stderr)
 
     if switch and not missing:
         if subprocess.run([app, 'do', 'layout.switch', '--name', LAYOUT], stdout=subprocess.DEVNULL).returncode != 0:
