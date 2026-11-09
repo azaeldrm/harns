@@ -12,23 +12,24 @@ status bar. Everything goes through herdr's own machine connections.
 
 Needs the Herdr app and Python 3 on each machine. The chat in agent tabs is
 [herdr-chat](https://github.com/azaeldrm/herdr-chat): the installer adds it when it isn't
-installed yet (`--no-chat`, or `-NoChat`, to skip) and never replaces a copy you have.
+installed yet (`--no-chat` to skip) and never replaces a copy you have.
 
-Ask your agent to add this layout, or run the installer from a clone: `./install.sh` on
-Linux and macOS, `./install.ps1` on Windows (both run `scripts/install.py`). It builds the
+Ask your agent to add this layout, or run `./install.sh` from a clone (on Windows, from Git
+Bash, or run `python scripts/install.py` in PowerShell, with the same options). It builds the
 generated files, copies the mods, theme, assets and layout into
 `~/.config/herdr-app` (or `HERDR_APP_HOME` when it's set), sets the icon and tint for Codex,
 Claude Code and Pi in your `programs.json` (its other entries stay as they are), checks every mod,
-installs this computer's relays (below) and switches to `herdr-harness` (`--no-switch`, or
-`-NoSwitch` on Windows, to skip). `ctrl-shift-l` switches back. A `herdr-harness` layout you
+installs this computer's relays (below) and switches to `herdr-harness` (`--no-switch` to
+skip). `ctrl-shift-l` switches back. A `herdr-harness` layout you
 changed is kept beside the new one as `herdr-harness.json.before-install-<time>`.
 
 Optional:
 
 - **Context rings** come from relays: Claude Code's status line and a Pi extension
-  (`scripts/install-context.py`, on Windows, Linux and macOS); Codex's comes from its footer.
-  The Claude Code and Codex quota bars read the account from each service and need no relay.
-  The installer sets the relays up on this computer (`--no-relays`, or `-NoRelays`, to skip);
+  (`scripts/install-context.py`, on Windows, Linux and macOS). Codex's comes from its footer,
+  when `context-remaining` is one of its `tui.status_line` items. The Claude Code and Codex
+  quota bars read the account from each service and need no relay.
+  The installer sets the relays up on this computer (`--no-relays` to skip);
   for each connected machine run `python scripts/install-context.py --on MACHINE`. They write:
   - `~/.config/harness/context-relay.py`, and the snapshots it keeps in `context/` beside it;
   - `~/.pi/agent/extensions/harness-context.ts`;
@@ -37,7 +38,7 @@ Optional:
     `~/.config/harness/claude-statusline-original.json`, and the relay still runs it;
   - in `~/.codex/config.toml`, only removing a `notify` line an older relay added.
 
-  See [CONTEXT.md](CONTEXT.md).
+  Pi sessions already running pick up the relay after `/reload`, typed in their terminal.
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
