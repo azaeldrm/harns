@@ -10,8 +10,9 @@ status bar. Everything goes through herdr's own machine connections.
 
 ## Install
 
-Needs the Herdr app, Python 3 on each machine, and
-[herdr-chat](https://github.com/azaeldrm/herdr-chat) installed first.
+Needs the Herdr app and Python 3 on each machine. The chat in agent tabs is
+[herdr-chat](https://github.com/azaeldrm/herdr-chat): the installer adds it when it isn't
+installed yet (`--no-chat`, or `-NoChat`, to skip) and never replaces a copy you have.
 
 Ask your agent to add this layout, or run the installer from a clone: `./install.sh` on
 Linux and macOS, `./install.ps1` on Windows (both run `scripts/install.py`). It builds the
