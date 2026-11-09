@@ -104,6 +104,26 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 ## Watch out
 
+**What it accesses** (herdr asks every shared mod to say so):
+
+- runs programs on this computer and on connected machines (`exec(…, { on })`): a PowerShell
+  or Python 3 stats probe every second, `nvidia-smi`, `uname -s`, `hostname`, `hc read`, and
+  for the usage meters a short-lived `codex app-server`;
+- reads Claude Code's login (`~/.claude/.credentials.json`, or the `Claude Code-credentials`
+  keychain item on macOS) and sends its token only to Anthropic's usage endpoint,
+  `https://api.anthropic.com/api/oauth/usage`. That request and `codex app-server` are its only
+  network use beyond herdr's own machine connections;
+- reads the context snapshots the relays write in `~/.config/harness/context/`, and files and Markdown
+  shown in the Files panel (images beside a Markdown file are read from its machine; web images
+  show as links and are never fetched);
+- reads `harness.json` in the Herdr home for an optional nickname, and keeps its readings in
+  shared `machine.*` values.
+
+The installer writes only in the Herdr home, apart from the relays: see the README for the
+files they add or change.
+
+**Notes for building it:**
+
 - Each herdr mod imports from its own folder, so `scripts/build-mods.py` copies shared code:
   `machine-metrics` into `machine-agents`, `machine-stats` into
   `workspace-status-machine`, `context-relay.py` into `context-probe.js`. Edit the

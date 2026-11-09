@@ -142,12 +142,13 @@ def main():
         except Exception as error:
             print(f'warning: could not install {CHAT} ({error}).', file=sys.stderr)
 
-    for mod in MODS:
+    checked = MODS + ([CHAT] if (home / 'mods' / CHAT).is_dir() else [])
+    for mod in checked:
         result = subprocess.run([app, 'check', str(home / 'mods' / mod)], capture_output=True, text=True)
         if result.returncode != 0:
             print(result.stdout + result.stderr, file=sys.stderr)
             fail(f'herdr-app check failed for mods/{mod}')
-    print(f'Checked {len(MODS)} mods in {home / "mods"}')
+    print(f'Checked {len(checked)} mods in {home / "mods"}')
 
     if relays and subprocess.run([sys.executable, str(repo / 'scripts' / 'install-context.py')]).returncode != 0:
         fail('Installing the relays failed (scripts/install-context.py). --no-relays skips them.')
