@@ -1,11 +1,13 @@
 /*
 !/.gitignore
+!/.gitattributes
 !/README.md
 !/RECIPE.md
 !/CONTEXT.md
 !/install.ps1
 !/install.sh
 !/package.json
+!/package-lock.json
 !/preview.png
 !/programs.json
 !/scripts/
@@ -21,6 +23,7 @@
 !/mods/
 /mods/*
 !/mods/harness-chrome/
+!/mods/harness-files/
 !/mods/harness-pane/
 !/mods/harness-tabs/
 !/mods/machine-agents/

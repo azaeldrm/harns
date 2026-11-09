@@ -1,0 +1,3 @@
+# Pele, copied from npm by scripts/vendor-pele.mjs. Kept byte for byte (no line-ending
+# conversion), so `npm run check:pele` compares it exactly; collapsed in GitHub diffs.
+mods/harness-files/vendor/** -text linguist-vendored linguist-generated

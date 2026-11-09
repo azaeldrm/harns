@@ -49,4 +49,10 @@ are entries in `mods/machine-stats/gpus.js`, with a place for AMD, Intel and App
   RECIPE.md, Watch out), and copies the result into `~/.config/herdr-app`.
 - Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
 - Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs`,
-  `node tests/turns.mjs`, `node tests/probes.mjs` and `node tests/snapshots.mjs`.
+  `node tests/turns.mjs`, `node tests/probes.mjs`, `node tests/snapshots.mjs`, `node tests/markdown.mjs` and `npm run check:pele` (the vendored
+  Pele matches its pin; after `npm install` it compares every byte).
+- `harness-files` is herdr's Files panel where Markdown and `.mmd` files open as a readable
+  document: images (beside the file or on its machine; web images show as links, never fetched) and
+  mermaid blocks drawn by Pele (the same pinned version as herdr-chat). Preview and
+  Source in its header switch views. To update Pele, change the pin in `package.json`, then run
+  `npm install && npm run vendor:pele`.

@@ -1,7 +1,7 @@
 import io, json, os, re, shutil, subprocess, sys, tarfile, tempfile, time, urllib.request
 from pathlib import Path
 
-MODS = ['harness-chrome', 'harness-pane', 'harness-tabs', 'machine-agents', 'machine-metrics',
+MODS = ['harness-chrome', 'harness-files', 'harness-pane', 'harness-tabs', 'machine-agents', 'machine-metrics',
         'machine-new-menu', 'machine-stats', 'workspace-status-machine']
 LAYOUT = 'herdr-harness'
 CHAT = 'herdr-chat'
