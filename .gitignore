@@ -2,6 +2,7 @@
 !/.gitignore
 !/.gitattributes
 !/README.md
+!/LICENSE
 !/RECIPE.md
 !/CONTEXT.md
 !/install.ps1
