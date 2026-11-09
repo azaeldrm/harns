@@ -8,6 +8,9 @@ A status bar shows where you are and how much Claude Code and Codex quota is lef
 
 ![Harness](preview.png)
 
+Needs [herdr-chat](https://github.com/azaeldrm/herdr-chat) for the chat and the toggle: the
+installer adds it, and adding this layout by hand means adding that repository's mod too.
+
 ## What you see
 
 Left to right: a sidebar, then the work column. There's no system title bar.
@@ -28,7 +31,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, and the window buttons on Windows and Linux.
-- **Work area** (12 px padding): the shown tab, as a chat or as terminal cards (10 px
+- **Work area** (12 px padding): the shown tab, as a chat (where a new agent session starts) or as terminal cards (10 px
   radius, 1 px `border`, a 42 px header with the Chat / Terminal toggle). Files or
   Changes open in a 368 px panel on the right.
 - **Status bar** (42 px, `surface`): the shown space's machine and branch, the focused
@@ -50,8 +53,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   pinned agents sit in a Pinned group on top. The sort button offers Priority (Needs you,
   Done, Working, Idle sections), Grouped by space and Grouped by machine. Group headers
   and parents with sub-agents fold. A machine's + opens the agents installed there.
-- **Rings:** CPU, RAM and GPU refresh every second; hover one for its percentage. Missing
-  readings stay empty, never 0%.
+- **Rings:** CPU, RAM and GPU refresh every second; hover one for its percentage. A ring
+  stays empty until its first reading arrives.
 - **Usage meters:** Claude's and Codex's limits belong to the account, so the bar shows one
   reading per service on every machine, from the service itself: Anthropic's OAuth usage
   endpoint with Claude Code's login, and `codex app-server`'s `account/rateLimits/read`. Each
@@ -101,23 +104,22 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 ## Watch out
 
-- Herdr won't import across mod folders, so `scripts/build-mods.py` copies code:
+- Each herdr mod imports from its own folder, so `scripts/build-mods.py` copies shared code:
   `machine-metrics` into `machine-agents`, `machine-stats` into
   `workspace-status-machine`, `context-relay.py` into `context-probe.js`. Edit the
   sources and run it.
 - The chat and the toggle need herdr-chat; without it those blocks show errors. The installer
   adds it from its repository when it's missing and never replaces an installed copy.
-- Claude's and Pi's context rings need the relays (`scripts/install-context.py`) on each
-  machine: the installer sets them up on this computer, `--on MACHINE` on the others.
-  Without them those stay empty. The usage meters need no relay, only a machine where
-  Claude Code and Codex are signed in. Anthropic's usage endpoint is undocumented (it
-  needs the `anthropic-beta: oauth-2025-04-20` header); the Windows account probe has never
-  run on Windows.
-- Remote machines need Python 3. GPUs are NVIDIA only (AMD, Intel and Apple are empty
-  entries in `machine-stats/gpus.js`). The macOS probe has never run on a Mac.
-- The installer is `scripts/install.py`; `install.sh` and `install.ps1` only find Python and
-  run it, so keep install logic there.
-- `harness-pane` (a pane header) is installed but the layout doesn't place it.
+- Claude's and Pi's context rings come from the relays (`scripts/install-context.py`) on each
+  machine: the installer sets them up on this computer, and `--on MACHINE` on the others. The
+  usage meters need only a machine where Claude Code and Codex are signed in. Claude's usage
+  comes from Anthropic's OAuth usage endpoint with the `anthropic-beta: oauth-2025-04-20`
+  header.
+- Other machines need Python 3. GPU rings read NVIDIA cards through `nvidia-smi`; other vendors
+  go in `machine-stats/gpus.js`, which has an entry for each.
+- The installer is `scripts/install.py`; `install.sh` and `install.ps1` find Python and run it,
+  so install logic belongs in `install.py`.
+- `harness-pane` is a pane header for layouts that want one; Harness itself uses herdr-chat's.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
   its rail.
 
@@ -128,4 +130,6 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   under it; a working agent spins and the logo fades.
 - Folding the sidebar leaves icons, rings and statuses centered in the rail.
 - The status bar names the focused pane's machine and folder and fills the quota bars.
-- A Claude Code tab toggles between Chat and Terminal from its header.
+- A new Claude Code tab opens on its chat and toggles to Terminal from its header.
+- Running the installer where herdr-chat isn't installed adds it; running it again leaves no layout
+  backup behind.
