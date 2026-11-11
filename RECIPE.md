@@ -1,8 +1,9 @@
 # harns
 
 A dark, amber-accented herdr window organized by machine. The sidebar lists every
-connected machine with live CPU, RAM and per-GPU load rings and the agents running on it,
-each with its session title, age and a status or context ring. Agent tabs open as a
+connected machine with live CPU, RAM and per-GPU load rings (hover it for a card of all its
+details) and the agents running on it, each a two-line card with its session title, status,
+folder and branch, and context used. Agent tabs open as a
 chat (from [herdr-chat](https://github.com/azaeldrm/herdr-chat)) or their live terminal.
 A status bar shows where you are and how much Claude Code and Codex quota is left.
 
@@ -28,9 +29,11 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   - **Agents:** an "Agents" heading (11.5 px, dim) with a sort button. By default it's
     grouped by machine. Each group has the machine's name (this computer's own name, or
     a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
-    GPU, amber), then its agents. Each agent row (30 px) shows the program icon, the
-    session's own title (else its folder, else the tab name), its age (`<1m`, `14h`,
-    `1d`) and its status. Sub-agents hang under their parent as a tree (26 px rows).
+    GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
+    session's own title (else its folder, else the tab name) and its status; under it, in
+    11.5 px dim, its folder and git branch and a 36 × 3 px bar of the context window used
+    (amber above 75%, red `#d88179` above 90%). Sub-agents hang under their parent as a
+    tree (26 px rows).
     A machine with no agents says "No agents", "Connecting…" or "Offline".
   - **Footer** (44 px): two icons side by side, Settings (a gear, with an amber dot when an update is ready) and Add
     machine (a server).
@@ -50,9 +53,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 ## How it behaves
 
 - **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
-  blocked is a "Needs you" badge (a "!" in the rail); done is a 7 px teal dot; idle is a
-  ring filled to the share of the context window used at the latest reading, with the
-  percentage on hover (red `#d88179` above 90%, an empty ring until the first reading).
+  blocked is a "Needs you" badge (a "!" in the rail); done is a green check (the theme's
+  `ansi2`); idle shows nothing, its context being the card's bar (the percentage on hover).
   Tabs show the same spinner, or a dot for blocked and done.
 - **Context readings:** Claude Code and Pi report through the relays (Watch out). Codex's
   ring is its footer's "Context N% left", so it shows when `context-remaining` is one of
@@ -61,10 +63,20 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   unavailable.
 - **Logo:** it fades in and out while any agent is working and bobs up and down otherwise.
   Clicking it folds or unfolds the sidebar.
-- **Sidebar:** clicking an agent focuses it; hovering a row swaps its age for a pin, and
-  pinned agents sit in a Pinned group on top. The sort button offers Priority (Needs you,
-  Done, Working, Idle sections), Grouped by space and Grouped by machine. Group headers
-  and parents with sub-agents fold. A machine's + opens the agents installed there.
+- **Sidebar:** clicking an agent focuses it; hovering a card shows a pin, and pinned
+  agents sit in a Pinned group on top. The sort button offers Priority (Needs you, Done,
+  Working, Idle sections), Grouped by space and Grouped by machine. Grouped by machine,
+  each machine keeps its own order: an agent that finishes, starts needing you or is new
+  moves to the top, and dragging a card onto another of the same machine puts it there.
+  Group headers and parents with sub-agents fold. A machine's + opens the agents
+  installed there.
+- **Machine card:** resting on a machine's name or rings for 450 ms opens a 320 px card
+  beside them: its OS and uptime, CPU model, cores, threads, load and temperature, memory
+  used of total, each GPU's load, VRAM, temperature and power (NVIDIA, through
+  `nvidia-smi`), each disk, load averages and the motherboard. It's read on the machine
+  when the card opens and every 3 s while it's in use (Python 3 on Linux and macOS,
+  PowerShell on Windows, where the CPU temperature needs administrator rights, so the card
+  leaves it out).
 - **Rings:** CPU, RAM and GPU refresh every second; hover one for its percentage. A ring
   stays empty until its first reading arrives.
 - **Usage meters:** Claude's and Codex's limits belong to the account, so the bar shows one
@@ -139,7 +151,8 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
 **Notes for building it:**
 
 - Each herdr mod imports from its own folder, so `scripts/build-mods.py` copies shared code:
-  `machine-metrics` into `machine-agents`, `machine-stats` into
+  `machine-metrics` and `machine-stats`'s `details.js` (with what it runs on) into
+  `machine-agents`, `machine-stats` into
   `workspace-status-machine`, `context-relay.py` into `context-probe.js`. Edit the
   sources and run it.
 - The chat and the toggle need herdr-chat; without it those blocks show errors. The installer

@@ -1,9 +1,10 @@
 import { View, div, image, svg } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { v_flex, h_flex, HoverCard } from "gpui-base";
 import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
+import { machineDetails } from "./details.js";
 import { look, changedHosts, machinesChanged } from "./turns.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
@@ -85,7 +86,11 @@ export default class Agents extends View {
     // The order of agents within each machine: dragged by hand, and an agent that finishes or needs you moves to the top.
     this.order = JSON.parse(localStorage.getItem("order") ?? "[]");
     this.drag = null; this.drop = null;
-    cx.timer.every(1000, (cx) => { this.noticeTurns(cx); cx.notify(); });
+    cx.timer.every(1000, (cx) => {
+      this.noticeTurns(cx);
+      if (this.detailsWanted && Date.now() < this.detailsWanted.until) this.readDetails(this.detailsWanted.name, cx);
+      cx.notify();
+    });
     this.noticeTurns(cx);
     this.watchLocalContext(cx);
   }
@@ -141,6 +146,75 @@ export default class Agents extends View {
     const kept = this.order.filter(k => listed.has(k) || this.changed[k]);
     if (kept.length !== this.order.length) { this.order = kept; localStorage.setItem("order", JSON.stringify(kept)); }
     localStorage.setItem("changed", JSON.stringify(this.changed));
+  }
+
+  wantDetails(name, cx) {
+    // Reads a hovered machine's details now (if over 3 s old) and keeps them fresh for a while.
+    this.detailsWanted = { name, until: Date.now() + 30000 };
+    this.readDetails(name, cx);
+  }
+
+  readDetails(name, cx) {
+    const key = name ?? "@local";
+    this.details ??= {};
+    if (this.detailsBusy?.[key] || Date.now() - (this.details[key]?.at ?? 0) < 3000) return;
+    (this.detailsBusy ??= {})[key] = true;
+    cx.spawn(async cx => {
+      try { this.details[key] = { ...(await machineDetails(name)), at: Date.now() }; }
+      finally { this.detailsBusy[key] = false; cx.notify(); }
+    });
+  }
+
+  machineCard(t, machine, trigger) {
+    // A machine's header and stats row; resting on them shows its details card beside the list.
+    const key = machine.name ?? "@local";
+    return HoverCard.new(`mcard-${key}`).anchor("top_left").open_delay(450).close_delay(250)
+      .trigger(div().id(`mtrig-${key}`).w_full().on_hover((on, cx) => { if (on) this.wantDetails(machine.name, cx); }).child(trigger))
+      .content(this.detailsCard(t, machine));
+  }
+
+  detailsCard(t, machine) {
+    const key = machine.name ?? "@local";
+    const d = this.details?.[key];
+    const s = (shared("machine.stats") ?? {})[key];
+    const fresh = s && !s.error && Date.now() - s.at <= 15000;
+    const GB = 1024 ** 3;
+    const gb = b => b == null ? "?" : (b / GB >= 100 ? Math.round(b / GB) : (b / GB).toFixed(1));
+    const pct = v => Number.isFinite(v) ? `${Math.round(v)}%` : "–";
+    const tint = v => v > 90 ? "#d88179" : v > 75 ? t.working : t.accent;
+    const hot = c => c > 85 ? "#d88179" : c > 70 ? t.working : t.muted;
+    const up = sec => { if (!Number.isFinite(sec)) return ""; const m = Math.floor(sec / 60), h = Math.floor(m / 60), dd = Math.floor(h / 24); return dd ? `up ${dd}d ${h % 24}h` : h ? `up ${h}h ${m % 60}m` : `up ${m}m`; };
+    const bar = v => div().h(4).w_full().rounded_full().bg(t.border)
+      .child(div().h_full().rounded_full().w(Number.isFinite(v) ? Math.max(2, Math.round(2.36 * Math.max(0, Math.min(100, v)))) : 0).bg(tint(v)));
+    const section = (icon, title, right, ...lines) => v_flex().w_full().gap(4)
+      .child(h_flex().w_full().gap(6).items_center()
+        .child(svg(`mods/machine-stats/${icon}.svg`).size(12).flex_none().text_color(t.muted))
+        .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(title))
+        .when(Boolean(right), el => el.child(div().flex_none().text_color(t.muted).child(right))))
+      .children(lines.filter(Boolean));
+    const meter = (value, note) => h_flex().w_full().pl(18).gap(8).items_center()
+      .child(div().w(236).flex_none().child(bar(value)))
+      .child(div().flex_1().text_size(11).text_color(t.muted).child(note));
+    const note = (text, color = t.dim) => div().pl(18).text_size(11).text_color(color).child(text);
+    const name = machine.name || localMachineLabel();
+    const card = v_flex().w(320).p(12).gap(10).rounded(10).border_1().border_color(t.border).bg(t.popover ?? t.raised).text_size(12).shadow_md()
+      .child(v_flex().gap(1)
+        .child(div().text_size(13.5).font_semibold().text_color(t.foreground).child(name))
+        .when(Boolean(d && !d.error), el => el.child(div().text_size(11).text_color(t.dim).truncate().child([d.os, up(d.uptime)].filter(Boolean).join(" \u00b7 ")))));
+    if (!d) return card.child(div().text_color(t.dim).child("Reading details\u2026"));
+    if (d.error) return card.child(div().text_color(t.dim).child(d.error));
+    const used = d.memory.total && d.memory.available != null ? d.memory.total - d.memory.available : null;
+    const memPct = fresh && Number.isFinite(s.memory) ? s.memory : used != null ? 100 * used / d.memory.total : null;
+    return card
+      .child(section("cpu", d.cpu.model || "CPU", d.cpu.temp != null ? `${Math.round(d.cpu.temp)}\u00b0C` : "",
+        meter(fresh ? s.cpu : null, pct(fresh ? s.cpu : null)),
+        note([d.cpu.cores && `${d.cpu.cores} cores`, d.cpu.threads && `${d.cpu.threads} threads`, d.load && `load ${d.load.map(x => x?.toFixed(2)).join(" ")}`].filter(Boolean).join(" \u00b7 "))))
+      .child(section("ram", "Memory", `${gb(used)} / ${gb(d.memory.total)} GB`, meter(memPct, pct(memPct))))
+      .children(d.gpus.map(g => section("gpu", g.name, g.temp != null ? `${Math.round(g.temp)}\u00b0C` : "",
+        g.load != null ? meter(g.load, pct(g.load)) : null,
+        note([g.memTotal && `VRAM ${gb(g.memUsed)} / ${gb(g.memTotal)} GB`, g.power != null && `${Math.round(g.power)} W`].filter(Boolean).join(" \u00b7 ") || "No live readings", g.temp > 70 ? hot(g.temp) : t.dim))))
+      .children(d.disks.map(k => section("usage", `Disk ${k.mount}`, `${gb(k.total - k.free)} / ${gb(k.total)} GB`, meter(100 * (k.total - k.free) / k.total, pct(100 * (k.total - k.free) / k.total)))))
+      .when(Boolean(d.board), el => el.child(div().text_size(11).text_color(t.dim).truncate().child(`Board \u00b7 ${d.board}`)));
   }
 
   toTop(address) {
@@ -359,11 +433,11 @@ export default class Agents extends View {
     const ring = (asset, tint, spinning = false) => mark(svg(`mods/machine-agents/context-rings/${asset}.svg`).size(12).flex_none().text_color(tint)
       .when(spinning, el => el.spin(900)));
     if (a.status === "working") return ring("spinner", t.working, true);
-    if (a.status === "done") return mark(div().size(7).rounded_full().bg(t.done));
+    if (a.status === "done") return mark(svg("mods/machine-agents/circle-check.svg").size(13).flex_none().text_color(t.ansi2 ?? t.done));
     if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
       .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
-    if (a.status === "idle") return ring(`ring-${Math.round(percent)}`, known ? (percent > 90 ? "#d88179" : t.muted) : (t.idle ?? t.dim));
+    // Idle shows nothing: the card's second line has the context bar.
     return div().size(14).flex_none();
   }
 
@@ -540,7 +614,6 @@ export default class Agents extends View {
           .child(div().flex_1().min_w(0).truncate().text_color(idle ? t.muted : t.foreground).child(name))
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .when(this.hovered === a.address, el => el.child(pin))
-          .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
           .child(this.status(t, a, byPriority && !isPinned)))
         .when(Boolean(where) || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
           .child(div().flex_1().min_w(0).truncate().child(where))
@@ -640,8 +713,7 @@ export default class Agents extends View {
         ])
       : groups.flatMap((g, index) => [
         ...(byMachine && index > 0 ? [div().h(12).flex_none()] : []),
-        header(g),
-        ...(byMachine ? [statsFor(g.machine?.name ?? null, t)] : []),
+        ...(byMachine && g.machine ? [this.machineCard(t, g.machine, v_flex().w_full().child(header(g)).child(statsFor(g.machine.name ?? null, t)))] : [header(g)]),
         ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids) : byMachine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
       ]);
 

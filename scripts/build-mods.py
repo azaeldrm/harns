@@ -4,7 +4,9 @@ from pathlib import Path
 repo = Path(__file__).resolve().parent.parent
 metrics = (repo / 'mods/machine-metrics/main.js').read_text(encoding='utf-8')
 (repo / 'mods/machine-agents/machine-metrics.js').write_text(metrics, encoding='utf-8')
-(repo / 'mods/machine-agents/turns.js').write_text((repo / 'mods/machine-stats/turns.js').read_text(encoding='utf-8'), encoding='utf-8')
+for name in ('turns.js', 'details.js', 'platforms.js', 'probes.js', 'gpus.js'):
+    # The agents list reads a machine's details itself, for its hover card (details.js and what it runs on).
+    (repo / 'mods/machine-agents' / name).write_text((repo / 'mods/machine-stats' / name).read_text(encoding='utf-8'), encoding='utf-8')
 probe = (repo / 'scripts/context-relay.py').read_text(encoding='utf-8')
 (repo / 'mods/machine-agents/context-probe.js').write_text('export const contextProbe = ' + json.dumps(probe) + ';\n', encoding='utf-8')
 target = repo / 'mods/machine-agents/context-rings'
