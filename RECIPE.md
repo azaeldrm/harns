@@ -72,7 +72,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   each machine top to bottom.
   A machine's whole band (name and rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
   installed there.
-- **Details cards** (an agent's, a machine's) hang from the row's top-right corner, beside the
+- **Details cards** (an agent's, a machine's) hang from the row's top-right corner, right against the
   sidebar: the first opens after 450 ms, and while one is up (or was, under 400 ms ago) moving to
   another row opens its card at once. A card closes 150 ms after the pointer leaves the row and the card.
 - **Agent card:** resting on an agent's card opens a 340 px card beside the

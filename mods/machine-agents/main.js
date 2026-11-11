@@ -176,21 +176,22 @@ export default class Agents extends View {
     });
   }
 
-  hang(key, card) {
-    // The card, hung beside the row from its top-right corner (the row must be relative), while it's the one up.
+  hang(key, card, edge = 8) {
+    // The card, hung from the row's top-right corner (the row must be relative), while it's the one up: `edge` px further,
+    // the row's distance from the sidebar's edge, so the card sits right against the sidebar.
     return Popup.new(`details-${key}`, div()).absolute().top(-1).right(-1).size(1)
-      .when(this.detailsKey === key && !this.drag?.moved, pop => pop.content(div().id(`details-hover-${key}`).pl(16)
+      .when(this.detailsKey === key && !this.drag?.moved, pop => pop.content(div().id(`details-hover-${key}`).pl(edge)
         .on_hover((on, cx) => { if (on) this.overCard = key; else { if (this.overCard === key) this.overCard = null; this.detailsLeave(key, cx); } })
         .child(card)));
   }
 
-  machineCard(t, machine, trigger) {
+  machineCard(t, machine, trigger, edge = 8) {
     // A machine's band (header and rings); resting on it shows its details beside the sidebar, level with it.
     const key = `m:${machine.name ?? "@local"}`;
     return div().id(`mtrig-${key}`).relative().w_full()
       .on_hover((on, cx) => { if (on) { this.wantDetails(machine.name, cx); this.detailsEnter(key, cx); } else this.detailsLeave(key, cx); })
       .child(trigger)
-      .child(this.hang(key, this.detailsCard(t, machine)));
+      .child(this.hang(key, this.detailsCard(t, machine), edge));
   }
 
   detailsCard(t, machine) {
@@ -801,7 +802,7 @@ export default class Agents extends View {
           this.machineCard(t, machine, v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
             .child(h_flex().h(30).pt(6).flex_none().items_center().justify_center()
               .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
-            .child(this.railCpu(t, machine.name ?? null))),
+            .child(this.railCpu(t, machine.name ?? null)), 0),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
