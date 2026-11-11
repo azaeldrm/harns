@@ -306,7 +306,7 @@ export default class Agents extends View {
   noticeMoves(list, cx) {
     // Cards whose place within their machine changed since the last draw: each starts offset by the places it moved
     // (CARD px apiece), with a fresh id so its transition starts there, and slides to 0 a frame later.
-    const CARD = 52;
+    const CARD = 50;
     const machineOf = x => x.includes("/") ? x.split("/")[0] : "";
     const place = new Map(), count = {};
     for (const a of list) { const m = machineOf(a.address); place.set(a.address, count[m] = (count[m] ?? -1) + 1); }
@@ -679,7 +679,6 @@ export default class Agents extends View {
         .transition("top", { duration: 280, easing: "ease-out" })
         .px(8)
         .py(6)
-        .mb(2)
         .gap(2)
         .flex_none()
         .rounded(6)
