@@ -660,7 +660,8 @@ export default class Agents extends View {
       const tab = tabs.find(x => x.id === a.tab);
       const folder = folderName((tab ? lead(tab) : null)?.cwd);
       const branch = spaces().find(s => s.id === a.space)?.branch;
-      const where = [folder !== name ? folder : "", branch, full && a.space_name !== name ? a.space_name : ""].filter(Boolean).join(" \u00b7 ");
+      // Line 2's pieces, each with its icon: the folder, the branch, and the space where the list doesn't group by it.
+      const where = [[folder !== name ? folder : "", "folder"], [branch, "branch"], [full && a.space_name !== name ? a.space_name : "", "layers"]].filter(([text]) => text);
       const context = (shared("agents.context") ?? {})[a.address];
       const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
       const bar = used == null ? null : div().w(36).h(3).flex_none().rounded_full().bg(t.border).tooltip(`Context: ${Math.round(used)}% used`)
@@ -728,8 +729,11 @@ export default class Agents extends View {
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .when(this.hovered === a.address, el => el.child(pin))
           .child(this.status(t, a, byPriority && !isPinned)))
-        .when(Boolean(where) || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
-          .child(div().flex_1().min_w(0).truncate().child(where))
+        .when(where.length > 0 || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
+          .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
+            .children(where.map(([text, glyph]) => h_flex().min_w(0).gap(4).items_center()
+              .child(svg(`mods/harness-chrome/${glyph}.svg`).size(11).flex_none().text_color(t.dim))
+              .child(div().min_w(0).truncate().child(text)))))
           .when(Boolean(bar), el => el.child(bar)))));
     };
 
