@@ -107,7 +107,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   window over the panel's screen area, at the device's aspect ratio, so it draws and takes
   input natively. It hides with the panel, while one of herdr's popups is open, and when herdr
   minimizes; it follows the window as it moves or resizes. The header pops it out into its own
-  window and back, and stops it.
+  window and back, and stops it. While it runs, showing a space on another machine shares it
+  there (that machine's adb lists it as `127.0.0.1:15555`), shown as the machine's name in
+  the header, with × to stop; sharing ends when the emulator stops.
 - **Status bar:** each quota bar shows the 5-hour window and switches to 7 days while
   hovered, red above 90%; the tooltip gives the reset time. The last item opens the
   command palette.
@@ -161,6 +163,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   computer, `csc.exe` once to build `harns-dock`, and that helper while the device is docked
   (it hooks herdr's window and mouse/keyboard release events only to place the device window
   and notice herdr's popups; it reads no input content);
+- while the Simulator runs and a space on another machine is shown: an SSH reverse tunnel to
+  that machine (Windows' OpenSSH, `ssh -N -R 127.0.0.1:<port>:127.0.0.1:<emulator adb port>`,
+  bound to its localhost) and `adb connect` / `adb disconnect` there, so agents on it can
+  drive the emulator;
 - reads Claude Code's login (`~/.claude/.credentials.json`, or the `Claude Code-credentials`
   keychain item on macOS) and sends its token only to Anthropic's usage endpoint,
   `https://api.anthropic.com/api/oauth/usage`. That request and `codex app-server` are its only

@@ -9,12 +9,13 @@
 // Windows only for now: the iOS Simulator needs a Mac, and docking a window is per platform.
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { exec, appHome, readTextFile, layout, settings, window, theme } from "herdr";
+import { exec, hc, appHome, readTextFile, layout, settings, window, theme, spaces, machines } from "herdr";
 import * as fs from "fs/promises";
 
 const BLOCK = "simulator";
 const PAD = 12;           // around the screen area, in the mod's px (herdr zooms them)
 const POLL = 4000;        // how often the device list is read while the panel shows (ms)
+const SHARE_PORT = 15555; // the first port tried on another machine for the emulator's adb
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -64,12 +65,15 @@ export default class Simulator extends View {
     try { this.mode = localStorage.getItem("mode") === "window" ? "window" : "dock"; } catch {}
     this.helper = false;         // a harns-dock is running for this device
     this.written = null;         // the state file's last contents
+    this.shares = {};            // machine -> { pid, port, error? } | { error }: shared there
+    this.declined = new Set();   // machines the user stopped sharing with, until it restarts
     if (window()?.platform !== "windows") { this.status = "The Simulator panel runs on Windows for now."; return; }
     cx.spawn(async cx => {
       await this.setup();
       cx.notify();
       for (;;) {
         if (this.shown() || this.busy) { await this.refresh(); cx.notify(); }
+        if (await this.shareActive()) cx.notify();
         await cx.sleep(this.busy ? 1500 : POLL);
       }
     });
@@ -79,8 +83,11 @@ export default class Simulator extends View {
   }
 
   async close() {
-    // The panel's slot went away (another layout, or quitting): the device window hides with it.
+    // The panel's slot went away (another layout, or quitting): the device window hides with it,
+    // and its tunnels close (the other machines see the device go offline).
     this.place(false);
+    for (const share of Object.values(this.shares)) if (share.pid) exec("taskkill", ["/PID", String(share.pid), "/F"]).catch(() => {});
+    this.shares = {};
   }
 
   async setup() {
@@ -93,6 +100,9 @@ export default class Simulator extends View {
     this.cache = `${appHome()}\\cache\\harness-simulator`;
     this.stateFile = `${this.cache}\\dock-state.txt`;
     await fs.mkdir(this.cache, { recursive: true }).catch(() => {});
+    // Tunnels a previous copy of this mod left (a reload, or a crash) close; they open again.
+    await ps(`Get-CimInstance Win32_Process -Filter "Name='ssh.exe'" | Where-Object { $_.CommandLine -like '*harns-simulator*' } | ` +
+      `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`).catch(() => {});
     const list = await exec(this.emulator, ["-list-avds"]).catch(() => null);
     if (!list || list.code !== 0) { this.status = "No Android emulator found. Install the Android SDK's emulator, or set ANDROID_HOME."; return; }
     this.avds = list.stdout.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith("INFO"));
@@ -115,7 +125,7 @@ export default class Simulator extends View {
     const serial = r?.stdout.split(/\r?\n/).map(l => l.split(/\s+/)).find(([s, state]) => /^emulator-\d+$/.test(s) && state === "device")?.[0];
     if (!serial) {
       // While one starts, adb doesn't list it yet: keep what start() set.
-      if (this.device && this.busy !== "starting") { this.device = null; this.helper = false; }
+      if (this.device && this.busy !== "starting") { this.device = null; this.helper = false; await this.unshareAll(); }
       return;
     }
     if (this.device?.serial !== serial || !this.device.width) {
@@ -132,6 +142,73 @@ export default class Simulator extends View {
       this.device = { serial, avd, width: size.width, height: size.height };
     }
     if (this.mode === "dock" && !this.helper && !this.busy) await this.dock();
+  }
+
+  // Sharing with other machines. An agent on another machine drives this emulator with its own
+  // adb: an SSH reverse tunnel (Windows' OpenSSH, with the ssh config herdr's machines use) brings
+  // that machine's 127.0.0.1:<port> to the emulator's adb port here, and that machine's adb
+  // server connects to it, so the emulator is one more device in its list, beside any phones.
+  // Bound to localhost there; nothing listens on the network. It happens on its own while the
+  // emulator runs and a space on that machine is shown, and lasts until the emulator stops.
+
+  remembered(update) {
+    // The machines it's shared with, kept across reloads and restarts of herdr (the emulator
+    // outlives both), so agents there keep the device without anyone revisiting their space.
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem("shared") ?? "[]"); } catch {}
+    if (update) { list = update(list); try { localStorage.setItem("shared", JSON.stringify(list)); } catch {} }
+    return list;
+  }
+
+  async shareActive() {
+    // Shares with the shown space's machine, if it's another one, and with the machines it was
+    // shared with before. True when something changed.
+    const d = this.device;
+    if (!d?.serial || this.busy) return false;
+    const want = [spaces().find(s => s.active)?.machine, ...this.remembered()];
+    const m = want.find(m => m && !this.shares[m] && !this.declined.has(m) && machines().find(x => x.name === m)?.layout === "ready");
+    if (!m) return false;
+    this.shares[m] = { pending: true };
+    this.shares[m] = await this.share(m, d).catch(err => ({ error: String(err?.message ?? err).split("\n")[0] }));
+    if (!this.shares[m].error) this.remembered(list => list.includes(m) ? list : [...list, m]);
+    return true;
+  }
+
+  async share(m, d) {
+    const list = await hc(["machine", "ls", "--json"]);
+    const info = JSON.parse(list.stdout || "{}").machines?.find(x => x.name === m);
+    if (!info) throw new Error("not one of herdr's machines");
+    if (info.via) throw new Error("connected through a command, not ssh");
+    const local = Number(d.serial.split("-")[1]) + 1;   // emulator-5554: console 5554, adb 5555
+    const ssh = `${this.windir}\\System32\\OpenSSH\\ssh.exe`;
+    for (let port = SHARE_PORT; port < SHARE_PORT + 5; port++) {
+      // SetEnv names the tunnel, so a later copy of the mod can find and close it.
+      const r = await ps(`$p = Start-Process -WindowStyle Hidden -PassThru -FilePath ${quote(ssh)} -ArgumentList ` +
+        `'-N','-o','BatchMode=yes','-o','ExitOnForwardFailure=yes','-o','ServerAliveInterval=30','-o','ServerAliveCountMax=3',` +
+        `'-o','SetEnv=HARNS=harns-simulator','-R',${quote(`127.0.0.1:${port}:127.0.0.1:${local}`)},${quote(info.target)}; ` +
+        `Start-Sleep -Milliseconds 2500; if ($p.HasExited) { 'exited' } else { $p.Id }`);
+      const pid = Number(r.stdout.trim());
+      if (!pid) continue;   // that port is taken there (or ssh can't log in): the next one
+      const c = await exec("adb", ["connect", `127.0.0.1:${port}`], { on: m, timeout: 10000 })
+        .catch(() => ({ code: 1, stdout: "", stderr: "adb isn't installed there" }));
+      if (/connected to/.test(c.stdout)) return { pid, port };
+      return { pid, port, error: (c.stderr || c.stdout).trim().split("\n")[0] || "adb couldn't connect" };
+    }
+    throw new Error("couldn't open a tunnel (ssh to it needs to work with a key)");
+  }
+
+  async unshare(m) {
+    const share = this.shares[m];
+    delete this.shares[m];
+    this.remembered(list => list.filter(x => x !== m));
+    if (!share?.pid) return;
+    await exec("adb", ["disconnect", `127.0.0.1:${share.port}`], { on: m, timeout: 5000 }).catch(() => {});
+    await exec("taskkill", ["/PID", String(share.pid), "/F"]).catch(() => {});
+  }
+
+  async unshareAll() {
+    for (const m of Object.keys(this.shares)) await this.unshare(m);
+    this.declined.clear();
   }
 
   async helperExe() {
@@ -235,6 +312,7 @@ export default class Simulator extends View {
     if (!this.device) return;
     this.busy = "stopping"; this.status = `Stopping ${this.device.avd}…`; cx.notify();
     await this.write("0 0 0 0 0");
+    await this.unshareAll();
     // `emu kill` can hang on after the emulator is gone: watch the device list instead.
     exec(this.adb, ["-s", this.device.serial, "emu", "kill"], { timeout: 15000 }).catch(() => {});
     for (let i = 0; i < 40 && this.device; i++) { await cx.sleep(500); await this.refresh(); cx.notify(); }
@@ -267,6 +345,14 @@ export default class Simulator extends View {
       .child(div().text_size(13).text_color(t.foreground).child("Simulator"))
       .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.dim)
         .child(d ? d.avd : this.busy === "starting" ? "Starting…" : ""))
+      .children(Object.entries(this.shares).filter(([, s]) => !s.pending).map(([m, s]) => h_flex().id(`sim-share-${m}`).h(22).px(6).gap(4)
+        .flex_none().items_center().rounded(5).bg(t.chrome).text_size(11).text_color(s.error ? t.blocked : t.muted)
+        .tooltip(s.error ? `Not shared with ${m}: ${s.error}` : `Shared with ${m}: adb -s 127.0.0.1:${s.port} there`)
+        .child(svg("mods/harness-simulator/share.svg").size(11)).child(m)
+        .child(div().id(`sim-unshare-${m}`).cursor_pointer().text_color(t.dim).hover(st => st.text_color(t.foreground))
+          .on_mouse_down("left", swallow)
+          .on_click((_e, cx) => { this.declined.add(m); cx.spawn(async acx => { await this.unshare(m); acx.notify(); }); })
+          .child(svg("mods/harness-simulator/x.svg").size(10)))))
       .when(Boolean(d), el => el
         .child(this.mode === "dock"
           ? button("sim-pop", "pop-out", null, cx => this.setMode("window", cx)).tooltip("Open in its own window")

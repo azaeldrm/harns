@@ -44,6 +44,13 @@ Optional:
   first in Android Studio's Device Manager or with `avdmanager`. The emulator's own window is
   placed over the panel, so it runs at full speed with its own input; for Expo apps, run
   `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
+
+  Agents on other machines can drive it too. While it runs and a space on another machine is
+  shown, the panel shares it there: that machine's `adb devices` lists it as `127.0.0.1:15555`
+  (beside any phones), so screenshots, taps, `adb install` and `expo run:android` there reach
+  it. This goes through an SSH reverse tunnel with Windows' OpenSSH and the same ssh config as
+  herdr's machines, so ssh to the machine needs to work with a key; it listens only on that
+  machine's localhost, and ends when the emulator stops (or from the × on the machine's name).
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
