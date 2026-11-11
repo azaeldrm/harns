@@ -64,9 +64,11 @@ are entries in `mods/machine-stats/gpus.js`, with a place for AMD, Intel and App
   developing). It runs `scripts/build-mods.py`, which writes the copies herdr needs (see
   RECIPE.md, Watch out), and copies the result into `~/.config/herdr-app`.
 - Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
-- Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs`,
-  `node tests/turns.mjs`, `node tests/probes.mjs`, `node tests/snapshots.mjs`, `node tests/markdown.mjs` and `npm run check:pele` (the vendored
-  Pele matches its pin; after `npm install` it compares every byte).
+- Tests: `npm test` runs them all (the Python unit tests, the Node tests, and a check that the
+  vendored Pele matches its pin; after `npm install` it compares every byte). It finds Python 3
+  as `python3`, `python` or `py -3`, so it runs as installed on Windows, Linux and macOS. The
+  stats and account probes are tested the way each platform runs them: PowerShell on Windows,
+  Python on Linux and macOS.
 - `harness-files` is herdr's Files panel where Markdown and `.mmd` files open as a readable
   document: images (beside the file or on its machine; web images show as links, never fetched) and
   mermaid blocks drawn by Pele (the same pinned version as herdr-chat). Preview and
