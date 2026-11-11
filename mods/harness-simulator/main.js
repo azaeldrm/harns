@@ -14,6 +14,7 @@ import * as fs from "fs/promises";
 
 const BLOCK = "simulator";
 const PAD = 12;           // around the screen area, in the mod's px (herdr zooms them)
+const BORDER = 1;         // the card's border, as on Files and Changes
 const POLL = 4000;        // how often the device list is read while the panel shows (ms)
 const SHARE_PORT = 15555; // the first port tried on another machine for the emulator's adb
 
@@ -272,8 +273,8 @@ export default class Simulator extends View {
     const scale = Math.min(a.width / d.width, a.height / d.height);
     const w = Math.floor(d.width * scale), h = Math.floor(d.height * scale);
     return {
-      right: (edge.right + PAD) * z + (a.width - w) / 2,
-      bottom: (edge.bottom + PAD) * z + (a.height - h) / 2,
+      right: (edge.right + BORDER + PAD) * z + (a.width - w) / 2,
+      bottom: (edge.bottom + BORDER + PAD) * z + (a.height - h) / 2,
       w, h,
     };
   }
@@ -331,7 +332,7 @@ export default class Simulator extends View {
     const d = this.device;
     const swallow = (_e, cx) => cx.stop_propagation();
     const button = (id, icon, label, action, opts = {}) => h_flex().id(id).h(26).px(8).gap(5).flex_none().items_center().rounded(6)
-      .text_size(12).text_color(opts.primary ? t.accent_foreground : t.muted).bg(opts.primary ? t.accent : t.chrome)
+      .text_size(12).text_color(opts.primary ? t.accent_foreground : t.muted).when(Boolean(opts.primary), el => el.bg(t.accent))
       .when(!opts.disabled, el => el.cursor_pointer().hover(s => s.bg(opts.primary ? t.accent : t.hover).text_color(opts.primary ? t.accent_foreground : t.foreground))
         .on_mouse_down("left", swallow)
         // The actions await programs: they run as a task, with a context of their own (an
@@ -341,12 +342,11 @@ export default class Simulator extends View {
       .child(svg(`mods/harness-simulator/${icon}.svg`).size(13)).when(Boolean(label), el => el.child(label));
 
     const header = h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-      .child(svg("mods/harness-simulator/smartphone.svg").size(14).flex_none().text_color(t.muted))
-      .child(div().text_size(13).text_color(t.foreground).child("Simulator"))
-      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.dim)
+      .child(div().font_semibold().child("Simulator"))
+      .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim)
         .child(d ? d.avd : this.busy === "starting" ? "Starting…" : ""))
       .children(Object.entries(this.shares).filter(([, s]) => !s.pending).map(([m, s]) => h_flex().id(`sim-share-${m}`).h(22).px(6).gap(4)
-        .flex_none().items_center().rounded(5).bg(t.chrome).text_size(11).text_color(s.error ? t.blocked : t.muted)
+        .flex_none().items_center().rounded(5).border_1().border_color(t.border).text_size(11).text_color(s.error ? t.blocked : t.muted)
         .tooltip(s.error ? `Not shared with ${m}: ${s.error}` : `Shared with ${m}: adb -s 127.0.0.1:${s.port} there`)
         .child(svg("mods/harness-simulator/share.svg").size(11)).child(m)
         .child(div().id(`sim-unshare-${m}`).cursor_pointer().text_color(t.dim).hover(st => st.text_color(t.foreground))
@@ -369,7 +369,7 @@ export default class Simulator extends View {
       const g = this.geometry();
       body = div().id("sim-area").size_full().flex().items_center().justify_center().on_size_change(sizeArea)
         .when(!this.helper && Boolean(this.status), el => el.child(div().max_w(260).text_size(12.5).text_color(t.muted).text_center().child(this.status)))
-        .when(this.helper && Boolean(g), el => el.child(div().w(g.w / zoom()).h(g.h / zoom()).rounded(8).bg(t.background)));
+        .when(this.helper && Boolean(g), el => el.child(div().w(g.w / zoom()).h(g.h / zoom()).rounded(8).bg(t.surface)));
     } else if (d) {
       body = div().id("sim-area").size_full().on_size_change(sizeArea).child(v_flex().size_full().items_center().justify_center().gap(10)
         .child(div().text_size(12.5).text_color(t.muted).child(`${d.avd} is in its own window.`))
@@ -380,7 +380,9 @@ export default class Simulator extends View {
         .children(this.busy ? [] : this.avds.map(avd => button(`sim-start-${avd}`, "play", `Start ${avd}`, cx => this.start(avd, cx), { primary: true }))));
     }
 
-    return v_flex().id("root").size_full().bg(t.surface)
+    // A card, as Files and Changes draw theirs.
+    return v_flex().id("root").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background)
+      .border_1().border_color(t.border).text_color(t.foreground).text_size(13)
       .child(header)
       .child(div().flex_1().min_h(0).p(PAD).child(body));
   }
