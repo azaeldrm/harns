@@ -30,9 +30,19 @@ mine=
 if [ -n "$HC_TERMINAL_ID" ] && [ -f "$map" ]; then
   mine=$(awk -v t="$HC_TERMINAL_ID" '$1 == t { print $2; exit }' "$map")
 fi
-if [ -n "$mine" ] && [ -z "$ANDROID_SERIAL" ]; then
+if [ -z "$ANDROID_SERIAL" ] && [ -n "$mine" ]; then
   ANDROID_SERIAL=$mine
   export ANDROID_SERIAL
+elif [ -z "$ANDROID_SERIAL" ] && [ -n "$HC_TERMINAL_ID" ] && [ -s "$map" ]; then
+  # A session without its own emulator never lands on another session's: with only one
+  # device connected, adb would pick it unasked. One other device (a phone) is the default;
+  # with none, the target is a name no device has, so adb says so instead.
+  others=$("$real" devices 2>/dev/null | awk -v map="$map" '
+    BEGIN { while ((getline line < map) > 0) { split(line, f, " "); if (f[2] != "") harns[f[2]] = 1 } }
+    NR > 1 && $2 == "device" && !($1 in harns) { print $1 }')
+  count=$(printf '%s\n' "$others" | grep -c .)
+  if [ "$count" -eq 1 ]; then ANDROID_SERIAL=$others; export ANDROID_SERIAL
+  elif [ "$count" -eq 0 ]; then ANDROID_SERIAL=no-harns-simulator-for-this-session; export ANDROID_SERIAL; fi
 fi
 
 if [ "$1" = devices ] && [ -n "$HC_TERMINAL_ID" ] && [ -f "$map" ]; then
