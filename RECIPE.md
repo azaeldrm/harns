@@ -66,7 +66,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   agents sit in a Pinned group on top. Each machine keeps its own order: an agent that finishes, starts needing you or is new
   moves to the top, and dragging a card onto another of the same machine puts it there.
   A card that changes place slides there (280 ms, ease-out), and the ones it passes slide too.
-  Group headers and parents with sub-agents fold. A machine's + opens the agents
+  A machine's whole band (name and rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
   installed there.
 - **Details cards** (an agent's, a machine's) hang from the row's top-right corner, beside the
   sidebar: the first opens after 450 ms, and while one is up (or was, under 400 ms ago) moving to

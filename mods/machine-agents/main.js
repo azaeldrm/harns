@@ -773,10 +773,11 @@ export default class Agents extends View {
         .font_medium()
         .cursor_pointer()
         .hover((s) => s.text_color(t.foreground))
-        .on_click((_e, cx) => {
+        // A machine's whole band folds it (below); other groups fold from their header.
+        .when(!byMachine, el => el.on_click((_e, cx) => {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
-        })
+        }))
         .when(byMachine, el => el.text_size(12.5).font_semibold().pt(6)
           .child(svg(`mods/harness-chrome/${g.machine?.name ? "server" : "monitor"}.svg`).size(13).flex_none().text_color(t.muted)))
         .child(div().truncate().text_color(byMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
@@ -833,7 +834,10 @@ export default class Agents extends View {
       : groups.flatMap((g, index) => [
         ...(byMachine && index > 0 ? [div().h(20).flex_none()] : []),
         // A machine's header and rings as one raised band, so each machine's agents read as a group.
-        ...(byMachine && g.machine ? [this.machineCard(t, g.machine, v_flex().w_full().mb(8).pb(3).rounded(8).bg(t.raised).border_1().border_color(t.border)
+        ...(byMachine && g.machine ? [this.machineCard(t, g.machine, v_flex().id(`band-${g.id}`).w_full().mb(8).pb(3).rounded(8).bg(t.raised).border_1().border_color(t.border)
+          // The whole band, name and rings alike, folds or unfolds the machine's agents.
+          .cursor_pointer().hover(s => s.border_color(t.dim))
+          .on_click((_e, cx) => { this.folded.has(g.id) ? this.folded.delete(g.id) : this.folded.add(g.id); cx.notify(); })
           .child(header(g)).child(statsFor(g.machine.name ?? null, t)))] : [header(g)]),
         ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids) : byMachine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
       ]);
