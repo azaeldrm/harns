@@ -769,7 +769,12 @@ export default class Agents extends View {
       ? machines().filter(machine => !machine.temporary).flatMap((machine) => [
           div().h(18).flex_none(),
           // The machine's rings in a raised band, as the open sidebar's, so its agents below read as its group.
-          v_flex().mx(6).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).child(statsFor(machine.name ?? null, t, true)),
+          v_flex().mx(6).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border)
+            // On top, the machine's own icon (as beside its name when open), in the rows' icon column.
+            .child(h_flex().w_full().h(26).flex_none().items_center().justify_center().gap(6).tooltip(machine.name || localMachineLabel())
+              .child(h_flex().w(16).flex_none().justify_center().child(svg(`mods/harness-chrome/${machine.name ? "server" : "monitor"}.svg`).size(14).flex_none().text_color(t.foreground)))
+              .child(div().w(14).flex_none()))
+            .child(statsFor(machine.name ?? null, t, true)),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
