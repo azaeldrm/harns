@@ -26,8 +26,9 @@ changed is kept beside the new one as `harns.json.before-install-<time>`.
 Optional:
 
 - **Context bars** (on each agent's card) come from relays: Claude Code's status line and a Pi extension
-  (`scripts/install-context.py`, on Windows, Linux and macOS). Codex's comes from its footer,
-  when `context-remaining` is one of its `tui.status_line` items. The Claude Code and Codex
+  (`scripts/install-context.py`, on Windows, Linux and macOS). Codex's comes from its log
+  (the one herdr-chat found for it), else its footer, when `context-remaining` is one of its
+  `tui.status_line` items. The Claude Code and Codex
   quota bars read the account from each service and need no relay.
   The installer sets the relays up on this computer (`--no-relays` to skip);
   for each connected machine run `python scripts/install-context.py --on MACHINE`. They write:
@@ -39,6 +40,23 @@ Optional:
   - in `~/.codex/config.toml`, only removing a `notify` line an older relay added.
 
   Pi sessions already running pick up the relay after `/reload`, typed in their terminal.
+- **Simulator** (Windows): the panel beside Files and Changes runs Android virtual devices
+  from the Android SDK (`ANDROID_HOME`, or `%LOCALAPPDATA%\Android\Sdk`). Create one first in
+  Android Studio's Device Manager or with `avdmanager`. Each session (an agent's tab) gets its
+  own emulator, and its sub-agents use the same one; when another session needs one, the panel
+  copies a virtual device for it. The panel shows the focused session's emulator, its own
+  window placed over the panel so it runs at full speed with its own input, and the others
+  keep running, hidden. Closing a tab stops its emulator and keeps the device. For Expo apps,
+  run `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
+
+  Sessions on other machines reach their emulator with that machine's own `adb`. The panel
+  shares each one there through an SSH reverse tunnel (Windows' OpenSSH, with the same ssh
+  config as herdr's machines, so ssh to the machine needs to work with a key), listening only
+  on that machine's localhost, and installs a small `~/.local/bin/adb` script there that points
+  each session's terminals at their own emulator before running the machine's own adb. In
+  that session, `adb devices` lists its emulator (and any phones, but not other sessions'
+  emulators), and `adb`, `adb install` and `expo run:android` reach it. An `adb` already in
+  `~/.local/bin` that isn't harns's is left alone.
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
@@ -59,9 +77,11 @@ are entries in `mods/machine-stats/gpus.js`, with a place for AMD, Intel and App
   developing). It runs `scripts/build-mods.py`, which writes the copies herdr needs (see
   RECIPE.md, Watch out), and copies the result into `~/.config/herdr-app`.
 - Check with `herdr-app check <mod folder>`, `herdr-app status` and `herdr-app shot`.
-- Tests: `python -m unittest discover -s tests`, `node tests/usage.mjs`,
-  `node tests/turns.mjs`, `node tests/probes.mjs`, `node tests/snapshots.mjs`, `node tests/markdown.mjs` and `npm run check:pele` (the vendored
-  Pele matches its pin; after `npm install` it compares every byte).
+- Tests: `npm test` runs them all (the Python unit tests, the Node tests, and a check that the
+  vendored Pele matches its pin; after `npm install` it compares every byte). It finds Python 3
+  as `python3`, `python` or `py -3`, so it runs as installed on Windows, Linux and macOS. The
+  stats and account probes are tested the way each platform runs them: PowerShell on Windows,
+  Python on Linux and macOS.
 - `harness-files` is herdr's Files panel where Markdown and `.mmd` files open as a readable
   document: images (beside the file or on its machine; web images show as links, never fetched) and
   mermaid blocks drawn by Pele (the same pinned version as herdr-chat). Preview and

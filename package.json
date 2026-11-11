@@ -8,6 +8,7 @@
     "pele": "1.13.0"
   },
   "scripts": {
+    "test": "node scripts/test.mjs",
     "vendor:pele": "node scripts/vendor-pele.mjs",
     "check:pele": "node scripts/vendor-pele.mjs --check"
   }

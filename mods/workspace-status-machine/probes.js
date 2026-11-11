@@ -32,7 +32,9 @@ function Win($used, $resets) { if ($null -eq $used) { return $null }; @{ used = 
 if ($wanted -contains 'Claude') {
   try {
     $dir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
-    $login = (Get-Content -Raw -LiteralPath (Join-Path $dir '.credentials.json') | ConvertFrom-Json).claudeAiOauth
+    $file = Join-Path $dir '.credentials.json'
+    # No login file is signed out, as on Linux and macOS (with Stop, reading it would throw).
+    $login = if (Test-Path -LiteralPath $file) { (Get-Content -Raw -LiteralPath $file | ConvertFrom-Json).claudeAiOauth } else { $null }
     if (-not $login.accessToken) { $out.Claude = @{ error = 'Signed out' } }
     else {
       $r = Invoke-RestMethod -Uri 'https://api.anthropic.com/api/oauth/usage' -TimeoutSec 10 -Headers @{ Authorization = 'Bearer ' + $login.accessToken; 'anthropic-beta' = 'oauth-2025-04-20'; Accept = 'application/json' }

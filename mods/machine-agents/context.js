@@ -43,9 +43,14 @@ export function refreshContext(view, cx, only, { footers = true } = {}) {
         }
         const codex = agents().filter(a => a.app === 'codex' && hostOf(a.address) === host);
         if (view.footersDue.delete(key)) {
+          // From each agent's log (its newest token_count), where herdr-chat found it; else from its footer, which Codex
+          // cuts off on a narrow terminal (as one behind the chat is), so it's the fallback.
+          const fromLogs = await codexLogContext(host, codex);
           for (const a of codex) {
-            const left = await codexFooter(a.address);
-            if (left != null) view.codexContext[a.address] = { percent: 100 - left, updatedAt: Date.now() / 1000 };
+            const logged = fromLogs[a.address];
+            const left = logged ? null : await codexFooter(a.address);
+            if (logged) view.codexContext[a.address] = logged;
+            else if (left != null) view.codexContext[a.address] = { percent: 100 - left, updatedAt: Date.now() / 1000 };
             else delete view.codexContext[a.address];
           }
         }
@@ -58,6 +63,42 @@ export function refreshContext(view, cx, only, { footers = true } = {}) {
       }
     });
   }
+}
+
+const CODEX_LOG_PROBE = `
+import json, os, sys
+out = {}
+for address, path in json.loads(sys.argv[1]):
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2); f.seek(max(0, f.tell() - 524288)); lines = f.read().decode("utf-8", "replace").splitlines()
+    except OSError: continue
+    for line in reversed(lines):
+        if '"token_count"' not in line: continue
+        try: info = (json.loads(line).get("payload") or {}).get("info") or {}
+        except ValueError: continue
+        used, window = (info.get("last_token_usage") or {}).get("input_tokens"), info.get("model_context_window")
+        if used is not None and window:
+            out[address] = {"percent": round(100 * used / window, 1), "updatedAt": os.path.getmtime(path)}
+            break
+print(json.dumps(out))
+`;
+
+export async function codexLogContext(host, codex) {
+  // Each Codex agent's context as its log's newest token_count gives it (last input tokens of the model's window), for the
+  // agents whose log herdr-chat found (its shared 'herdr-chat.paths', by address and start); { address: snapshot }.
+  const paths = shared('herdr-chat.paths') ?? {};
+  const all = terminals();
+  const list = codex.map(a => {
+    const t = all.find(x => x.address === a.address);
+    const path = t ? paths[`${a.address}:${t.created_ms}`]?.path : null;
+    return path ? [a.address, path] : null;
+  }).filter(Boolean);
+  if (!list.length) return {};
+  const run = program => exec(program, ['-c', CODEX_LOG_PROBE, JSON.stringify(list)], host === null ? undefined : { on: host }).catch(() => null);
+  let r = await run('python3');
+  if (!r || r.code !== 0) r = await run('python');
+  try { return r?.code === 0 ? JSON.parse(r.stdout.trim() || '{}') : {}; } catch { return {}; }
 }
 
 export async function codexFooter(address) {
