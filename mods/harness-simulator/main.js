@@ -50,6 +50,7 @@ function insets(node, id) {
   return null;
 }
 
+const ANDROID = { 29: "10", 30: "11", 31: "12", 32: "12L", 33: "13", 34: "14", 35: "15", 36: "16" };
 const hash = text => { let h = 5381; for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 const quote = s => `'${String(s).replace(/'/g, "''")}'`;   // a PowerShell literal
 const zoom = () => Number(settings()?.zoom) || 1;   // herdr scales the mod's px by this
@@ -59,6 +60,7 @@ export default class Simulator extends View {
   init(_props, cx) {
     this.area = null;            // the screen area's size, real logical px
     this.avds = [];              // virtual devices that can start
+    this.info = {};              // avd -> { width, height, label }, from its config.ini
     this.device = null;          // the running emulator: { serial, avd, width, height }
     this.status = "Looking for the Android SDK…";
     this.busy = null;            // "starting" | "stopping" while that runs
@@ -107,17 +109,29 @@ export default class Simulator extends View {
     const list = await exec(this.emulator, ["-list-avds"]).catch(() => null);
     if (!list || list.code !== 0) { this.status = "No Android emulator found. Install the Android SDK's emulator, or set ANDROID_HOME."; return; }
     this.avds = list.stdout.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith("INFO"));
+    for (const avd of this.avds) await this.avdInfo(avd);
     this.status = this.avds.length ? "" : "No virtual devices yet. Create one in Android Studio's Device Manager, or with avdmanager.";
     await this.refresh();
   }
 
-  async avdSize(avd) {
-    // The screen size from the virtual device's config.ini, known before it boots.
+  async avdInfo(avd) {
+    // From the virtual device's config.ini, known before it boots: its screen size, and a
+    // label to show for it ("Pixel 5 · Android 15") instead of its file name. The emulator
+    // rewrites the file with spaces around "=", Android Studio without.
+    if (this.info[avd]) return this.info[avd];
     const r = await ps(`$d = if ($env:ANDROID_AVD_HOME) { $env:ANDROID_AVD_HOME } else { Join-Path $HOME '.android\\avd' }; ` +
-      `Get-Content -LiteralPath (Join-Path $d ${quote(`${avd}.avd\\config.ini`)}) -ErrorAction SilentlyContinue | Select-String '^hw\\.lcd\\.(width|height)='`).catch(() => null);
-    const w = /hw\.lcd\.width=(\d+)/.exec(r?.stdout ?? ""), h = /hw\.lcd\.height=(\d+)/.exec(r?.stdout ?? "");
-    return w && h ? { width: +w[1], height: +h[1] } : null;
+      `Get-Content -LiteralPath (Join-Path $d ${quote(`${avd}.avd\\config.ini`)}) -ErrorAction SilentlyContinue`).catch(() => null);
+    const key = name => new RegExp(`^${name.replace(/\./g, "\\.")}\\s*=\\s*(.*)$`, "m").exec(r?.stdout ?? "")?.[1]?.trim();
+    const width = Number(key("hw.lcd.width")) || 0, height = Number(key("hw.lcd.height")) || 0;
+    const device = (key("hw.device.name") ?? "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || avd.replace(/_/g, " ");
+    const api = /android-(\d+)/.exec(key("image.sysdir.1") ?? "")?.[1];
+    const label = api ? `${device} · Android ${ANDROID[api] ?? `API ${api}`}` : device;
+    const info = { width, height, label };
+    if (r) this.info[avd] = info;
+    return info;
   }
+
+  label(avd) { return this.info[avd]?.label ?? avd; }
 
   async refresh() {
     // The running emulator, if any (the first one adb lists). Short timeouts throughout:
@@ -132,8 +146,8 @@ export default class Simulator extends View {
     if (this.device?.serial !== serial || !this.device.width) {
       const name = await exec(this.adb, ["-s", serial, "emu", "avd", "name"], { timeout: 5000 }).catch(() => null);
       const avd = name?.stdout.split(/\r?\n/)[0]?.trim() || serial;
-      let size = this.device?.avd === avd && this.device.width ? this.device : await this.avdSize(avd);
-      if (!size) {
+      let size = this.device?.avd === avd && this.device.width ? this.device : await this.avdInfo(avd);
+      if (!size.width) {
         const booted = await exec(this.adb, ["-s", serial, "shell", "getprop", "sys.boot_completed"], { timeout: 5000 }).catch(() => null);
         const out = booted?.stdout.trim() === "1"
           ? (await exec(this.adb, ["-s", serial, "shell", "wm", "size"], { timeout: 5000 }).catch(() => null))?.stdout ?? "" : "";
@@ -289,14 +303,14 @@ export default class Simulator extends View {
   }
 
   async start(avd, cx) {
-    this.busy = "starting"; this.status = `Starting ${avd}…`; cx.notify();
+    this.busy = "starting"; this.status = `Starting ${this.label(avd)}…`; cx.notify();
     // Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it
     // as soon as it appears, so it boots inside the panel.
     const started = await ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(this.emulator)} -ArgumentList '-avd',${quote(avd)},'-no-boot-anim'`)
-      .then(() => true, err => { this.status = `Couldn't start ${avd}: ${err}`; return false; });
+      .then(() => true, err => { this.status = `Couldn't start ${this.label(avd)}: ${err}`; return false; });
     if (started) {
-      const size = await this.avdSize(avd);
-      this.device = { serial: null, avd, width: size?.width ?? 0, height: size?.height ?? 0 };
+      const size = await this.avdInfo(avd);
+      this.device = { serial: null, avd, width: size.width, height: size.height };
       if (this.mode === "dock") await this.dock();
       cx.notify();
       for (let i = 0; i < 120 && !this.device?.serial; i++) { await cx.sleep(1500); await this.refresh(); cx.notify(); }
@@ -304,14 +318,14 @@ export default class Simulator extends View {
     this.busy = null;
     if (!this.device?.serial) {
       this.device = null; this.helper = false;
-      if (started) this.status = `${avd} didn't start. Check it in Android Studio's Device Manager.`;
+      if (started) this.status = `${this.label(avd)} didn't start. Check it in Android Studio's Device Manager.`;
     } else this.status = "";
     cx.notify();
   }
 
   async stop(cx) {
     if (!this.device) return;
-    this.busy = "stopping"; this.status = `Stopping ${this.device.avd}…`; cx.notify();
+    this.busy = "stopping"; this.status = `Stopping ${this.label(this.device.avd)}…`; cx.notify();
     await this.write("0 0 0 0 0");
     await this.unshareAll();
     // `emu kill` can hang on after the emulator is gone: watch the device list instead.
@@ -342,9 +356,8 @@ export default class Simulator extends View {
       .child(svg(`mods/harness-simulator/${icon}.svg`).size(13)).when(Boolean(label), el => el.child(label));
 
     const header = h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-      .child(div().font_semibold().child("Simulator"))
-      .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim)
-        .child(d ? d.avd : this.busy === "starting" ? "Starting…" : ""))
+      .child(div().id("sim-title").font_semibold().child("Simulator").when(Boolean(d), el => el.tooltip(this.label(d.avd))))
+      .child(div().flex_1())
       .children(Object.entries(this.shares).filter(([, s]) => !s.pending).map(([m, s]) => h_flex().id(`sim-share-${m}`).h(22).px(6).gap(4)
         .flex_none().items_center().rounded(5).border_1().border_color(t.border).text_size(11).text_color(s.error ? t.blocked : t.muted)
         .tooltip(s.error ? `Not shared with ${m}: ${s.error}` : `Shared with ${m}: adb -s 127.0.0.1:${s.port} there`)
@@ -372,12 +385,12 @@ export default class Simulator extends View {
         .when(this.helper && Boolean(g), el => el.child(div().w(g.w / zoom()).h(g.h / zoom()).rounded(8).bg(t.surface)));
     } else if (d) {
       body = div().id("sim-area").size_full().on_size_change(sizeArea).child(v_flex().size_full().items_center().justify_center().gap(10)
-        .child(div().text_size(12.5).text_color(t.muted).child(`${d.avd} is in its own window.`))
+        .child(div().text_size(12.5).text_color(t.muted).child(`${this.label(d.avd)} is in its own window.`))
         .child(button("sim-dock-big", "dock", "Show in the panel", cx => this.setMode("dock", cx), { primary: true })));
     } else {
       body = div().id("sim-area").size_full().on_size_change(sizeArea).child(v_flex().size_full().items_center().justify_center().gap(10).px(10)
         .when(Boolean(this.status), el => el.child(div().max_w(260).text_size(12.5).text_color(t.muted).text_center().child(this.status)))
-        .children(this.busy ? [] : this.avds.map(avd => button(`sim-start-${avd}`, "play", `Start ${avd}`, cx => this.start(avd, cx), { primary: true }))));
+        .children(this.busy ? [] : this.avds.map(avd => button(`sim-start-${avd}`, "play", `Start ${this.label(avd)}`, cx => this.start(avd, cx), { primary: true }))));
     }
 
     // A card, as Files and Changes draw theirs.
