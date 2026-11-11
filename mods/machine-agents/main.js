@@ -49,15 +49,6 @@ const kidStatus = (k, listed) => {
   const s = listed.get(k.address) ?? k.status;
   return s === "error" ? "blocked" : s === "done" ? "idle" : s;
 };
-const SORTS = [
-  { id: "priority", label: "Priority", icon: "clock" },
-  { id: "grouped", label: "Grouped by space", icon: "layers" },
-  { id: "machine", label: "Grouped by machine", icon: "server" },
-];
-// Always grouped by machine (the sort menu is gone; a sort chosen before is no longer read).
-const sortOf = () => SORTS.find((s) => s.id === "machine");
-const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
-const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
 
 function duration(ms) {
   const m = Math.floor(ms / 60000);
@@ -77,7 +68,7 @@ const READ_AFTER = [1000, 4000];
 
 export default class Agents extends View {
   init(_props, cx) {
-    if (props()?.sortMenu || props()?.loginBar) return;
+    if (props()?.loginBar) return;
     this.folded = new Set();
     this.hosts = {};
     this.retrying = {};
@@ -358,18 +349,6 @@ export default class Agents extends View {
     return this.changed[a.address]?.at ?? 0;
   }
 
-  hold(list) {
-    // Looking at a done agent makes it idle; it stays with Done until you leave it rather than drop away under you.
-    const cur = list.find((a) => a.focused);
-    const same = cur && cur.address === this.held?.address;
-    if (!same || cur.status !== "idle") this.held = cur ? { address: cur.address, rank: RANK[cur.status] ?? 0 } : null;
-  }
-
-  rank(a) {
-    const sawDone = a.address === this.held?.address && this.held.rank === RANK.done && a.status === "idle";
-    return sawDone ? RANK.done : RANK[a.status] ?? 0;
-  }
-
   refreshHosts(cx) {
     cx.spawn(async cx => {
       try {
@@ -461,32 +440,6 @@ export default class Agents extends View {
         .child(svg("mods/harness-chrome/x.svg").size(12)));
   }
 
-  sortMenu(t) {
-    const on = sortOf().id;
-    return v_flex()
-      .w_full()
-      .p(5)
-      .bg(t.popover)
-      .text_size(12.8)
-      .child(div().px(8).pt(4).pb(6).text_size(11).text_color(t.dim).child("Sort agents"))
-      .children(SORTS.map((s) => h_flex()
-        .id(`sort-${s.id}`)
-        .h(31)
-        .px(8)
-        .gap(9)
-        .rounded(7)
-        .items_center()
-        .text_color(t.foreground)
-        .hover((el) => el.bg(t.hover))
-        .on_click(() => {
-          setShared("agents.sort", s.id);
-          closeOverlay(props().overlay);
-        })
-        .child(svg(`mods/harness-chrome/${s.icon}.svg`).size(14).flex_none().text_color(t.muted))
-        .child(div().flex_1().child(s.label))
-        .when(s.id === on, (el) => el.child(svg("mods/harness-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))));
-  }
-
   peek(addr) {
     run("terminal.peek", { terminal: addr });
   }
@@ -550,38 +503,27 @@ export default class Agents extends View {
 
   render(cx) {
     const t = theme();
-    if (props()?.sortMenu) return this.sortMenu(t);
     if (props()?.loginBar) return this.loginBar(t);
     const collapsed = narrow();
-    const sort = sortOf();
     let list = agents();
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
     const shown = focused()?.agent;
     const now = Date.now();
     this.track(list, now);
-    this.hold(list);
-    const byPriority = sort.id === "priority";
-    const byMachine = sort.id === "machine";
-    const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
-    const rankOf = (a) => urgency.get(a.address);
-    if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
-    if (byMachine) {
-      const at = new Map(this.order.map((x, i) => [x, i]));
-      list = [...list].sort((x, y) => (at.get(x.address) ?? -1) - (at.get(y.address) ?? -1));
-    }
+    const at = new Map(this.order.map((x, i) => [x, i]));
+    list = [...list].sort((x, y) => (at.get(x.address) ?? -1) - (at.get(y.address) ?? -1));
     this.prunePins(all);
     const pinned = this.pins.map((p) => list.find((a) => a.address === p)).filter(Boolean);
     const rest = list.filter((a) => !this.pins.includes(a.address));
     list = [...pinned, ...rest];
-    setAgentOrder(list.map((a) => a.address));
     this.noticeMoves(list, cx);
 
     const withKids = (a, i) => {
       const subs = collapsed ? [] : this.tree(all, a.address);
       const r = row(a, i, subs);
       if (this.folded.has(a.address)) return [r];
-      return [r, ...subs.map((s) => this.subRow(t, s, shown, byPriority))];
+      return [r, ...subs.map((s) => this.subRow(t, s, shown, false))];
     };
 
     const fold = (a, subs) => {
@@ -635,7 +577,6 @@ export default class Agents extends View {
           .when(Boolean(pic), el => el.child(pic))
           .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true)));
       }
-      const when = this.since(a);
       const idle = a.status === "idle" && !a.focused;
       const isPinned = this.pins.includes(a.address);
       const pin = div()
@@ -654,7 +595,7 @@ export default class Agents extends View {
           cx.notify();
         })
         .child(svg(`mods/harness-chrome/${isPinned ? "pin-off" : "pin"}.svg`).size(13));
-      const full = byPriority || isPinned;
+      const full = isPinned;
       const name = label(a) || a.space_name || "";
       // Line 2: where it works (folder · branch, and its space where the list doesn't group by it); context used as a small bar.
       const tab = tabs.find(x => x.id === a.tab);
@@ -668,7 +609,7 @@ export default class Agents extends View {
         .child(div().h_full().rounded_full().w(Math.max(2, Math.round(36 * used / 100))).bg(used > 90 ? "#d88179" : used > 75 ? t.working : t.muted));
       // Dragging (by machine, not pinned): press, move over another agent of the same machine, release.
       const machineOf = x => x.includes("/") ? x.split("/")[0] : "";
-      const draggable = byMachine && !isPinned;
+      const draggable = !isPinned;
       const dragging = this.drag?.moved && this.drag.address === a.address;
       const dropHere = this.drag?.moved && this.drop?.target === a.address;
       // A card that moved gets a new id and starts where it was, then slides to its place (noticeMoves).
@@ -728,7 +669,7 @@ export default class Agents extends View {
           .child(div().flex_1().min_w(0).truncate().text_color(idle ? t.muted : t.foreground).child(name))
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .when(this.hovered === a.address, el => el.child(pin))
-          .child(this.status(t, a, byPriority && !isPinned)))
+          .child(this.status(t, a)))
         .when(where.length > 0 || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
           .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
             .children(where.map(([text, glyph]) => h_flex().min_w(0).gap(4).items_center()
@@ -738,28 +679,23 @@ export default class Agents extends View {
     };
 
     const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
-    if (byMachine) {
-      for (const machine of machines()) {
-        const machineKey = machine.name ?? "";
-        groups.push({
-          id: `machine-${machineKey || "local"}`,
-          label: machine.name || localMachineLabel(),
-          status: null,
-          members: rest.filter(a => (a.address.includes("/") ? a.address.split("/")[0] : "") === machineKey),
-          machine,
-        });
-      }
-    } else for (const a of rest) {
-      const r = rankOf(a) || RANK.idle;
-      const machine = a.address.includes("/") ? a.address.split("/")[0] : "";
-      const id = byPriority ? `sec-${r}` : byMachine ? `machine-${machine || "local"}` : `sp-${a.space}`;
-      if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
-      else groups.push({ id, label: byPriority ? SECTION[r] : byMachine ? machine || localMachineLabel() : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a] });
+    for (const machine of machines()) {
+      const machineKey = machine.name ?? "";
+      groups.push({
+        id: `machine-${machineKey || "local"}`,
+        label: machine.name || localMachineLabel(),
+        status: null,
+        members: rest.filter(a => (a.address.includes("/") ? a.address.split("/")[0] : "") === machineKey),
+        machine,
+      });
     }
+    // agent.next / agent.prev (Alt+Down / Alt+Up) walk the agents as the list shows them: Pinned, then each machine top to bottom.
+    setAgentOrder(groups.flatMap(g => g.members).map(a => a.address));
 
     const header = (g) => {
-      // A group's header; it folds the group.
+      // A group's header: a machine's (inside its band, which folds it) or Pinned's (which folds itself).
       const open = !this.folded.has(g.id);
+      const isMachine = Boolean(g.machine);
       const top = g.members.reduce((m, a) => ((RANK[a.status] ?? 0) > (RANK[m] ?? 0) ? a.status : m), null);
       return h_flex()
         .id(g.id)
@@ -774,23 +710,23 @@ export default class Agents extends View {
         .cursor_pointer()
         .hover((s) => s.text_color(t.foreground))
         // A machine's whole band folds it (below); other groups fold from their header.
-        .when(!byMachine, el => el.on_click((_e, cx) => {
+        .when(!isMachine, el => el.on_click((_e, cx) => {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         }))
-        .when(byMachine, el => el.text_size(12.5).font_semibold().pt(6)
+        .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6)
           .child(svg(`mods/harness-chrome/${g.machine?.name ? "server" : "monitor"}.svg`).size(13).flex_none().text_color(t.muted)))
-        .child(div().truncate().text_color(byMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
-        .when(byPriority || byMachine || !open, (el) => el.child(div().font_medium().text_size(11).text_color(t.dim).child(String(g.members.length))))
+        .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
+        .when(isMachine || !open, (el) => el.child(div().font_medium().text_size(11).text_color(t.dim).child(String(g.members.length))))
         .child(div().flex_1())
         .when(!open, (el) => el
-          .when(!byPriority && top && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
-          .when(!byMachine, el => el.child(svg("mods/harness-chrome/chevron-right.svg").size(11).flex_none().text_color(t.dim))))
+          .when(Boolean(top) && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
+          .when(!isMachine, el => el.child(svg("mods/harness-chrome/chevron-right.svg").size(11).flex_none().text_color(t.dim))))
         // A machine always shows its fold arrow, left of the +: down while its agents show, right when folded.
-        .when(byMachine, el => el.child(div().size(14).flex_none().flex().items_center().justify_center()
+        .when(isMachine, el => el.child(div().size(14).flex_none().flex().items_center().justify_center()
           .tooltip(open ? "Fold this machine's agents" : "Show this machine's agents")
           .child(svg(`mods/harness-chrome/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim))))
-        .when(byMachine && g.machine?.layout === "ready", el => el.child(div()
+        .when(isMachine && g.machine?.layout === "ready", el => el.child(div()
           .id(`add-${g.id}`)
           .size(14)
           .flex_none()
@@ -806,7 +742,7 @@ export default class Agents extends View {
             openOverlay({ mod: "machine-new-menu", kind: "popup", width: 280, height: 500, props: { machine: g.machine.name } });
           })
           .child(svg("mods/harness-chrome/plus.svg").size(12))))
-        .when(byMachine && Boolean(g.machine?.name) && g.machine?.layout !== "ready", el => {
+        .when(isMachine && Boolean(g.machine?.name) && g.machine?.layout !== "ready", el => {
           const name = g.machine.name;
           const busy = Boolean(this.retrying[name]?.busy);
           const state = (this.hosts[name]?.state ?? g.machine.layout).replace(/_/g, " ");
@@ -836,14 +772,14 @@ export default class Agents extends View {
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
       : groups.flatMap((g, index) => [
-        ...(byMachine && index > 0 ? [div().h(20).flex_none()] : []),
+        ...(index > 0 ? [div().h(20).flex_none()] : []),
         // A machine's header and rings as one raised band, so each machine's agents read as a group.
-        ...(byMachine && g.machine ? [this.machineCard(t, g.machine, v_flex().id(`band-${g.id}`).w_full().mb(8).pb(3).rounded(8).bg(t.raised).border_1().border_color(t.border)
+        ...(g.machine ? [this.machineCard(t, g.machine, v_flex().id(`band-${g.id}`).w_full().mb(8).pb(3).rounded(8).bg(t.raised).border_1().border_color(t.border)
           // The whole band, name and rings alike, folds or unfolds the machine's agents.
           .cursor_pointer().hover(s => s.border_color(t.dim))
           .on_click((_e, cx) => { this.folded.has(g.id) ? this.folded.delete(g.id) : this.folded.add(g.id); cx.notify(); })
           .child(header(g)).child(statsFor(g.machine.name ?? null, t)))] : [header(g)]),
-        ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids) : byMachine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
+        ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids)   : g.machine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
       ]);
 
     return v_flex()
