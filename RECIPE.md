@@ -103,13 +103,15 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Tab bar:** click selects, double-click renames, drag reorders, right-click opens the
   tab menu, the scroll wheel moves between tabs. Files, Changes and Simulator toggle the right
   panel, remembered per space.
-- **Simulator** (Windows): starts an Android virtual device and shows the emulator's own
-  window over the panel's screen area, at the device's aspect ratio, so it draws and takes
-  input natively. It hides with the panel, while one of herdr's popups is open, and when herdr
-  minimizes; it follows the window as it moves or resizes. The header pops it out into its own
-  window and back, and stops it. While it runs, showing a space on another machine shares it
-  there (that machine's adb lists it as `127.0.0.1:15555`), shown as the machine's name in
-  the header, with × to stop; sharing ends when the emulator stops.
+- **Simulator** (Windows): one Android emulator per session (tab), shared by its sub-agents.
+  The panel shows the focused session's emulator's own window over its screen area, at the
+  device's aspect ratio, so it draws and takes input natively; the other sessions' keep
+  running, hidden. It hides with the panel, while one of herdr's popups is open, and when
+  herdr minimizes; it follows the window as it moves or resizes. A session without one gets
+  Start (a free virtual device, or a copy of one); the header pops the emulators out into
+  their own windows and back, and stops this session's. Closing a tab stops its emulator and
+  keeps the device. A session on another machine has its emulator shared there, shown as the
+  machine's name in the header, with × to stop.
 - **Status bar:** each quota bar shows the 5-hour window and switches to 7 days while
   hovered, red above 90%; the tooltip gives the reset time. The last item opens the
   command palette.
@@ -134,7 +136,13 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
     herdr's, just above it. The mod writes the screen area, as gaps from the window's
     bottom-right corner, to `cache/harness-simulator/dock-state.txt` only when it changes; the
     helper follows herdr's window through WinEvent hooks and, after a click or key press in
-    herdr, asks `herdr-app status` whether an overlay is open. Nothing runs per frame.
+    herdr, asks `herdr-app status` whether an overlay is open. Nothing runs per frame. The
+    state also names the emulator to show and every other one, which it keeps hidden.
+    Sessions are tabs (`focused().tab`); their emulators are kept in localStorage `owners`.
+    For a session on another machine, the mod writes `~/.config/harness/devices` there (each
+    terminal of the tab, its panes' and the sub-agents under them from `terminals()` `parent`,
+    and the emulator's serial there) and installs `adb.sh` as `~/.local/bin/adb`, which sets
+    `ANDROID_SERIAL` from `HC_TERMINAL_ID` and filters `adb devices`.
   - `workspace-status-machine`: the status bar. It also collects the stats: a built copy of
     `machine-stats` publishes shared `machine.stats`, `machine.usage` and
     `machine.local-label`.
@@ -163,10 +171,12 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   computer, `csc.exe` once to build `harns-dock`, and that helper while the device is docked
   (it hooks herdr's window and mouse/keyboard release events only to place the device window
   and notice herdr's popups; it reads no input content);
-- while the Simulator runs and a space on another machine is shown: an SSH reverse tunnel to
-  that machine (Windows' OpenSSH, `ssh -N -R 127.0.0.1:<port>:127.0.0.1:<emulator adb port>`,
-  bound to its localhost) and `adb connect` / `adb disconnect` there, so agents on it can
-  drive the emulator;
+- for each session on another machine with a running emulator: an SSH reverse tunnel to that
+  machine (Windows' OpenSSH, `ssh -N -R 127.0.0.1:<port>:127.0.0.1:<emulator adb port>`, bound
+  to its localhost), `adb connect` / `adb disconnect` there, and two files there:
+  `~/.local/bin/adb` (harns's `adb.sh`, never over an `adb` that isn't its own) and
+  `~/.config/harness/devices`; on this computer, copies of a virtual device in
+  `~/.android/avd` when more sessions need one;
 - reads Claude Code's login (`~/.claude/.credentials.json`, or the `Claude Code-credentials`
   keychain item on macOS) and sends its token only to Anthropic's usage endpoint,
   `https://api.anthropic.com/api/oauth/usage`. That request and `codex app-server` are its only
@@ -216,7 +226,9 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
 
 - `herdr-app check` passes for every mod and `herdr-app status` shows no errors.
 - On Windows, Simulator starts a virtual device inside the panel; the + menu shows over it, and
-  Files hides it.
+  Files hides it. Two sessions on another machine each get their own emulator: `adb devices`
+  in each lists only its own, a sub-agent's lists its session's, and closing a tab stops its
+  emulator.
 - Each connected machine has a group with live CPU, RAM and GPU rings, and its agents
   under it; a working agent spins and the logo fades.
 - Folding the sidebar leaves icons, rings and statuses centered in the rail.

@@ -1,22 +1,30 @@
-// Harness's Simulator: an Android emulator in the right-hand panel, beside Files and Changes.
+// Harness's Simulator: Android emulators in the right-hand panel, beside Files and Changes.
+//
+// One emulator per session (an agent's tab): the panel shows the focused session's, and the
+// others keep running, hidden, for the agents still testing on them. Sub-agents (terminals an
+// agent started with `hc run`) use their session's emulator. Closing a tab stops its emulator
+// and keeps the virtual device for a later session.
 //
 // The device isn't drawn by this mod. The emulator's own window sits over the panel's screen
 // area (harns-dock, built from dock.cs on first use), so it runs at the emulator's own frame
 // rate with its own mouse and keyboard input, and nothing here runs per frame. This mod only
-// says where that area is, in a small state file, when it moves or shows or hides; the helper
-// follows herdr's window by itself.
+// says where that area is and which emulator shows, in a small state file, when that changes.
+//
+// A session on another machine gets its emulator shared there (an SSH reverse tunnel to that
+// machine's adb server), and ~/.local/bin/adb there (adb.sh) points each session's agents at
+// their own emulator, so they find it with plain `adb`.
 //
 // Windows only for now: the iOS Simulator needs a Mac, and docking a window is per platform.
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { exec, hc, appHome, readTextFile, layout, settings, window, theme, spaces, machines } from "herdr";
+import { exec, hc, appHome, readTextFile, layout, settings, window, theme, spaces, machines, panes, terminals, focused } from "herdr";
 import * as fs from "fs/promises";
 
 const BLOCK = "simulator";
 const PAD = 12;           // around the screen area, in the mod's px (herdr zooms them)
 const BORDER = 1;         // the card's border, as on Files and Changes
-const POLL = 4000;        // how often the device list is read while the panel shows (ms)
-const SHARE_PORT = 15555; // the first port tried on another machine for the emulator's adb
+const POLL = 4000;        // how often the emulators are read (ms)
+const SHARE_PORT = 15555; // the first port tried on another machine for an emulator's adb
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -55,39 +63,50 @@ const hash = text => { let h = 5381; for (let i = 0; i < text.length; i++) h = (
 const quote = s => `'${String(s).replace(/'/g, "''")}'`;   // a PowerShell literal
 const zoom = () => Number(settings()?.zoom) || 1;   // herdr scales the mod's px by this
 const ps = script => exec("powershell", ["-NoProfile", "-NonInteractive", "-Command", script]);
+const prefixOf = avd => `Android Emulator - ${avd}:`;   // its window's title
+// Addresses name their machine ("homelab-compute/t34"); this computer's are bare ("t28").
+const machineOf = address => address?.includes("/") ? address.slice(0, address.lastIndexOf("/")) : null;
+const idOf = address => address?.split("/").pop();
+const errorText = err => String(err?.message ?? err).split("\n")[0];
 
 export default class Simulator extends View {
   init(_props, cx) {
     this.area = null;            // the screen area's size, real logical px
-    this.avds = [];              // virtual devices that can start
+    this.avds = [];              // virtual devices on this computer
     this.info = {};              // avd -> { width, height, label }, from its config.ini
-    this.device = null;          // the running emulator: { serial, avd, width, height }
+    this.running = {};           // avd -> adb serial ("emulator-5554"), every running emulator
+    this.owners = {};            // tab -> avd: each session's emulator, kept across restarts
+    try { this.owners = JSON.parse(localStorage.getItem("owners") ?? "{}"); } catch {}
+    this.starting = new Set();   // avds starting, so their windows dock as soon as they appear
     this.status = "Looking for the Android SDK…";
-    this.busy = null;            // "starting" | "stopping" while that runs
-    this.mode = "dock";          // "dock": in the panel; "window": a window of its own
+    this.mode = "dock";          // "dock": in the panel; "window": windows of their own
     try { this.mode = localStorage.getItem("mode") === "window" ? "window" : "dock"; } catch {}
-    this.helper = false;         // a harns-dock is running for this device
+    this.helper = false;         // harns-dock is running
     this.written = null;         // the state file's last contents
-    this.shares = {};            // machine -> { pid, port, error? } | { error }: shared there
-    this.declined = new Set();   // machines the user stopped sharing with, until it restarts
+    this.shares = {};            // avd -> { machine, pid, port, serial } | { machine, error } | { pending }
+    this.declined = new Set();   // avds the user stopped sharing, until they stop
+    this.maps = {};              // machine -> the devices file last written there
+    this.scripts = {};           // machine -> true once its adb script is in place
     if (window()?.platform !== "windows") { this.status = "The Simulator panel runs on Windows for now."; return; }
     cx.spawn(async cx => {
       await this.setup();
       cx.notify();
       for (;;) {
-        if (this.shown() || this.busy) { await this.refresh(); cx.notify(); }
-        if (await this.shareActive()) cx.notify();
-        await cx.sleep(this.busy ? 1500 : POLL);
+        // Always, not only while the panel shows: sessions keep working while you're elsewhere.
+        await this.refresh();
+        await this.tend();
+        cx.notify();
+        await cx.sleep(this.starting.size ? 1500 : POLL);
       }
     });
-    // Whether the panel shows is read from the layout. A hidden stack child may not render, so a
-    // light timer keeps the device window in step with it (no programs run here).
+    // Whether the panel shows, and which session has focus, are read from herdr. A hidden stack
+    // child may not render, so a light timer keeps the device windows in step (no programs run).
     cx.timer.every(200, () => this.place());
   }
 
   async close() {
-    // The panel's slot went away (another layout, or quitting): the device window hides with it,
-    // and its tunnels close (the other machines see the device go offline).
+    // The panel's slot went away (another layout, or quitting): the device windows hide, and the
+    // tunnels close (the other machines see their emulators go offline until it's back).
     this.place(false);
     for (const share of Object.values(this.shares)) if (share.pid) exec("taskkill", ["/PID", String(share.pid), "/F"]).catch(() => {});
     this.shares = {};
@@ -114,13 +133,16 @@ export default class Simulator extends View {
     await this.refresh();
   }
 
+  avdHome() {
+    return `$d = if ($env:ANDROID_AVD_HOME) { $env:ANDROID_AVD_HOME } else { Join-Path $HOME '.android\\avd' }; `;
+  }
+
   async avdInfo(avd) {
     // From the virtual device's config.ini, known before it boots: its screen size, and a
     // label to show for it ("Pixel 5 · Android 15") instead of its file name. The emulator
     // rewrites the file with spaces around "=", Android Studio without.
     if (this.info[avd]) return this.info[avd];
-    const r = await ps(`$d = if ($env:ANDROID_AVD_HOME) { $env:ANDROID_AVD_HOME } else { Join-Path $HOME '.android\\avd' }; ` +
-      `Get-Content -LiteralPath (Join-Path $d ${quote(`${avd}.avd\\config.ini`)}) -ErrorAction SilentlyContinue`).catch(() => null);
+    const r = await ps(this.avdHome() + `Get-Content -LiteralPath (Join-Path $d ${quote(`${avd}.avd\\config.ini`)}) -ErrorAction SilentlyContinue`).catch(() => null);
     const key = name => new RegExp(`^${name.replace(/\./g, "\\.")}\\s*=\\s*(.*)$`, "m").exec(r?.stdout ?? "")?.[1]?.trim();
     const width = Number(key("hw.lcd.width")) || 0, height = Number(key("hw.lcd.height")) || 0;
     const device = (key("hw.device.name") ?? "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || avd.replace(/_/g, " ");
@@ -133,70 +155,96 @@ export default class Simulator extends View {
 
   label(avd) { return this.info[avd]?.label ?? avd; }
 
+  async clone(base) {
+    // Another virtual device like `base`, for one more session: its config.ini without its
+    // data, so it boots fresh (the first boot is a cold one).
+    let n = 2;
+    while (this.avds.includes(`${base}_${n}`)) n++;
+    const name = `${base}_${n}`;
+    const r = await ps(this.avdHome() +
+      `$src = Join-Path $d ${quote(`${base}.avd`)}; $dst = Join-Path $d ${quote(`${name}.avd`)}; ` +
+      `New-Item -ItemType Directory -Force -Path $dst | Out-Null; ` +
+      `$lines = Get-Content -LiteralPath (Join-Path $src 'config.ini') | Where-Object { $_ -notmatch '^(AvdId|avd\\.ini\\.displayname)\\s*=' }; ` +
+      `Set-Content -LiteralPath (Join-Path $dst 'config.ini') -Encoding ascii -Value ($lines + ${quote(`AvdId=${name}`)} + ${quote(`avd.ini.displayname=${name}`)}); ` +
+      `$target = (Select-String -LiteralPath (Join-Path $d ${quote(`${base}.ini`)}) -Pattern '^target=').Line; ` +
+      `Set-Content -LiteralPath (Join-Path $d ${quote(`${name}.ini`)}) -Encoding ascii -Value @('avd.ini.encoding=UTF-8', "path=$dst", ${quote(`path.rel=avd\\${name}.avd`)}, $target)`);
+    if (r.code !== 0) throw new Error(r.stderr.trim().split("\n")[0] || "couldn't copy the virtual device");
+    this.avds.push(name);
+    await this.avdInfo(name);
+    return name;
+  }
+
   async refresh() {
-    // The running emulator, if any (the first one adb lists). Short timeouts throughout:
-    // `adb shell` commands wait while Android is still booting.
+    // The running emulators, by virtual device. Short timeouts: adb can be slow while one boots.
     const r = await exec(this.adb, ["devices"], { timeout: 5000 }).catch(() => null);
-    const serial = r?.stdout.split(/\r?\n/).map(l => l.split(/\s+/)).find(([s, state]) => /^emulator-\d+$/.test(s) && state === "device")?.[0];
-    if (!serial) {
-      // While one starts, adb doesn't list it yet: keep what start() set.
-      if (this.device && this.busy !== "starting") { this.device = null; this.helper = false; await this.unshareAll(); }
-      return;
-    }
-    if (this.device?.serial !== serial || !this.device.width) {
-      const name = await exec(this.adb, ["-s", serial, "emu", "avd", "name"], { timeout: 5000 }).catch(() => null);
-      const avd = name?.stdout.split(/\r?\n/)[0]?.trim() || serial;
-      let size = this.device?.avd === avd && this.device.width ? this.device : await this.avdInfo(avd);
-      if (!size.width) {
-        const booted = await exec(this.adb, ["-s", serial, "shell", "getprop", "sys.boot_completed"], { timeout: 5000 }).catch(() => null);
-        const out = booted?.stdout.trim() === "1"
-          ? (await exec(this.adb, ["-s", serial, "shell", "wm", "size"], { timeout: 5000 }).catch(() => null))?.stdout ?? "" : "";
-        const m = /Override size: (\d+)x(\d+)/.exec(out) ?? /Physical size: (\d+)x(\d+)/.exec(out);
-        size = m ? { width: +m[1], height: +m[2] } : { width: 0, height: 0 };
+    if (!r) return;
+    const serials = r.stdout.split(/\r?\n/).map(l => l.split(/\s+/)).filter(([s, state]) => /^emulator-\d+$/.test(s) && state === "device").map(([s]) => s);
+    const next = {};
+    for (const serial of serials) {
+      let avd = Object.keys(this.running).find(a => this.running[a] === serial);
+      if (!avd) {
+        const name = await exec(this.adb, ["-s", serial, "emu", "avd", "name"], { timeout: 5000 }).catch(() => null);
+        avd = name?.stdout.split(/\r?\n/)[0]?.trim();
+        if (!avd) continue;
+        await this.avdInfo(avd);
       }
-      this.device = { serial, avd, width: size.width, height: size.height };
+      next[avd] = serial;
+      this.starting.delete(avd);
     }
-    if (this.mode === "dock" && !this.helper && !this.busy) await this.dock();
+    for (const avd of Object.keys(this.running)) if (!next[avd]) await this.unshare(avd);
+    this.running = next;
+    if (this.mode === "dock" && !this.helper && (Object.keys(next).length || this.starting.size)) await this.dock();
   }
 
-  // Sharing with other machines. An agent on another machine drives this emulator with its own
-  // adb: an SSH reverse tunnel (Windows' OpenSSH, with the ssh config herdr's machines use) brings
-  // that machine's 127.0.0.1:<port> to the emulator's adb port here, and that machine's adb
-  // server connects to it, so the emulator is one more device in its list, beside any phones.
-  // Bound to localhost there; nothing listens on the network. It happens on its own while the
-  // emulator runs and a space on that machine is shown, and lasts until the emulator stops.
+  saveOwners() { try { localStorage.setItem("owners", JSON.stringify(this.owners)); } catch {} }
 
-  remembered(update) {
-    // The machines it's shared with, kept across reloads and restarts of herdr (the emulator
-    // outlives both), so agents there keep the device without anyone revisiting their space.
-    let list = [];
-    try { list = JSON.parse(localStorage.getItem("shared") ?? "[]"); } catch {}
-    if (update) { list = update(list); try { localStorage.setItem("shared", JSON.stringify(list)); } catch {} }
-    return list;
+  session() { return focused()?.tab ?? null; }
+
+  tabMachine(tab) { return spaces().find(s => (s.tabs ?? []).some(t => t.id === tab))?.machine ?? null; }
+
+  ready(machine) { return machines().find(x => x.name === machine)?.layout === "ready"; }
+
+  async tend() {
+    // Closed sessions' emulators stop (their devices are kept), and each running session's
+    // emulator is shared with its machine, with the devices file there kept current.
+    const live = new Set(spaces().flatMap(s => (s.tabs ?? []).map(t => t.id)));
+    for (const [tab, avd] of Object.entries(this.owners)) {
+      // Only when its machine answers: a machine going offline hides its tabs without closing them.
+      if (live.has(tab) || !this.ready(machineOf(tab))) continue;
+      delete this.owners[tab];
+      this.saveOwners();
+      if (this.running[avd]) {
+        await this.unshare(avd);
+        exec(this.adb, ["-s", this.running[avd], "emu", "kill"], { timeout: 15000 }).catch(() => {});
+      }
+    }
+    for (const [tab, avd] of Object.entries(this.owners)) {
+      const m = this.tabMachine(tab);
+      if (this.shares[avd] && this.shares[avd].machine !== m) await this.unshare(avd);
+      if (!m || !this.running[avd] || this.shares[avd] || this.declined.has(avd) || !this.ready(m)) continue;
+      this.shares[avd] = { machine: m, pending: true };
+      this.shares[avd] = await this.share(m, avd).catch(err => ({ machine: m, error: errorText(err) }));
+    }
+    await this.writeMaps();
   }
 
-  async shareActive() {
-    // Shares with the shown space's machine, if it's another one, and with the machines it was
-    // shared with before. True when something changed.
-    const d = this.device;
-    if (!d?.serial || this.busy) return false;
-    const want = [spaces().find(s => s.active)?.machine, ...this.remembered()];
-    const m = want.find(m => m && !this.shares[m] && !this.declined.has(m) && machines().find(x => x.name === m)?.layout === "ready");
-    if (!m) return false;
-    this.shares[m] = { pending: true };
-    this.shares[m] = await this.share(m, d).catch(err => ({ error: String(err?.message ?? err).split("\n")[0] }));
-    if (!this.shares[m].error) this.remembered(list => list.includes(m) ? list : [...list, m]);
-    return true;
-  }
+  // Sharing a session's emulator with its machine. An SSH reverse tunnel (Windows' OpenSSH, with
+  // the ssh config herdr's machines use) brings that machine's 127.0.0.1:<port> to the emulator's
+  // adb port here, and that machine's own adb server connects to it: the emulator is one more
+  // device in its list, beside any phones. Bound to localhost there; nothing listens on the network.
 
-  async share(m, d) {
+  async share(m, avd) {
     const list = await hc(["machine", "ls", "--json"]);
     const info = JSON.parse(list.stdout || "{}").machines?.find(x => x.name === m);
     if (!info) throw new Error("not one of herdr's machines");
     if (info.via) throw new Error("connected through a command, not ssh");
-    const local = Number(d.serial.split("-")[1]) + 1;   // emulator-5554: console 5554, adb 5555
+    await this.installScript(m);
+    const local = Number(this.running[avd].split("-")[1]) + 1;   // emulator-5554: console 5554, adb 5555
+    const taken = new Set(Object.values(this.shares).filter(s => s.machine === m && s.port).map(s => s.port));
     const ssh = `${this.windir}\\System32\\OpenSSH\\ssh.exe`;
-    for (let port = SHARE_PORT; port < SHARE_PORT + 5; port++) {
+    for (let port = SHARE_PORT, tries = 0; tries < 5; port++) {
+      if (taken.has(port)) continue;
+      tries++;
       // SetEnv names the tunnel, so a later copy of the mod can find and close it.
       const r = await ps(`$p = Start-Process -WindowStyle Hidden -PassThru -FilePath ${quote(ssh)} -ArgumentList ` +
         `'-N','-o','BatchMode=yes','-o','ExitOnForwardFailure=yes','-o','ServerAliveInterval=30','-o','ServerAliveCountMax=3',` +
@@ -204,26 +252,58 @@ export default class Simulator extends View {
         `Start-Sleep -Milliseconds 2500; if ($p.HasExited) { 'exited' } else { $p.Id }`);
       const pid = Number(r.stdout.trim());
       if (!pid) continue;   // that port is taken there (or ssh can't log in): the next one
-      const c = await exec("adb", ["connect", `127.0.0.1:${port}`], { on: m, timeout: 10000 })
+      const serial = `127.0.0.1:${port}`;
+      const c = await exec("adb", ["connect", serial], { on: m, timeout: 10000 })
         .catch(() => ({ code: 1, stdout: "", stderr: "adb isn't installed there" }));
-      if (/connected to/.test(c.stdout)) return { pid, port };
-      return { pid, port, error: (c.stderr || c.stdout).trim().split("\n")[0] || "adb couldn't connect" };
+      if (/connected to/.test(c.stdout)) return { machine: m, pid, port, serial };
+      return { machine: m, pid, port, serial, error: (c.stderr || c.stdout).trim().split("\n")[0] || "adb couldn't connect" };
     }
     throw new Error("couldn't open a tunnel (ssh to it needs to work with a key)");
   }
 
-  async unshare(m) {
-    const share = this.shares[m];
-    delete this.shares[m];
-    this.remembered(list => list.filter(x => x !== m));
+  async unshare(avd) {
+    const share = this.shares[avd];
+    delete this.shares[avd];
     if (!share?.pid) return;
-    await exec("adb", ["disconnect", `127.0.0.1:${share.port}`], { on: m, timeout: 5000 }).catch(() => {});
+    await exec("adb", ["disconnect", share.serial], { on: share.machine, timeout: 5000 }).catch(() => {});
     await exec("taskkill", ["/PID", String(share.pid), "/F"]).catch(() => {});
   }
 
-  async unshareAll() {
-    for (const m of Object.keys(this.shares)) await this.unshare(m);
-    this.declined.clear();
+  async installScript(m) {
+    // ~/.local/bin/adb there: adb.sh, which points each session at its own emulator and then runs
+    // that machine's own adb. An adb already there that isn't this script is left alone.
+    if (this.scripts[m]) return;
+    const text = (await readTextFile(`${appHome()}\\mods\\harness-simulator\\adb.sh`))?.replace(/\r/g, "");
+    if (!text) throw new Error("adb.sh is missing from the mod");
+    const r = await exec("sh", ["-c",
+      'f="$HOME/.local/bin/adb"; if [ -e "$f" ] && ! grep -q "^# harns: points adb" "$f"; then exit 3; fi; ' +
+      'mkdir -p "$HOME/.local/bin" && printf "%s" "$1" > "$f.harns" && chmod +x "$f.harns" && mv "$f.harns" "$f"', "harns", text], { on: m, timeout: 10000 });
+    if (r.code === 3) throw new Error("~/.local/bin/adb there isn't harns's: left as it is");
+    if (r.code !== 0) throw new Error(r.stderr.trim().split("\n")[0] || "couldn't install the adb script");
+    this.scripts[m] = true;
+  }
+
+  async writeMaps() {
+    // ~/.config/harness/devices on each machine: every terminal of a session (its panes and the
+    // sub-agents under them) and that session's emulator there.
+    const all = terminals() ?? [], kids = {};
+    for (const t of all) if (t.parent) (kids[t.parent] ??= []).push(t.address);
+    const maps = {};
+    for (const [tab, avd] of Object.entries(this.owners)) {
+      const share = this.shares[avd];
+      if (!share?.serial || share.error) continue;
+      const seen = new Set(), queue = (panes() ?? []).filter(p => p.tab === tab && p.terminal).map(p => p.terminal);
+      while (queue.length) { const a = queue.shift(); if (seen.has(a)) continue; seen.add(a); queue.push(...(kids[a] ?? [])); }
+      const lines = [...seen].filter(a => machineOf(a) === share.machine).map(a => `${idOf(a)} ${share.serial}`);
+      maps[share.machine] = (maps[share.machine] ?? "") + (lines.length ? lines.join("\n") : `- ${share.serial}`) + "\n";
+    }
+    for (const m of new Set([...Object.keys(maps), ...Object.keys(this.maps)])) {
+      const text = maps[m] ?? "";
+      if (this.maps[m] === text || !this.ready(m)) continue;
+      const r = await exec("sh", ["-c", 'mkdir -p "$HOME/.config/harness" && printf "%s" "$1" > "$HOME/.config/harness/devices.harns" && mv "$HOME/.config/harness/devices.harns" "$HOME/.config/harness/devices"', "harns", text],
+        { on: m, timeout: 10000 }).catch(() => null);
+      if (r?.code === 0) { if (text) this.maps[m] = text; else delete this.maps[m]; }
+    }
   }
 
   async helperExe() {
@@ -241,26 +321,24 @@ export default class Simulator extends View {
   }
 
   async dock() {
-    // Hand the device window to a fresh harns-dock (one at a time).
-    if (!this.device) return;
+    // A fresh harns-dock takes in the emulators' windows (one helper for all of them).
     try {
       const exe = await this.helperExe();
       this.written = null;
       this.place();
       await ps(`Get-Process -Name 'harns-dock-*' -ErrorAction SilentlyContinue | Stop-Process -Force; ` +
-        `Start-Process -WindowStyle Hidden -FilePath ${quote(exe)} -ArgumentList ${quote(`run "Android Emulator - ${this.device.avd}:" "${this.stateFile}"`)}`);
+        `Start-Process -WindowStyle Hidden -FilePath ${quote(exe)} -ArgumentList ${quote(`run "${this.stateFile}"`)}`);
       this.helper = true;
-      this.status = "";
       // Builds from older versions of dock.cs (the running one can't be deleted, and stays).
       for (const name of await fs.readdir(this.cache).catch(() => []))
         if (/^harns-dock-.*\.exe$/.test(name) && !exe.endsWith(name)) fs.unlink(`${this.cache}\\${name}`).catch(() => {});
     } catch (err) {
-      this.status = `Couldn't put the emulator in the panel: ${String(err?.message ?? err).split("\n")[0]}`;
+      this.status = `Couldn't put the emulator in the panel: ${errorText(err)}`;
     }
   }
 
   async undock() {
-    // Back to the emulator's own window; harns-dock gives it back and exits.
+    // Back to the emulators' own windows; harns-dock gives them back and exits.
     await this.write("quit");
     this.helper = false;
   }
@@ -276,10 +354,16 @@ export default class Simulator extends View {
     return Boolean(panel && !panel.hidden && body?.active === BLOCK);
   }
 
-  geometry() {
+  current() {
+    // The focused session's emulator, when it's running or starting.
+    const avd = this.owners[this.session()];
+    return avd && (this.running[avd] || this.starting.has(avd)) ? avd : null;
+  }
+
+  geometry(avd) {
     // Where the device goes: centered in the screen area at its own aspect ratio, as gaps from
     // the window's right and bottom edges plus a size, in real logical px.
-    const d = this.device, a = this.area;
+    const d = this.info[avd], a = this.area;
     if (!d?.width || !a?.width || !a?.height) return null;
     const z = zoom();
     const edge = insets(layout(), BLOCK);
@@ -294,44 +378,56 @@ export default class Simulator extends View {
   }
 
   place(show) {
-    // The state harns-dock reads; written only when it changes.
+    // The state harns-dock reads, written only when it changes: where the panel's screen is,
+    // which emulator shows there, and every other one (kept hidden).
     if (!this.helper || this.mode !== "dock") return;
-    const g = this.geometry();
+    const avd = this.current(), g = avd ? this.geometry(avd) : null;
     const visible = (show ?? this.shown()) && Boolean(g);
-    const text = g ? `${g.right.toFixed(1)} ${g.bottom.toFixed(1)} ${g.w} ${g.h} ${visible ? 1 : 0}` : "0 0 0 0 0";
-    this.write(text);
+    const others = [...new Set([...Object.keys(this.running), ...this.starting])].filter(a => a !== avd).map(prefixOf);
+    const head = g ? `${g.right.toFixed(1)} ${g.bottom.toFixed(1)} ${g.w} ${g.h} ${visible ? 1 : 0}` : "0 0 0 0 0";
+    this.write([head, avd ? prefixOf(avd) : "", ...others].join("\n") + "\n");
   }
 
-  async start(avd, cx) {
-    this.busy = "starting"; this.status = `Starting ${this.label(avd)}…`; cx.notify();
-    // Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it
-    // as soon as it appears, so it boots inside the panel.
+  async start(label, cx) {
+    // The focused session's emulator: the one it had, else a free device of this kind (a running
+    // one no session has, or a stopped one), else a new copy of one.
+    const tab = this.session();
+    if (!tab) return;
+    let avd = this.owners[tab];
+    const owned = new Set(Object.values(this.owners));
+    if (!avd) avd = this.avds.find(a => this.label(a) === label && !owned.has(a) && this.running[a])
+      ?? this.avds.find(a => this.label(a) === label && !owned.has(a));
+    try {
+      if (!avd) { this.status = `Setting up another ${label}…`; cx.notify(); avd = await this.clone(this.avds.find(a => this.label(a) === label)); }
+    } catch (err) { this.status = `Couldn't set up another ${label}: ${errorText(err)}`; cx.notify(); return; }
+    this.owners[tab] = avd;
+    this.saveOwners();
+    this.status = "";
+    if (this.running[avd]) { cx.notify(); return; }
+    this.starting.add(avd); this.status = `Starting ${this.label(avd)}…`; cx.notify();
+    // Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it as
+    // soon as it appears, so it boots inside the panel.
     const started = await ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(this.emulator)} -ArgumentList '-avd',${quote(avd)},'-no-boot-anim'`)
-      .then(() => true, err => { this.status = `Couldn't start ${this.label(avd)}: ${err}`; return false; });
-    if (started) {
-      const size = await this.avdInfo(avd);
-      this.device = { serial: null, avd, width: size.width, height: size.height };
-      if (this.mode === "dock") await this.dock();
-      cx.notify();
-      for (let i = 0; i < 120 && !this.device?.serial; i++) { await cx.sleep(1500); await this.refresh(); cx.notify(); }
-    }
-    this.busy = null;
-    if (!this.device?.serial) {
-      this.device = null; this.helper = false;
-      if (started) this.status = `${this.label(avd)} didn't start. Check it in Android Studio's Device Manager.`;
-    } else this.status = "";
+      .then(() => true, err => { this.status = `Couldn't start ${this.label(avd)}: ${errorText(err)}`; return false; });
+    if (started && this.mode === "dock" && !this.helper) await this.dock();
+    // A fresh copy boots cold, which takes a while the first time.
+    for (let i = 0; started && i < 160 && !this.running[avd]; i++) { await cx.sleep(1500); await this.refresh(); cx.notify(); }
+    this.starting.delete(avd);
+    this.status = this.running[avd] || !started ? this.status.replace(/^Starting.*/, "") : `${this.label(avd)} didn't start. Check it in Android Studio's Device Manager.`;
     cx.notify();
   }
 
   async stop(cx) {
-    if (!this.device) return;
-    this.busy = "stopping"; this.status = `Stopping ${this.label(this.device.avd)}…`; cx.notify();
-    await this.write("0 0 0 0 0");
-    await this.unshareAll();
+    // The focused session's emulator stops; the session keeps its device for next time.
+    const avd = this.owners[this.session()], serial = avd && this.running[avd];
+    if (!serial) return;
+    this.status = `Stopping ${this.label(avd)}…`; cx.notify();
+    await this.unshare(avd);
+    this.declined.delete(avd);
     // `emu kill` can hang on after the emulator is gone: watch the device list instead.
-    exec(this.adb, ["-s", this.device.serial, "emu", "kill"], { timeout: 15000 }).catch(() => {});
-    for (let i = 0; i < 40 && this.device; i++) { await cx.sleep(500); await this.refresh(); cx.notify(); }
-    this.busy = null; this.helper = false; this.status = ""; cx.notify();
+    exec(this.adb, ["-s", serial, "emu", "kill"], { timeout: 15000 }).catch(() => {});
+    for (let i = 0; i < 40 && this.running[avd]; i++) { await cx.sleep(500); await this.refresh(); cx.notify(); }
+    this.status = ""; cx.notify();
   }
 
   async setMode(mode, cx) {
@@ -343,7 +439,9 @@ export default class Simulator extends View {
 
   render() {
     const t = theme();
-    const d = this.device;
+    const avd = this.owners[this.session()];
+    const live = avd && this.running[avd] ? avd : null, booting = avd && this.starting.has(avd);
+    const share = live ? this.shares[live] : null;
     const swallow = (_e, cx) => cx.stop_propagation();
     const button = (id, icon, label, action, opts = {}) => h_flex().id(id).h(26).px(8).gap(5).flex_none().items_center().rounded(6)
       .text_size(12).text_color(opts.primary ? t.accent_foreground : t.muted).when(Boolean(opts.primary), el => el.bg(t.accent))
@@ -356,41 +454,44 @@ export default class Simulator extends View {
       .child(svg(`mods/harness-simulator/${icon}.svg`).size(13)).when(Boolean(label), el => el.child(label));
 
     const header = h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-      .child(div().id("sim-title").font_semibold().child("Simulator").when(Boolean(d), el => el.tooltip(this.label(d.avd))))
+      .child(div().id("sim-title").font_semibold().child("Simulator").when(Boolean(avd), el => el.tooltip(`This session's: ${this.label(avd)}`)))
       .child(div().flex_1())
-      .children(Object.entries(this.shares).filter(([, s]) => !s.pending).map(([m, s]) => h_flex().id(`sim-share-${m}`).h(22).px(6).gap(4)
-        .flex_none().items_center().rounded(5).border_1().border_color(t.border).text_size(11).text_color(s.error ? t.blocked : t.muted)
-        .tooltip(s.error ? `Not shared with ${m}: ${s.error}` : `Shared with ${m}: adb -s 127.0.0.1:${s.port} there`)
-        .child(svg("mods/harness-simulator/share.svg").size(11)).child(m)
-        .child(div().id(`sim-unshare-${m}`).cursor_pointer().text_color(t.dim).hover(st => st.text_color(t.foreground))
+      .when(Boolean(share && !share.pending), el => el.child(h_flex().id("sim-share").h(22).px(6).gap(4).flex_none().items_center().rounded(5)
+        .border_1().border_color(t.border).text_size(11).text_color(share.error ? t.blocked : t.muted)
+        .tooltip(share.error ? `Not shared with ${share.machine}: ${share.error}` : `Shared with ${share.machine}: this session's agents reach it with adb (${share.serial} there)`)
+        .child(svg("mods/harness-simulator/share.svg").size(11)).child(share.machine)
+        .child(div().id("sim-unshare").cursor_pointer().text_color(t.dim).hover(st => st.text_color(t.foreground))
           .on_mouse_down("left", swallow)
-          .on_click((_e, cx) => { this.declined.add(m); cx.spawn(async acx => { await this.unshare(m); acx.notify(); }); })
+          .on_click((_e, cx) => { this.declined.add(live); cx.spawn(async acx => { await this.unshare(live); await this.writeMaps(); acx.notify(); }); })
           .child(svg("mods/harness-simulator/x.svg").size(10)))))
-      .when(Boolean(d), el => el
+      .when(Boolean(live), el => el
         .child(this.mode === "dock"
-          ? button("sim-pop", "pop-out", null, cx => this.setMode("window", cx)).tooltip("Open in its own window")
+          ? button("sim-pop", "pop-out", null, cx => this.setMode("window", cx)).tooltip("Open in their own windows")
           : button("sim-dock", "dock", null, cx => this.setMode("dock", cx)).tooltip("Show in the panel"))
-        .child(button("sim-stop", "stop", null, cx => this.stop(cx), { disabled: Boolean(this.busy) }).tooltip("Stop the emulator")));
+        .child(button("sim-stop", "stop", null, cx => this.stop(cx)).tooltip("Stop this session's emulator")));
 
     const sizeArea = (size, cx) => {
       if (this.area && Math.abs(size.width - this.area.width) < 0.5 && Math.abs(size.height - this.area.height) < 0.5) return;
       this.area = size; this.place(); cx.notify();
     };
+    const message = text => div().max_w(260).text_size(12.5).text_color(t.muted).text_center().child(text);
     let body;
-    if (d && this.mode === "dock") {
+    if ((live || booting) && this.mode === "dock") {
       // The device window covers this; it shows only while the window is placed.
-      const g = this.geometry();
+      const g = this.geometry(avd);
       body = div().id("sim-area").size_full().flex().items_center().justify_center().on_size_change(sizeArea)
-        .when(!this.helper && Boolean(this.status), el => el.child(div().max_w(260).text_size(12.5).text_color(t.muted).text_center().child(this.status)))
+        .when(!this.helper && Boolean(this.status), el => el.child(message(this.status)))
         .when(this.helper && Boolean(g), el => el.child(div().w(g.w / zoom()).h(g.h / zoom()).rounded(8).bg(t.surface)));
-    } else if (d) {
+    } else if (live) {
       body = div().id("sim-area").size_full().on_size_change(sizeArea).child(v_flex().size_full().items_center().justify_center().gap(10)
-        .child(div().text_size(12.5).text_color(t.muted).child(`${this.label(d.avd)} is in its own window.`))
+        .child(message(`${this.label(live)} is in its own window.`))
         .child(button("sim-dock-big", "dock", "Show in the panel", cx => this.setMode("dock", cx), { primary: true })));
     } else {
+      // This session has no emulator running: start its own (or the one it had).
+      const kinds = avd ? [this.label(avd)] : [...new Set(this.avds.map(a => this.label(a)))];
       body = div().id("sim-area").size_full().on_size_change(sizeArea).child(v_flex().size_full().items_center().justify_center().gap(10).px(10)
-        .when(Boolean(this.status), el => el.child(div().max_w(260).text_size(12.5).text_color(t.muted).text_center().child(this.status)))
-        .children(this.busy ? [] : this.avds.map(avd => button(`sim-start-${avd}`, "play", `Start ${this.label(avd)}`, cx => this.start(avd, cx), { primary: true }))));
+        .child(message(this.status || (avd ? "This session's emulator is stopped." : this.avds.length ? "This session has no emulator yet." : "")))
+        .children(kinds.map(k => button(`sim-start-${k}`, "play", `Start ${k}`, cx => this.start(k, cx), { primary: true }))));
     }
 
     // A card, as Files and Changes draw theirs.

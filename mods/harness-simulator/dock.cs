@@ -1,25 +1,30 @@
-// harns-dock: shows the Android emulator's own window over the Simulator panel, so the device
-// draws natively (the emulator's GPU frames, at its own rate) instead of through copied screenshots.
+// harns-dock: shows Android emulators' own windows over the Simulator panel, so a device draws
+// natively (the emulator's GPU frames, at its own rate) instead of through copied screenshots.
+// Each session has its own emulator: the panel shows the focused session's, and the others keep
+// running, hidden, for the agents still using them.
 //
-// herdr draws with DirectComposition, which covers child windows, so the device window is an
+// herdr draws with DirectComposition, which covers child windows, so each device window is an
 // owned popup instead: borderless, just above herdr's window (never above other apps), gone
 // when herdr minimizes. It follows herdr's window through WinEvent hooks, not polling.
 //
-// The mod writes the panel's screen area to a small state file, only when it changes:
+// The mod writes the state to a small file, only when it changes:
 //
 //   right bottom w h visible     gaps from the right and bottom of herdr's client area, and
 //                                the size, in logical pixels; visible is 1 or 0
-//   quit                         give the window back as a normal emulator window and exit
+//   <title prefix>               the emulator to show ("Android Emulator - <avd>:"), or empty
+//   <title prefix>...            every other running emulator, kept hidden
+//
+//   quit                         give every window back as a normal emulator window and exit
 //
 // The panel is anchored to the window's bottom-right corner, so a window resize keeps it in
 // place here, in the same moment, without waiting for the mod.
 //
 // herdr's popups (menus, the palette) draw inside its window, under this one. After a click or
 // key press in herdr, the helper asks `herdr-app status` whether an overlay is open, and steps
-// aside until it closes. Nothing runs while herdr is idle.
+// aside until it closes.
 //
-//   harns-dock run <device window title prefix> <state file>
-// Exits on its own when the emulator's window or herdr's goes away.
+//   harns-dock run <state file>
+// Exits on its own when herdr's window goes away.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -73,10 +78,17 @@ static class Dock {
   const uint WM_TIMER = 0x113, WM_QUIT = 0x12, WM_APP_STATE = 0x8001, WM_APP_INPUT = 0x8002, WM_APP_OVERLAYS = 0x8003;
   const int WM_LBUTTONUP = 0x202, WM_RBUTTONUP = 0x205, WM_MBUTTONUP = 0x208, WM_KEYUP = 0x101, WM_SYSKEYUP = 0x105;
 
-  static IntPtr host, dev;
-  static List<IntPtr> tools = new List<IntPtr>();
+  const uint WM_APP_SCAN = 0x8004;
+
+  class Device { public IntPtr h; public List<IntPtr> tools = new List<IntPtr>(); }
+
+  static IntPtr host;
+  static Dictionary<string, Device> devices = new Dictionary<string, Device>();   // by title prefix
+  static List<string> wanted = new List<string>();   // every session's emulator, from the state file
+  static string current = "";    // the one the panel shows
   static double[] rect;          // right bottom w h, logical px from herdr's client bottom-right
-  static bool visible, shown, overlay;
+  static bool visible, overlay;
+  static IntPtr shownDev = IntPtr.Zero;
   static uint mainThread;
   static string herdrApp = "herdr-app";   // herdr's own executable, once its window is found
   static int checking;           // an overlay check running (0/1)
@@ -106,15 +118,35 @@ static class Dock {
     return best;
   }
 
-  static IntPtr FindDevice(string prefix) {
-    foreach (var h in TopLevel()) if (Title(h).StartsWith(prefix)) return h;
-    return IntPtr.Zero;
+  static void Scan() {
+    // Takes in the wanted emulators' windows as they appear (a few seconds after each starts),
+    // and forgets the ones that closed.
+    var gone = new List<string>();
+    foreach (var kv in devices) if (!IsWindow(kv.Value.h)) gone.Add(kv.Key);
+    foreach (var k in gone) devices.Remove(k);
+    var missing = wanted.FindAll(p => !devices.ContainsKey(p));
+    if (missing.Count == 0) return;
+    var all = TopLevel();
+    foreach (var prefix in missing) {
+      foreach (var h in all) {
+        if (!Title(h).StartsWith(prefix)) continue;
+        var d = new Device { h = h };
+        Adopt(d, all);
+        devices[prefix] = d;
+        break;
+      }
+    }
+    Apply();
   }
 
   static void Apply() {
-    if (!IsWindow(dev) || !IsWindow(host)) { PostThreadMessage(mainThread, WM_QUIT, IntPtr.Zero, IntPtr.Zero); return; }
-    bool show = visible && !overlay && rect != null && rect[2] > 0 && rect[3] > 0 && !IsIconic(host) && IsWindowVisible(host);
-    if (!show) { if (shown) { ShowWindow(dev, 0); shown = false; } return; }
+    if (!IsWindow(host)) { PostThreadMessage(mainThread, WM_QUIT, IntPtr.Zero, IntPtr.Zero); return; }
+    Device d;
+    IntPtr want = devices.TryGetValue(current, out d) ? d.h : IntPtr.Zero;
+    bool show = want != IntPtr.Zero && visible && !overlay && rect != null && rect[2] > 0 && rect[3] > 0 && !IsIconic(host) && IsWindowVisible(host);
+    // Only one shows at a time; the others keep running, hidden.
+    if (shownDev != IntPtr.Zero && (!show || shownDev != want)) { ShowWindow(shownDev, 0); shownDev = IntPtr.Zero; }
+    if (!show) return;
     double s = GetDpiForWindow(host) / 96.0;
     RECT c; GetClientRect(host, out c);
     int w = (int)Math.Round(rect[2] * s), h = (int)Math.Round(rect[3] * s);
@@ -123,14 +155,15 @@ static class Dock {
     // Just above herdr's window: owning it doesn't reorder a window that already exists, and
     // the top of the stack would cover other apps.
     IntPtr above = GetWindow(host, 3 /* GW_HWNDPREV */);
-    uint z = above == dev ? SWP_NOZORDER : 0;
-    SetWindowPos(dev, above == IntPtr.Zero ? IntPtr.Zero : above, p.x, p.y, w, h, z | SWP_NOACTIVATE | (shown ? 0 : SWP_SHOWWINDOW));
-    shown = true;
+    uint z = above == want ? SWP_NOZORDER : 0;
+    SetWindowPos(want, above == IntPtr.Zero ? IntPtr.Zero : above, p.x, p.y, w, h, z | SWP_NOACTIVATE | (shownDev == want ? 0 : SWP_SHOWWINDOW));
+    shownDev = want;
   }
 
-  static void Adopt() {
+  static void Adopt(Device d, List<IntPtr> all) {
     // Borderless, owned by herdr's window (so it stays just above it, minimizes with it and has
-    // no taskbar button), with the emulator's side toolbar out of the way.
+    // no taskbar button), hidden until shown, with the emulator's side toolbar out of the way.
+    IntPtr dev = d.h;
     long style = GetLong(dev, GWL_STYLE).ToInt64();
     bool child = (style & WS_CHILD) != 0;
     style = (style & ~(WS_CHILD | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINMAX)) | WS_POPUP;
@@ -142,11 +175,12 @@ static class Dock {
     SetWindowPos(dev, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     ShowWindow(dev, 0);
     uint emu = Pid(dev);
-    foreach (var h in TopLevel()) if (h != dev && Pid(h) == emu && IsWindowVisible(h)) { tools.Add(h); ShowWindow(h, 0); }
+    foreach (var h in all) if (h != dev && Pid(h) == emu && IsWindowVisible(h)) { d.tools.Add(h); ShowWindow(h, 0); }
   }
 
-  static void Release() {
+  static void Release(Device d) {
     // Back to a normal emulator window, where the user can find it.
+    IntPtr dev = d.h;
     if (!IsWindow(dev)) return;
     SetLong(dev, GWLP_HWNDPARENT, IntPtr.Zero);
     long style = (GetLong(dev, GWL_STYLE).ToInt64() & ~WS_POPUP) | WS_CAPTION | WS_SYSMENU | WS_MINMAX;
@@ -154,20 +188,28 @@ static class Dock {
     long ex = (GetLong(dev, GWL_EXSTYLE).ToInt64() & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW;
     SetLong(dev, GWL_EXSTYLE, new IntPtr(ex));
     SetWindowPos(dev, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-    foreach (var t in tools) ShowWindow(t, 4);
+    foreach (var t in d.tools) ShowWindow(t, 4);
   }
 
   static bool ReadState(string path) {
     // false on "quit". A half-written file (the mod rewrites it whole) is read again on its next change.
     string text;
-    try { using (var f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) using (var r = new StreamReader(f)) text = r.ReadToEnd().Trim(); }
+    try { using (var f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) using (var r = new StreamReader(f)) text = r.ReadToEnd(); }
     catch { return true; }
-    if (text == "quit") return false;
-    var parts = text.Split(' ');
-    if (parts.Length < 5) return true;
+    var lines = text.Replace("\r", "").Split('\n');
+    if (lines[0].Trim() == "quit") return false;
+    var parts = lines[0].Trim().Split(' ');
+    if (parts.Length < 5 || lines.Length < 2) return true;
     var next = new double[4];
     for (int i = 0; i < 4; i++) if (!double.TryParse(parts[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out next[i])) return true;
     rect = next; visible = parts[4] == "1";
+    current = lines[1].Trim();
+    wanted = new List<string>();
+    for (int i = 1; i < lines.Length; i++) if (lines[i].Trim().Length > 0 && !wanted.Contains(lines[i].Trim())) wanted.Add(lines[i].Trim());
+    // An emulator no longer listed (it stopped, or the mod let it go) is given back.
+    var drop = new List<string>();
+    foreach (var k in devices.Keys) if (!wanted.Contains(k)) drop.Add(k);
+    foreach (var k in drop) { if (devices[k].h == shownDev) shownDev = IntPtr.Zero; Release(devices[k]); devices.Remove(k); }
     return true;
   }
 
@@ -190,21 +232,14 @@ static class Dock {
   }
 
   static int Main(string[] a) {
-    if (a.Length < 3 || a[0] != "run") { Console.Error.WriteLine("usage: harns-dock run <device window title prefix> <state file>"); return 1; }
+    if (a.Length < 2 || a[0] != "run") { Console.Error.WriteLine("usage: harns-dock run <state file>"); return 1; }
     SetProcessDpiAwarenessContext(new IntPtr(-4)); // per-monitor v2: positions in real pixels
-    string prefix = a[1], state = Path.GetFullPath(a[2]);
+    string state = Path.GetFullPath(a[1]);
     mainThread = GetCurrentThreadId();
 
     host = FindHost();
     if (host == IntPtr.Zero) { Console.Error.WriteLine("herdr has no window"); return 2; }
-    // The emulator's window appears a few seconds after it starts.
-    for (int i = 0; i < 600 && dev == IntPtr.Zero; i++) { dev = FindDevice(prefix); if (dev == IntPtr.Zero) Thread.Sleep(100); }
-    if (dev == IntPtr.Zero) { Console.Error.WriteLine("the emulator has no window"); return 2; }
-    Thread.Sleep(300); // its side toolbar shows just after
-
-    Adopt();
-    if (!ReadState(state)) { Release(); return 0; }
-    Apply();
+    if (!ReadState(state)) return 0;
 
     var watcher = new FileSystemWatcher(Path.GetDirectoryName(state), Path.GetFileName(state));
     watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName;
@@ -241,15 +276,16 @@ static class Dock {
     SetWindowsHookEx(WH_MOUSE_LL, keepMouse, me, 0);
     SetWindowsHookEx(WH_KEYBOARD_LL, keepKeys, me, 0);
 
-    // Either window going away ends this.
+    // Twice a second: new emulator windows to take in, closed ones to forget, herdr still there.
     new Thread(() => {
-      while (IsWindow(dev) && IsWindow(host)) Thread.Sleep(1000);
-      PostThreadMessage(mainThread, WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+      for (;;) { Thread.Sleep(500); PostThreadMessage(mainThread, WM_APP_SCAN, IntPtr.Zero, IntPtr.Zero); }
     }) { IsBackground = true }.Start();
+    Scan();
 
     MSG msg;
     while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) {
-      if (msg.msg == WM_APP_STATE) { if (!ReadState(state)) break; Apply(); }
+      if (msg.msg == WM_APP_STATE) { if (!ReadState(state)) break; Scan(); Apply(); }
+      else if (msg.msg == WM_APP_SCAN) { if (!IsWindow(host)) break; Scan(); }
       else if (msg.msg == WM_APP_INPUT) SetTimer(IntPtr.Zero, UIntPtr.Zero, 90, IntPtr.Zero);   // the popup draws first
       else if (msg.msg == WM_TIMER) {
         // Thread timers are one-shot here (a null window ignores the id passed in, so kill the
@@ -262,7 +298,7 @@ static class Dock {
         if (open) SetTimer(IntPtr.Zero, UIntPtr.Zero, 250, IntPtr.Zero);   // until it closes
       }
     }
-    Release();
+    foreach (var d in devices.Values) Release(d);
     return 0;
   }
 }
