@@ -25,7 +25,7 @@ changed is kept beside the new one as `harns.json.before-install-<time>`.
 
 Optional:
 
-- **Context rings** come from relays: Claude Code's status line and a Pi extension
+- **Context bars** (on each agent's card) come from relays: Claude Code's status line and a Pi extension
   (`scripts/install-context.py`, on Windows, Linux and macOS). Codex's comes from its footer,
   when `context-remaining` is one of its `tui.status_line` items. The Claude Code and Codex
   quota bars read the account from each service and need no relay.
