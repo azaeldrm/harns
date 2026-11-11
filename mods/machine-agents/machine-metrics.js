@@ -4,7 +4,7 @@ import { shared, theme, props } from 'herdr';
 
 const valid = n => typeof n === 'number' && Number.isFinite(n);
 
-export function machineMetrics(machine, compact, t = theme(), only = null) {
+export function machineMetrics(machine, compact, t = theme()) {
   const name = machine ?? shared('machine.local-label') ?? 'This computer';
   const sample = (shared('machine.stats') ?? {})[machine ?? '@local'];
   const fresh = sample && !sample.error && Date.now() - sample.at <= 15000;
@@ -17,7 +17,7 @@ export function machineMetrics(machine, compact, t = theme(), only = null) {
     ['ram', 'RAM', fresh ? sample.memory : null],
     ...(gpus.length ? gpus.map((load, i) => ['gpu', `GPU ${i + 1}`, fresh ? load : null]) : [['gpu', 'GPU', null]]),
   ];
-  const items = metrics.filter(([icon]) => !only || only.includes(icon)).map(([icon, label, value]) => {
+  const items = metrics.map(([icon, label, value]) => {
     const ring = svg(`mods/machine-stats/rings/ring-${valid(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0}.svg`)
       .size(compact ? 12 : 10).flex_none().text_color(valid(value) ? t.accent : t.dim);
     if (compact) return h_flex().w_full().h(26).flex_none().items_center().justify_center().gap(6)

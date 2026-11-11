@@ -315,6 +315,18 @@ export default class Agents extends View {
     if (moved) cx.timer.after(32, cx => { this.slides = {}; cx.notify(); });
   }
 
+  railCpu(t, machine) {
+    // The rail band's CPU reading: its ring alone, under the machine's icon on the icon axis (8 + band border 1 + 11 + half
+    // of 12 = 26 px in), in the open rings row's 22 px.
+    const sample = (shared("machine.stats") ?? {})[machine ?? "@local"];
+    const value = sample && !sample.error && Date.now() - sample.at <= 15000 && Number.isFinite(sample.cpu) ? sample.cpu : null;
+    const name = machine ?? localMachineLabel();
+    return h_flex().h(22).pl(11).flex_none().items_center()
+      .child(div().id(`rail-cpu-${machine ?? "local"}`).tooltip(`${name} · CPU: ${value == null ? "unavailable" : `${Math.round(value)}%`}`)
+        .child(svg(`mods/machine-stats/rings/ring-${value == null ? 0 : Math.max(0, Math.min(100, Math.round(value)))}.svg`).size(12).flex_none()
+          .text_color(value == null ? t.dim : t.accent)));
+  }
+
   toTop(address) {
     this.order = [address, ...this.order.filter(x => x !== address)];
     localStorage.setItem("order", JSON.stringify(this.order));
@@ -785,7 +797,7 @@ export default class Agents extends View {
           v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
             .child(h_flex().h(30).pt(6).pl(10).flex_none().items_center().tooltip(machine.name || localMachineLabel())
               .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
-            .child(machineMetrics(machine.name ?? null, false, t, ["cpu"])),
+            .child(this.railCpu(t, machine.name ?? null)),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
