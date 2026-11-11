@@ -774,7 +774,7 @@ export default class Agents extends View {
           v_flex().mx(8).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border)
             // On top, the machine's own icon (as beside its name when open), centred in the band.
             .child(h_flex().w_full().h(26).flex_none().items_center().justify_center().tooltip(machine.name || localMachineLabel())
-              .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.foreground)))
+              .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
             .child(statsFor(machine.name ?? null, t, true)),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
