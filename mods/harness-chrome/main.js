@@ -55,9 +55,10 @@ export default class WorkspaceChrome extends View {
     // The logo on the sidebar's icon axis, 26 px in (12 + half of 28), as the agents' icons and the footer's gear.
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 12).pr(10).gap(4).items_center().text_size(13.5)
       .when(collapsed, el => el.pl(0).pr(0).child(div().flex_1().flex().items_center().justify_center()
-        .child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 34, "Expand sidebar").cursor_pointer())))
+        .child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Expand sidebar").cursor_pointer())))
       .when(window()?.platform === "macos" && !collapsed, el => el.pl(76))
       .when(!collapsed, el => el.child(h_flex().flex_1().gap(8).items_center()
+        // The same 28 px button and logo as the rail's.
         .child(this.button("sidebar-collapse-logo", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Collapse sidebar"))
         .child(div().text_size(16).font_semibold().text_color(t.foreground).child("harns"))))
       .when(!collapsed, el => el.child(this.button("search", svg("mods/harness-chrome/search.svg").size(15), () => run("mod.open", { name: "picker" }))))
