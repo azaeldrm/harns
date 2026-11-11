@@ -497,8 +497,10 @@ export default class Agents extends View {
     if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
       .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
-    // Idle shows nothing: the card's second line has the context bar.
-    return div().size(14).flex_none();
+    // Idle: on the rail (compact) the ring filled to the context used, as the bar it has no room for; open, an empty ring,
+    // the spinner's circle at rest (the card's bar shows the context).
+    if (compact) return ring(`ring-${Math.round(percent)}`, known ? (percent > 90 ? "#d88179" : t.muted) : (t.idle ?? t.dim));
+    return ring("ring-0", t.idle ?? t.dim);
   }
 
   render(cx) {
@@ -577,11 +579,12 @@ export default class Agents extends View {
           .cursor_pointer()
           .hover((s) => s.bg(t.hover))
           .on_click(() => run("pane.focus", { pane: a.pane }))
-          .child(h_flex().pl(16).gap(4).items_center()
+          .child(h_flex().pl(16).items_center()
             .child(h_flex().w(16).flex_none().justify_center().when(Boolean(pic), el => el.child(pic)))
-            .child(div().w(0).overflow_hidden().child(" "))
-            .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true))))
-          .child(div().w(0).overflow_hidden().text_size(11.5).child(" "));
+            .child(div().w(0).overflow_hidden().child(" ")))
+          // The second line (its height from invisible text) holds the status mark, under the icon.
+          .child(div().relative().w_full().text_size(11.5).child(div().w(0).overflow_hidden().child(" "))
+            .child(h_flex().absolute().top(0).bottom(0).left(16).w(16).items_center().justify_center().child(this.status(t, a, true))));
       }
       const idle = a.status === "idle" && !a.focused;
       const isPinned = this.pins.includes(a.address);

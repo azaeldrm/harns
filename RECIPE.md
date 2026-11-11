@@ -53,7 +53,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 - **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
   blocked is a "Needs you" badge (a "!" in the rail); done is a green check (the theme's
-  `ansi2`); idle shows nothing, its context being the card's bar (the percentage on hover).
+  `ansi2`); idle is an empty ring open (the card's bar shows its context) and, on the rail, a ring
+  filled to the context used (red `#d88179` above 90%, the percentage on hover). On the rail the mark sits on
+  the row's second line, under the icon.
   Tabs show the same spinner, or a dot for blocked and done.
 - **Context readings:** Claude Code and Pi report through the relays (Watch out). Codex's
   reading is its footer's "Context N% left", so it shows when `context-remaining` is one of
