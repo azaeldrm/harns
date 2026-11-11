@@ -227,7 +227,8 @@ export default class Agents extends View {
         ok(g.power) ? row("Power", g.powerLimit ? 100 * g.power / g.powerLimit : null, g.powerLimit ? level(100 * g.power / g.powerLimit, 85, 98) : t.dim,
           g.powerLimit ? `${Math.round(g.power)} / ${Math.round(g.powerLimit)} W` : `${Math.round(g.power)} W`) : null)))
       .children(d.disks.map(k => section("usage", `Disk ${k.mount}`, usage("Used", 100 * (k.total - k.free) / k.total, `${gb(k.total - k.free)} / ${gb(k.total)} GB`))))
-      .when(Boolean(d.board), el => el.child(div().text_size(11).text_color(t.dim).truncate().child(`Board \u00b7 ${d.board}`)));
+      // The board's name wraps rather than cut off: makers' names run long.
+      .when(Boolean(d.board), el => el.child(div().w_full().text_size(11).text_color(t.dim).whitespace_normal().child(`Board \u00b7 ${d.board}`)));
   }
 
   toTop(address) {
