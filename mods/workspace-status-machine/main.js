@@ -50,7 +50,7 @@ export default class WorkspaceStatus extends MachineData {
     };
     const label = (icon, text) => h_flex().gap(6).items_center().child(svg(`mods/harness-chrome/${icon}.svg`).size(13)).child(text);
     return h_flex().size_full().px(14).gap(16).items_center().bg(t.surface).text_size(11.8).text_color(t.muted)
-      .child(label(space?.machine ? "server" : "monitor", space?.machine ?? shared("machine.local-label") ?? "This computer"))
+      .child(label(space?.machine ? "hard-drive" : "monitor", space?.machine ?? shared("machine.local-label") ?? "This computer"))
       .when(Boolean(space?.branch), el => el.child(label("branch", space.branch)))
       .when(Boolean(folder), el => el.child(label("folder", folder)))
       .when(needs > 0, el => el.child(div().text_color(t.blocked).child(`${needs} needs you`)))

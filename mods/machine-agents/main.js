@@ -419,7 +419,7 @@ export default class Agents extends View {
       .border_b(1)
       .border_color(t.border)
       .text_size(12)
-      .child(svg("mods/harness-chrome/server.svg").size(13).flex_none().text_color(t.dim))
+      .child(svg("mods/harness-chrome/hard-drive.svg").size(13).flex_none().text_color(t.dim))
       .child(div().flex_none().text_color(t.foreground).font_medium().child(`Log in to ${name}`))
       .child(div().flex_1().min_w(0).truncate().text_color(t.dim).child("Type the password or code below; this closes when it connects."))
       .child(div()
@@ -716,7 +716,7 @@ export default class Agents extends View {
         }))
         // A machine's icon on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band border 1 + 10 + half of 14.
         .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6).pl(10)
-          .child(svg(`mods/harness-chrome/${g.machine?.name ? "server" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
+          .child(svg(`mods/harness-chrome/${g.machine?.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
         .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
         .when(isMachine || !open, (el) => el.child(div().font_medium().text_size(11).text_color(t.dim).child(String(g.members.length))))
         .child(div().flex_1())
@@ -772,10 +772,9 @@ export default class Agents extends View {
           // The machine's rings in a raised band, as the open sidebar's, so its agents below read as its group.
           // 8 px in from each edge, as the open sidebar's bands (its list's padding); 56 - 16 still holds the rows' 36 px.
           v_flex().mx(8).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border)
-            // On top, the machine's own icon (as beside its name when open), in the rows' icon column.
-            .child(h_flex().w_full().h(26).flex_none().items_center().justify_center().gap(6).tooltip(machine.name || localMachineLabel())
-              .child(h_flex().w(16).flex_none().justify_center().child(svg(`mods/harness-chrome/${machine.name ? "server" : "monitor"}.svg`).size(14).flex_none().text_color(t.foreground)))
-              .child(div().w(14).flex_none()))
+            // On top, the machine's own icon (as beside its name when open), centred in the band.
+            .child(h_flex().w_full().h(26).flex_none().items_center().justify_center().tooltip(machine.name || localMachineLabel())
+              .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.foreground)))
             .child(statsFor(machine.name ?? null, t, true)),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
