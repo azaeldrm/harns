@@ -769,7 +769,8 @@ export default class Agents extends View {
       ? machines().filter(machine => !machine.temporary).flatMap((machine) => [
           div().h(18).flex_none(),
           // The machine's rings in a raised band, as the open sidebar's, so its agents below read as its group.
-          v_flex().mx(6).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border)
+          // 8 px in from each edge, as the open sidebar's bands (its list's padding); 56 - 16 still holds the rows' 36 px.
+          v_flex().mx(8).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border)
             // On top, the machine's own icon (as beside its name when open), in the rows' icon column.
             .child(h_flex().w_full().h(26).flex_none().items_center().justify_center().gap(6).tooltip(machine.name || localMachineLabel())
               .child(h_flex().w(16).flex_none().justify_center().child(svg(`mods/harness-chrome/${machine.name ? "server" : "monitor"}.svg`).size(14).flex_none().text_color(t.foreground)))
