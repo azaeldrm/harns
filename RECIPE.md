@@ -65,6 +65,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Sidebar:** clicking an agent focuses it; hovering a card shows a pin, and pinned
   agents sit in a Pinned group on top. Each machine keeps its own order: an agent that finishes, starts needing you or is new
   moves to the top, and dragging a card onto another of the same machine puts it there.
+  A card that changes place slides there (280 ms, ease-out), and the ones it passes slide too.
   Group headers and parents with sub-agents fold. A machine's + opens the agents
   installed there.
 - **Machine card:** resting on a machine's band for 450 ms opens a 340 px card level with it,

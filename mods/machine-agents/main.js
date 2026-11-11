@@ -231,6 +231,27 @@ export default class Agents extends View {
       .when(Boolean(d.board), el => el.child(div().w_full().text_size(11).text_color(t.dim).whitespace_normal().child(`Board \u00b7 ${d.board}`)));
   }
 
+  noticeMoves(list, cx) {
+    // Cards whose place within their machine changed since the last draw: each starts offset by the places it moved
+    // (CARD px apiece), with a fresh id so its transition starts there, and slides to 0 a frame later.
+    const CARD = 52;
+    const machineOf = x => x.includes("/") ? x.split("/")[0] : "";
+    const place = new Map(), count = {};
+    for (const a of list) { const m = machineOf(a.address); place.set(a.address, count[m] = (count[m] ?? -1) + 1); }
+    const before = this.places;
+    this.places = place;
+    if (!before) return;
+    let moved = false;
+    for (const [address, now] of place) {
+      const was = before.get(address);
+      if (was === undefined || was === now) continue;
+      (this.slides ??= {})[address] = (was - now) * CARD;
+      (this.moveGen ??= {})[address] = (this.moveGen[address] ?? 0) + 1;
+      moved = true;
+    }
+    if (moved) cx.timer.after(32, cx => { this.slides = {}; cx.notify(); });
+  }
+
   toTop(address) {
     this.order = [address, ...this.order.filter(x => x !== address)];
     localStorage.setItem("order", JSON.stringify(this.order));
@@ -482,6 +503,7 @@ export default class Agents extends View {
     const rest = list.filter((a) => !this.pins.includes(a.address));
     list = [...pinned, ...rest];
     setAgentOrder(list.map((a) => a.address));
+    this.noticeMoves(list, cx);
 
     const withKids = (a, i) => {
       const subs = collapsed ? [] : this.tree(all, a.address);
@@ -576,9 +598,13 @@ export default class Agents extends View {
       const draggable = byMachine && !isPinned;
       const dragging = this.drag?.moved && this.drag.address === a.address;
       const dropHere = this.drag?.moved && this.drop?.target === a.address;
+      // A card that moved gets a new id and starts where it was, then slides to its place (noticeMoves).
+      const slide = this.slides?.[a.address];
       return v_flex()
-        .id(`ag-${a.address}`)
+        .id(`ag-${a.address}-${this.moveGen?.[a.address] ?? 0}`)
         .relative()
+        .top(slide ?? 0)
+        .transition("top", { duration: 280, easing: "ease-out" })
         .px(8)
         .py(6)
         .mb(2)
