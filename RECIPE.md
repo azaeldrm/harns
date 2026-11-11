@@ -1,4 +1,4 @@
-# Harness
+# harns
 
 A dark, amber-accented herdr window organized by machine. The sidebar lists every
 connected machine with live CPU, RAM and per-GPU load rings and the agents running on it,
@@ -6,14 +6,14 @@ each with its session title, age and a status or context ring. Agent tabs open a
 chat (from [herdr-chat](https://github.com/azaeldrm/herdr-chat)) or their live terminal.
 A status bar shows where you are and how much Claude Code and Codex quota is left.
 
-![Harness](preview.png)
+![harns](preview.png)
 
 Needs [herdr-chat](https://github.com/azaeldrm/herdr-chat) for the chat and the toggle: the
 installer adds it, and adding this layout by hand means adding that repository's mod too.
 
 To add it, run `./install.sh` from a clone (or `python scripts/install.py`). By hand, copy
-more than the layout and its mods: `layouts/herdr-harness.json` with its picture
-`layouts/herdr-harness.png`, every folder in `mods/` (the rings' images live in
+more than the layout and its mods: `layouts/harns.json` with its picture
+`layouts/harns.png`, every folder in `mods/` (the rings' images live in
 `machine-stats`), `themes/harness.json` and `brand-assets/`, and merge `programs.json`'s
 entries into yours.
 
@@ -23,7 +23,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
 
 - **Sidebar** (268 px, `surface` `#0e1012`; drag 44–480 px, or fold to a 56 px rail,
   76 px on macOS):
-  - **Brand** (46 px, drags the window): the animated Harness logo (28 px), "Harness"
+  - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
     (16 px semibold), then Search and the sidebar toggle.
   - **Agents:** an "Agents" heading (11.5 px, dim) with a sort button. By default it's
     grouped by machine. Each group has the machine's name (this computer's own name, or
@@ -85,7 +85,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 ## Built from
 
-- **Layout** `layouts/herdr-harness.json`, cloned from `main`: root `row` (`titlebar:
+- **Layout** `layouts/harns.json`, cloned from `main`: root `row` (`titlebar:
   none`, theme `harness`, `terminal_padding [14, 12]`) → `sidebar` column [`brand`
   block, `sidebar-lists` column with the `agents` block, `sidebar-footer` block] and `work` column [`tabs` block,
   `work-body` row [`chat-view` stack of `chat-panel` and `terminal-panel`, hidden
@@ -162,7 +162,7 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
 - `harness-files` replaces herdr's `files` block (same block id, so its clicks survive). It is
   herdr's Files plus a Markdown view, and `vendor/pele` comes from `npm run vendor:pele`. Don't
   edit the vendored copy. With props `{ file }` it is a viewer for that one file.
-- `harness-pane` is a pane header for layouts that want one; Harness itself uses herdr-chat's.
+- `harness-pane` is a pane header for layouts that want one; harns itself uses herdr-chat's.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
   its rail.
 

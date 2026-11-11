@@ -320,22 +320,21 @@ export default class Agents extends View {
   }
 
   status(t, a, compact = false) {
-    // An agent's status: its ring, spinner or mark (compact: a ! for blocked, under a "Needs you" header).
-    const ring = (asset, tint, detail, spinning = false) => div().size(14).flex_none()
-      .flex().items_center().justify_center().tooltip(detail)
-      .child(svg(`mods/machine-agents/context-rings/${asset}.svg`).size(12).flex_none().text_color(tint)
-        .when(spinning, el => el.spin(900)));
-    if (a.status === "working") return ring('spinner', t.working, 'Working', true);
-    if (a.status === 'done') return div().size(14).flex_none().flex().items_center().justify_center()
-      .tooltip('Finished · not yet viewed').child(div().size(7).rounded_full().bg(t.done));
-    if (a.status === "blocked" && compact) return div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!");
-    if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center().child("Needs you");
-    const context = (shared('agents.context') ?? {})[a.address];
-    if (a.status === 'idle' && Number.isFinite(context?.percent)) {
-      const percent = Math.max(0, Math.min(100, context.percent));
-      return ring(`ring-${Math.round(percent)}`, percent > 90 ? '#d88179' : t.muted, `Context: ${Math.round(percent)}% used`);
-    }
-    if (a.status === "idle") return ring('ring-0', t.idle ?? t.dim, 'Context unavailable');
+    // An agent's status mark (compact: a ! for blocked, under a "Needs you" header); hovering any of them gives the context window used.
+    const context = a.address ? (shared('agents.context') ?? {})[a.address] : null;
+    const known = Number.isFinite(context?.percent);
+    const percent = known ? Math.max(0, Math.min(100, context.percent)) : 0;
+    const state = { working: "Working", done: "Finished · not yet viewed", blocked: "Needs you" }[a.status];
+    const tip = a.address ? `Context: ${known ? `${Math.round(percent)}% used` : "unavailable"}${state ? ` · ${state}` : ""}` : state;
+    const mark = el => div().size(14).flex_none().flex().items_center().justify_center().when(Boolean(tip), d => d.tooltip(tip)).child(el);
+    const ring = (asset, tint, spinning = false) => mark(svg(`mods/machine-agents/context-rings/${asset}.svg`).size(12).flex_none().text_color(tint)
+      .when(spinning, el => el.spin(900)));
+    if (a.status === "working") return ring("spinner", t.working, true);
+    if (a.status === "done") return mark(div().size(7).rounded_full().bg(t.done));
+    if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
+    if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
+      .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
+    if (a.status === "idle") return ring(`ring-${Math.round(percent)}`, known ? (percent > 90 ? "#d88179" : t.muted) : (t.idle ?? t.dim));
     return div().size(14).flex_none();
   }
 

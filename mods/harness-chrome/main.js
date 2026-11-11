@@ -54,7 +54,7 @@ export default class WorkspaceChrome extends View {
       .when(window()?.platform === "macos" && !collapsed, el => el.pl(76))
       .when(!collapsed, el => el.child(h_flex().flex_1().gap(8).items_center()
         .child(this.button("sidebar-collapse-logo", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Collapse sidebar"))
-        .child(div().text_size(16).font_semibold().text_color(t.foreground).child("Harness"))))
+        .child(div().text_size(16).font_semibold().text_color(t.foreground).child("harns"))))
       .when(!collapsed, el => el.child(this.button("search", svg("mods/harness-chrome/search.svg").size(15), () => run("mod.open", { name: "picker" }))))
       .when(!collapsed, el => el.child(this.button("sidebar-toggle", svg("mods/harness-chrome/sidebar.svg").size(15), toggleSidebar)));
   }

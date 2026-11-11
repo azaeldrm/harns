@@ -1,10 +1,10 @@
-# Harness
+# harns
 
 A herdr layout organized by machine: each machine's CPU, RAM and GPU load and its agents
 in the sidebar, agent tabs as a chat or a terminal, and Claude Code and Codex quota in the
 status bar. Everything goes through herdr's own machine connections.
 
-![Harness](preview.png)
+![harns](preview.png)
 
 [RECIPE.md](RECIPE.md) describes it in full, as a brief to build it from.
 
@@ -19,9 +19,9 @@ Bash, or run `python scripts/install.py` in PowerShell, with the same options). 
 generated files, copies the mods, theme, assets and layout into
 `~/.config/herdr-app` (or `HERDR_APP_HOME` when it's set), sets the icon and tint for Codex,
 Claude Code and Pi in your `programs.json` (its other entries stay as they are), checks every mod,
-installs this computer's relays (below) and switches to `herdr-harness` (`--no-switch` to
-skip). `ctrl-shift-l` switches back. A `herdr-harness` layout you
-changed is kept beside the new one as `herdr-harness.json.before-install-<time>`.
+installs this computer's relays (below) and switches to `harns` (`--no-switch` to
+skip). `ctrl-shift-l` switches back. A `harns` layout you
+changed is kept beside the new one as `harns.json.before-install-<time>`.
 
 Optional:
 
