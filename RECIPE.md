@@ -68,6 +68,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   A card that changes place slides there (280 ms, ease-out), and the ones it passes slide too.
   Group headers and parents with sub-agents fold. A machine's + opens the agents
   installed there.
+- **Agent card:** resting on an agent's card for 600 ms opens a 340 px card beside the
+  sidebar, level with it: the agent's name, program and machine; its status, for how long
+  and its turn; its space and tab, full folder and branch; the context used as a bar; and
+  its sub-agents, each with its status and for how long. Not while a card is being dragged.
 - **Machine card:** resting on a machine's band for 450 ms opens a 340 px card level with it,
   beside the sidebar. Each part is a title (icon, name) and rows of label, a 148 px bar and the
   value, in fixed columns: CPU load and temperature (cores, threads and load averages under

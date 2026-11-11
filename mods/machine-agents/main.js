@@ -231,6 +231,60 @@ export default class Agents extends View {
       .when(Boolean(d.board), el => el.child(div().w_full().text_size(11).text_color(t.dim).whitespace_normal().child(`Board \u00b7 ${d.board}`)));
   }
 
+  agentCard(t, a, all, name, trigger) {
+    // An agent's card; resting on it shows its details beside the sidebar, level with it. Not while it's being dragged.
+    if (this.drag?.moved) return trigger;
+    return HoverCard.new(`acard-${a.address}`).anchor("top_left").open_delay(600).close_delay(200)
+      .trigger(trigger)
+      .content(div().ml(find(layout(), "sidebar")?.size?.px ?? 268).mt(-52).child(this.agentDetails(t, a, all, name)));
+  }
+
+  agentDetails(t, a, all, name) {
+    // Status and for how long, its turn, where it runs (machine, space and tab, folder, branch), context used, and its sub-agents.
+    const now = Date.now();
+    const term = all.find(x => x.address === a.address);
+    const since = term?.status_ms ?? this.since(a);
+    const word = { working: "Working", blocked: "Needs you", done: "Finished \u00b7 not yet seen", idle: "Idle" };
+    const color = { working: t.working, blocked: t.blocked, done: t.ansi2 ?? t.done }[a.status] ?? t.muted;
+    const machine = a.address.includes("/") ? a.address.split("/")[0] : localMachineLabel();
+    const tab = spaces().flatMap(s => s.tabs).find(x => x.id === a.tab);
+    const folder = (tab ? lead(tab) : null)?.cwd;
+    const branch = spaces().find(s => s.id === a.space)?.branch;
+    const context = (shared("agents.context") ?? {})[a.address];
+    const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
+    const LABEL = 64;
+    const row = (label, value) => h_flex().w_full().gap(8).items_start()
+      .child(div().w(LABEL).flex_none().text_size(11).text_color(t.dim).child(label))
+      .child(div().flex_1().min_w(0).whitespace_normal().text_color(t.muted).child(value));
+    const kids = this.tree(all, a.address);
+    return v_flex().w(340).p(12).gap(8).rounded(10).border_1().border_color(t.border).bg(t.popover ?? t.raised).text_size(12).shadow_md()
+      .child(h_flex().w_full().gap(8).items_center()
+        .when(Boolean(icon(a.program, 16, t.muted)), el => el.child(icon(a.program, 16, t.muted)))
+        .child(v_flex().flex_1().min_w(0)
+          .child(div().text_size(13.5).font_semibold().text_color(t.foreground).whitespace_normal().child(name || a.program?.name || a.address))
+          .child(div().text_size(11).text_color(t.dim).truncate().child([a.program?.name, machine].filter(Boolean).join(" \u00b7 ")))))
+      .child(row("Status", h_flex().gap(6).items_center()
+        .child(div().text_color(color).child(word[a.status] ?? a.status))
+        .when(Boolean(since), el => el.child(div().text_color(t.dim).child(`\u00b7 ${duration(now - since)}`)))
+        .when(Number.isFinite(term?.turn), el => el.child(div().text_color(t.dim).child(`\u00b7 turn ${term.turn}`)))))
+      .child(row("Space", [a.space_name, a.tab_name || (Number.isFinite(a.tab_index) ? `tab ${a.tab_index + 1}` : "")].filter(Boolean).join(" / ")))
+      .when(Boolean(folder), el => el.child(row("Folder", folder)))
+      .when(Boolean(branch), el => el.child(row("Branch", branch)))
+      .child(row("Context", used == null ? "No reading yet" : h_flex().gap(8).items_center()
+        .child(div().w(148).h(4).flex_none().rounded_full().bg(t.border)
+          .child(div().h_full().rounded_full().w(Math.max(2, Math.round(148 * used / 100))).bg(used >= 90 ? "#d88179" : used >= 75 ? "#e8823a" : t.accent)))
+        .child(div().text_size(11).child(`${Math.round(used)}% used`))))
+      .when(kids.length > 0, el => el.child(v_flex().w_full().gap(4).pt(2)
+        .child(div().text_size(11).text_color(t.dim).child(`Sub-agents \u00b7 ${kids.length}`))
+        .children(kids.map(({ t: k, lines }) => {
+          const st = kidStatus(k, this.listed);
+          return h_flex().w_full().gap(6).items_center().pl(Math.max(0, lines.length - 1) * 12)
+            .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(k.name || k.template || k.program?.name || k.address))
+            .child(div().flex_none().text_size(11).text_color({ working: t.working, blocked: t.blocked }[st] ?? t.dim)
+              .child([word[st] ?? st, k.status_ms ? duration(now - k.status_ms) : ""].filter(Boolean).join(" \u00b7 ")));
+        }))));
+  }
+
   noticeMoves(list, cx) {
     // Cards whose place within their machine changed since the last draw: each starts offset by the places it moved
     // (CARD px apiece), with a fresh id so its transition starts there, and slides to 0 a frame later.
@@ -600,7 +654,7 @@ export default class Agents extends View {
       const dropHere = this.drag?.moved && this.drop?.target === a.address;
       // A card that moved gets a new id and starts where it was, then slides to its place (noticeMoves).
       const slide = this.slides?.[a.address];
-      return v_flex()
+      return this.agentCard(t, a, all, name, v_flex()
         .id(`ag-${a.address}-${this.moveGen?.[a.address] ?? 0}`)
         .relative()
         .top(slide ?? 0)
@@ -658,7 +712,7 @@ export default class Agents extends View {
           .child(this.status(t, a, byPriority && !isPinned)))
         .when(Boolean(where) || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
           .child(div().flex_1().min_w(0).truncate().child(where))
-          .when(Boolean(bar), el => el.child(bar))));
+          .when(Boolean(bar), el => el.child(bar)))));
     };
 
     const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
