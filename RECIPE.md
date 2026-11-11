@@ -67,13 +67,16 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   moves to the top, and dragging a card onto another of the same machine puts it there.
   Group headers and parents with sub-agents fold. A machine's + opens the agents
   installed there.
-- **Machine card:** resting on a machine's name or rings for 450 ms opens a 320 px card
-  beside them: its OS and uptime, CPU model, cores, threads, load and temperature, memory
-  used of total, each GPU's load, VRAM, temperature and power (NVIDIA, through
-  `nvidia-smi`; a GPU with no live readings is left out), each disk, load averages and the motherboard. It's read on the machine
-  when the card opens and every 3 s while it's in use (Python 3 on Linux and macOS,
-  PowerShell on Windows, where the CPU temperature needs administrator rights, so the card
-  leaves it out).
+- **Machine card:** resting on a machine's band for 450 ms opens a 340 px card level with it,
+  beside the sidebar. Each part is a title (icon, name) and rows of label, a 148 px bar and the
+  value, in fixed columns: CPU load and temperature (cores, threads and load averages under
+  them), memory used, each GPU's load, VRAM, temperature and power against its limit (NVIDIA,
+  through `nvidia-smi`; a GPU with no live readings is left out), each disk's use, and the
+  motherboard. Bars are amber, orange (`#e8823a`) when high and red (`#d88179`) when near
+  full: use from 80% and 95%, temperatures from 70 and 85 °C, power from 85% and 98% of its
+  limit. It's read on the machine when the card opens and every 3 s while it's in use
+  (Python 3 on Linux and macOS, PowerShell on Windows, where the CPU temperature needs
+  administrator rights, so the card leaves it out).
 - **Rings:** CPU, RAM and GPU refresh every second; hover one for its percentage. A ring
   stays empty until its first reading arrives.
 - **Usage meters:** Claude's and Codex's limits belong to the account, so the bar shows one

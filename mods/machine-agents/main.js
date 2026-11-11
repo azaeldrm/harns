@@ -177,47 +177,56 @@ export default class Agents extends View {
   }
 
   detailsCard(t, machine) {
+    // A grid: each section a title (icon, name), then rows of label | bar | value in fixed columns, so every bar and value lines up.
     const key = machine.name ?? "@local";
     const d = this.details?.[key];
     const s = (shared("machine.stats") ?? {})[key];
     const fresh = s && !s.error && Date.now() - s.at <= 15000;
     const GB = 1024 ** 3;
     const gb = b => b == null ? "?" : (b / GB >= 100 ? Math.round(b / GB) : (b / GB).toFixed(1));
-    const pct = v => Number.isFinite(v) ? `${Math.round(v)}%` : "–";
-    const tint = v => v > 90 ? "#d88179" : v > 75 ? t.working : t.accent;
-    const hot = c => c > 85 ? "#d88179" : c > 70 ? t.working : t.muted;
-    const up = sec => { if (!Number.isFinite(sec)) return ""; const m = Math.floor(sec / 60), h = Math.floor(m / 60), dd = Math.floor(h / 24); return dd ? `up ${dd}d ${h % 24}h` : h ? `up ${h}h ${m % 60}m` : `up ${m}m`; };
-    const bar = v => div().h(4).w_full().rounded_full().bg(t.border)
-      .child(div().h_full().rounded_full().w(Number.isFinite(v) ? Math.max(2, Math.round(2.36 * Math.max(0, Math.min(100, v)))) : 0).bg(tint(v)));
-    const section = (icon, title, right, ...lines) => v_flex().w_full().gap(4)
+    const ok = v => Number.isFinite(v);
+    const WARN = "#e8823a", CRIT = "#d88179";
+    const level = (v, warn, crit) => v >= crit ? CRIT : v >= warn ? WARN : t.accent;
+    const BAR = 148, LABEL = 44, VALUE = 90; // with the 18 px indent and two 8 px gaps: the card's 316 px inside
+    const row = (label, fill, color, value) => h_flex().w_full().pl(18).gap(8).items_center().h(18)
+      .child(div().w(LABEL).flex_none().text_size(11).text_color(t.dim).child(label))
+      .child(div().w(BAR).h(4).flex_none().rounded_full().bg(t.border)
+        .child(div().h_full().rounded_full().w(ok(fill) ? Math.max(2, Math.round(BAR * Math.max(0, Math.min(100, fill)) / 100)) : 0).bg(color)))
+      .child(h_flex().w(VALUE).flex_none().justify_end().text_size(11).text_color(color === t.accent ? t.muted : color).child(value));
+    const pct = v => ok(v) ? `${Math.round(v)}%` : "\u2013";
+    // A size says it in GB and the bar shows the share; otherwise the share in numbers.
+    const usage = (label, v, size) => row(label, v, ok(v) ? level(v, 80, 95) : t.dim, size ?? pct(v));
+    const temp = c => ok(c) ? row("Temp", c, level(c, 70, 85), `${Math.round(c)}\u00b0C`) : null;
+    const section = (icon, title, ...rows) => v_flex().w_full().gap(3)
       .child(h_flex().w_full().gap(6).items_center()
         .child(svg(`mods/machine-stats/${icon}.svg`).size(12).flex_none().text_color(t.muted))
-        .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(title))
-        .when(Boolean(right), el => el.child(div().flex_none().text_color(t.muted).child(right))))
-      .children(lines.filter(Boolean));
-    const meter = (value, note) => h_flex().w_full().pl(18).gap(8).items_center()
-      .child(div().w(236).flex_none().child(bar(value)))
-      .child(div().flex_1().text_size(11).text_color(t.muted).child(note));
-    const note = (text, color = t.dim) => div().pl(18).text_size(11).text_color(color).child(text);
-    const name = machine.name || localMachineLabel();
-    const card = v_flex().w(320).p(12).gap(10).rounded(10).border_1().border_color(t.border).bg(t.popover ?? t.raised).text_size(12).shadow_md()
+        .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(title)))
+      .children(rows.filter(Boolean));
+    const note = text => div().pl(18).text_size(11).text_color(t.dim).truncate().child(text);
+    const up = sec => { if (!ok(sec)) return ""; const m = Math.floor(sec / 60), h = Math.floor(m / 60), dd = Math.floor(h / 24); return dd ? `up ${dd}d ${h % 24}h` : h ? `up ${h}h ${m % 60}m` : `up ${m}m`; };
+    const card = v_flex().w(340).p(12).gap(10).rounded(10).border_1().border_color(t.border).bg(t.popover ?? t.raised).text_size(12).shadow_md()
       .child(v_flex().gap(1)
-        .child(div().text_size(13.5).font_semibold().text_color(t.foreground).child(name))
+        .child(div().text_size(13.5).font_semibold().text_color(t.foreground).child(machine.name || localMachineLabel()))
         .when(Boolean(d && !d.error), el => el.child(div().text_size(11).text_color(t.dim).truncate().child([d.os, up(d.uptime)].filter(Boolean).join(" \u00b7 ")))));
     if (!d) return card.child(div().text_color(t.dim).child("Reading details\u2026"));
     if (d.error) return card.child(div().text_color(t.dim).child(d.error));
     const used = d.memory.total && d.memory.available != null ? d.memory.total - d.memory.available : null;
-    const memPct = fresh && Number.isFinite(s.memory) ? s.memory : used != null ? 100 * used / d.memory.total : null;
+    const memPct = fresh && ok(s.memory) ? s.memory : used != null ? 100 * used / d.memory.total : null;
+    const memUsed = used ?? (ok(memPct) && d.memory.total ? d.memory.total * memPct / 100 : null);
     return card
-      .child(section("cpu", d.cpu.model || "CPU", d.cpu.temp != null ? `${Math.round(d.cpu.temp)}\u00b0C` : "",
-        meter(fresh ? s.cpu : null, pct(fresh ? s.cpu : null)),
+      .child(section("cpu", d.cpu.model || "CPU",
+        usage("Load", fresh ? s.cpu : null),
+        temp(d.cpu.temp),
         note([d.cpu.cores && `${d.cpu.cores} cores`, d.cpu.threads && `${d.cpu.threads} threads`, d.load && `load ${d.load.map(x => x?.toFixed(2)).join(" ")}`].filter(Boolean).join(" \u00b7 "))))
-      .child(section("ram", "Memory", `${gb(used)} / ${gb(d.memory.total)} GB`, meter(memPct, pct(memPct))))
+      .child(section("ram", "Memory", usage("Used", memPct, `${gb(memUsed)} / ${gb(d.memory.total)} GB`)))
       // Only GPUs with something live to show (an integrated GPU nvidia-smi doesn't read is left out).
-      .children(d.gpus.filter(g => g.load != null || g.temp != null || g.memTotal).map(g => section("gpu", g.name, g.temp != null ? `${Math.round(g.temp)}\u00b0C` : "",
-        g.load != null ? meter(g.load, pct(g.load)) : null,
-        note([g.memTotal && `VRAM ${gb(g.memUsed)} / ${gb(g.memTotal)} GB`, g.power != null && `${Math.round(g.power)} W`].filter(Boolean).join(" \u00b7 ") || "No live readings", g.temp > 70 ? hot(g.temp) : t.dim))))
-      .children(d.disks.map(k => section("usage", `Disk ${k.mount}`, `${gb(k.total - k.free)} / ${gb(k.total)} GB`, meter(100 * (k.total - k.free) / k.total, pct(100 * (k.total - k.free) / k.total)))))
+      .children(d.gpus.filter(g => g.load != null || g.temp != null || g.memTotal).map(g => section("gpu", g.name,
+        ok(g.load) ? usage("Load", g.load) : null,
+        g.memTotal ? usage("VRAM", 100 * g.memUsed / g.memTotal, `${gb(g.memUsed)} / ${gb(g.memTotal)} GB`) : null,
+        temp(g.temp),
+        ok(g.power) ? row("Power", g.powerLimit ? 100 * g.power / g.powerLimit : null, g.powerLimit ? level(100 * g.power / g.powerLimit, 85, 98) : t.dim,
+          g.powerLimit ? `${Math.round(g.power)} / ${Math.round(g.powerLimit)} W` : `${Math.round(g.power)} W`) : null)))
+      .children(d.disks.map(k => section("usage", `Disk ${k.mount}`, usage("Used", 100 * (k.total - k.free) / k.total, `${gb(k.total - k.free)} / ${gb(k.total)} GB`))))
       .when(Boolean(d.board), el => el.child(div().text_size(11).text_color(t.dim).truncate().child(`Board \u00b7 ${d.board}`)));
   }
 

@@ -2,7 +2,7 @@
 // and how it's doing (temperatures, GPU load, memory, power), read on demand. CPU and RAM load come from machine.stats.
 import { platformOf, runOn } from './platforms.js';
 
-const NVIDIA = ['nvidia-smi', '--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw', '--format=csv,noheader,nounits'];
+const NVIDIA = ['nvidia-smi', '--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit', '--format=csv,noheader,nounits'];
 
 const linux = `
 import glob, json, os, platform, shutil, subprocess
@@ -88,11 +88,11 @@ const COMMANDS = {
 const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 
 export function nvidiaGpu(line) {
-  // One nvidia-smi line (name, load %, VRAM used and total MiB, temp °C, power W) as a GPU; the name may hold commas.
+  // One nvidia-smi line (name, load %, VRAM used and total MiB, temp °C, power and its limit W) as a GPU; the name may hold commas.
   const parts = String(line).split(',').map(s => s.trim());
-  if (parts.length < 6) return null;
-  const [load, used, total, temp, power] = parts.slice(-5).map(num);
-  return { name: parts.slice(0, -5).join(', '), load, memUsed: used == null ? null : used * 1048576, memTotal: total == null ? null : total * 1048576, temp, power };
+  if (parts.length < 7) return null;
+  const [load, used, total, temp, power, limit] = parts.slice(-6).map(num);
+  return { name: parts.slice(0, -6).join(', '), load, memUsed: used == null ? null : used * 1048576, memTotal: total == null ? null : total * 1048576, temp, power, powerLimit: limit };
 }
 
 export function normalized(raw) {
@@ -102,7 +102,7 @@ export function normalized(raw) {
   for (const name of raw.adapters ?? []) {
     const short = String(name).toLowerCase();
     if (/virtual|basic display|basic render|remote|mirror/.test(short)) continue;
-    if (name && ![...named].some(n => short.includes(n) || n.includes(short.replace(/^nvidia\s+/, '')))) gpus.push({ name, load: null, memUsed: null, memTotal: null, temp: null, power: null });
+    if (name && ![...named].some(n => short.includes(n) || n.includes(short.replace(/^nvidia\s+/, '')))) gpus.push({ name, load: null, memUsed: null, memTotal: null, temp: null, power: null, powerLimit: null });
   }
   return {
     host: raw.host ?? '', os: raw.os ?? '', kernel: raw.kernel ?? '', uptime: num(raw.uptime), board: raw.board ?? '',
