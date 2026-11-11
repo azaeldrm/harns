@@ -59,7 +59,7 @@ export default class NewMenu extends View {
     const targetSpace = spaces().find(s => s.machine === this.machine && s.active)
       ?? spaces().find(s => s.machine === this.machine);
     if (targetSpace) run("tab.new", { name: agent.name, space: targetSpace.id, argv: agent.run });
-    else run("space.new", { name: agent.name, machine: this.machine, argv: agent.run });
+    else run("space.new", { name: agent.name, machine: this.machine ?? "", argv: agent.run });
   }
   row(id, icon, name, action, hint = "", enabled = true) {
     const t = theme();
@@ -85,7 +85,7 @@ export default class NewMenu extends View {
       })
       .child(this.row("terminal", svg("icons/shell.svg").size(14), "Terminal", () => {
         closeOverlay(props().overlay);
-        if (targeted && !space) run("space.new", { machine: this.machine });
+        if (targeted && !space) run("space.new", { machine: this.machine ?? "" });
         else run("tab.new", { space: space?.id });
       }, shortcut("tab.new"), !targeted || machine?.layout === "ready"))
       .child(div().px(9).pt(8).pb(4).text_size(11).text_color(t.dim).child(targeted ? `Start on ${machine?.name ?? shared("machine.local-label") ?? "This computer"}` : "Start an agent"))
