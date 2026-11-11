@@ -24,6 +24,7 @@
 !/mods/harness-chrome/
 !/mods/harness-files/
 !/mods/harness-pane/
+!/mods/harness-simulator/
 !/mods/harness-tabs/
 !/mods/machine-agents/
 !/mods/machine-metrics/

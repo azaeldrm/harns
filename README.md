@@ -39,6 +39,11 @@ Optional:
   - in `~/.codex/config.toml`, only removing a `notify` line an older relay added.
 
   Pi sessions already running pick up the relay after `/reload`, typed in their terminal.
+- **Simulator** (Windows): the panel beside Files and Changes runs an Android virtual
+  device from the Android SDK (`ANDROID_HOME`, or `%LOCALAPPDATA%\Android\Sdk`). Create one
+  first in Android Studio's Device Manager or with `avdmanager`. The emulator's own window is
+  placed over the panel, so it runs at full speed with its own input; for Expo apps, run
+  `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 

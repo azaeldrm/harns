@@ -154,6 +154,13 @@
                                                                                                              "content":  {
                                                                                                                              "mod":  "changes"
                                                                                                                          }
+                                                                                                         },
+                                                                                                         {
+                                                                                                             "id":  "simulator",
+                                                                                                             "type":  "block",
+                                                                                                             "content":  {
+                                                                                                                             "mod":  "harness-simulator"
+                                                                                                                         }
                                                                                                          }
                                                                                                      ],
                                                                                         "active":  "files"
