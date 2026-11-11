@@ -26,8 +26,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   76 px on macOS):
   - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
     (16 px semibold), then Search and the sidebar toggle.
-  - **Agents:** an "Agents" heading (11.5 px, dim) with a sort button. By default it's
-    grouped by machine. Each group has the machine's name (this computer's own name, or
+  - **Agents:** an "Agents" heading (11.5 px, dim), grouped by machine. Each group has the machine's name (this computer's own name, or
     a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
     GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (else its folder, else the tab name) and its status; under it, in
@@ -64,9 +63,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Logo:** it fades in and out while any agent is working and bobs up and down otherwise.
   Clicking it folds or unfolds the sidebar.
 - **Sidebar:** clicking an agent focuses it; hovering a card shows a pin, and pinned
-  agents sit in a Pinned group on top. The sort button offers Priority (Needs you, Done,
-  Working, Idle sections), Grouped by space and Grouped by machine. Grouped by machine,
-  each machine keeps its own order: an agent that finishes, starts needing you or is new
+  agents sit in a Pinned group on top. Each machine keeps its own order: an agent that finishes, starts needing you or is new
   moves to the top, and dragging a card onto another of the same machine puts it there.
   Group headers and parents with sub-agents fold. A machine's + opens the agents
   installed there.
@@ -105,8 +102,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Mods:**
   - `harness-chrome`: the brand bar, or the footer with props `{footer: true}`. Folds
     the sidebar with `layout.resize` and opens the shipped `picker` and `machine-add`.
-  - `machine-agents`: the agents list, its sort popup (props `{sortMenu: true}`) and
-    context rings. Calls `setAgentOrder`, `pane.focus` and `terminal.peek`.
+  - `machine-agents`: the agents list, its machine cards and context bars. Calls `setAgentOrder`, `pane.focus` and `terminal.peek`.
   - `machine-metrics`: draws a machine's ring row (built into `machine-agents`).
   - `machine-new-menu`: the per-machine agent menu, from `knownAgents({on})`.
   - `harness-tabs`: the tab bar; uses the shipped `new-menu` and `menu`.

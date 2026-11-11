@@ -54,7 +54,8 @@ const SORTS = [
   { id: "grouped", label: "Grouped by space", icon: "layers" },
   { id: "machine", label: "Grouped by machine", icon: "server" },
 ];
-const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS.find((s) => s.id === "machine");
+// Always grouped by machine (the sort menu is gone; a sort chosen before is no longer read).
+const sortOf = () => SORTS.find((s) => s.id === "machine");
 const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
 const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
 
@@ -750,16 +751,7 @@ export default class Agents extends View {
             .flex_none()
             .items_center()
             .justify_between()
-            .child(div().text_size(11.5).font_medium().text_color(t.dim).child("Agents"))
-            .child(h_flex().gap(10).items_center()
-              .child(div()
-                .id("ag-sort")
-                .text_size(11)
-                .text_color(t.dim)
-                .hover((s) => s.text_color(t.foreground))
-                .on_click(() => openOverlay({ mod: "machine-agents", kind: "popup", width: 200, height: 140, props: { sortMenu: true } }))
-                .tooltip(`Sort agents: ${sort.label}`)
-                .child(svg(`mods/harness-chrome/${sort.icon}.svg`).size(14)))),
+            .child(div().text_size(11.5).font_medium().text_color(t.dim).child("Agents")),
         ),
       )
       .when(list.length === 0 && !collapsed, (el) =>
