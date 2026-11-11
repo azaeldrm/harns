@@ -1,5 +1,5 @@
 import { View, div, image, svg } from "gpui-kit";
-import { v_flex, h_flex, HoverCard } from "gpui-base";
+import { v_flex, h_flex, Popup } from "gpui-base";
 import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
@@ -166,14 +166,40 @@ export default class Agents extends View {
     });
   }
 
+  // Details cards (a machine's, an agent's), as herdr-t3's: hung from a 1 px point at the row's top-right corner, so
+  // nothing covers the other rows; the first waits OPEN_AFTER, and while one is up (or was, under LIVE ago) the next opens at once.
+  detailsEnter(key, cx) {
+    const OPEN_AFTER = 450, LIVE = 400;
+    this.hot = key;
+    this.detailsTimer?.cancel();
+    if (this.detailsKey || Date.now() - (this.detailsClosed ?? 0) < LIVE) { this.detailsKey = key; cx.notify(); return; }
+    this.detailsTimer = cx.timer.after(OPEN_AFTER, cx => { if (this.hot === key && !this.drag?.moved) { this.detailsKey = key; cx.notify(); } });
+  }
+
+  detailsLeave(key, cx) {
+    // Closes a little after the pointer has left both the row and its card.
+    if (this.hot === key) this.hot = null;
+    cx.timer.after(150, cx => {
+      if (this.detailsKey !== key || this.hot === key || this.overCard === key) return;
+      this.detailsKey = null; this.detailsClosed = Date.now(); cx.notify();
+    });
+  }
+
+  hang(key, card) {
+    // The card, hung beside the row from its top-right corner (the row must be relative), while it's the one up.
+    return Popup.new(`details-${key}`, div()).absolute().top(-1).right(-1).size(1)
+      .when(this.detailsKey === key && !this.drag?.moved, pop => pop.content(div().id(`details-hover-${key}`).pl(16)
+        .on_hover((on, cx) => { if (on) this.overCard = key; else { if (this.overCard === key) this.overCard = null; this.detailsLeave(key, cx); } })
+        .child(card)));
+  }
+
   machineCard(t, machine, trigger) {
-    // A machine's header and stats row; resting on them shows its details card beside the list.
-    const key = machine.name ?? "@local";
-    return HoverCard.new(`mcard-${key}`).anchor("top_left").open_delay(450).close_delay(250)
-      .trigger(div().id(`mtrig-${key}`).w_full().on_hover((on, cx) => { if (on) this.wantDetails(machine.name, cx); }).child(trigger))
-      // Beside the sidebar rather than over its agents: shifted right by the sidebar's width (the pointer's way there keeps it open).
-      // Pinned under the band it opens from: raised by the band's height (header 30, rings 22, padding, border and gap: 61) to sit level with it.
-      .content(div().ml(find(layout(), "sidebar")?.size?.px ?? 268).mt(-61).child(this.detailsCard(t, machine)));
+    // A machine's band (header and rings); resting on it shows its details beside the sidebar, level with it.
+    const key = `m:${machine.name ?? "@local"}`;
+    return div().id(`mtrig-${key}`).relative().w_full()
+      .on_hover((on, cx) => { if (on) { this.wantDetails(machine.name, cx); this.detailsEnter(key, cx); } else this.detailsLeave(key, cx); })
+      .child(trigger)
+      .child(this.hang(key, this.detailsCard(t, machine)));
   }
 
   detailsCard(t, machine) {
@@ -229,14 +255,6 @@ export default class Agents extends View {
       .children(d.disks.map(k => section("usage", `Disk ${k.mount}`, usage("Used", 100 * (k.total - k.free) / k.total, `${gb(k.total - k.free)} / ${gb(k.total)} GB`))))
       // The board's name wraps rather than cut off: makers' names run long.
       .when(Boolean(d.board), el => el.child(div().w_full().text_size(11).text_color(t.dim).whitespace_normal().child(`Board \u00b7 ${d.board}`)));
-  }
-
-  agentCard(t, a, all, name, trigger) {
-    // An agent's card; resting on it shows its details beside the sidebar, level with it. Not while it's being dragged.
-    if (this.drag?.moved) return trigger;
-    return HoverCard.new(`acard-${a.address}`).anchor("top_left").open_delay(600).close_delay(200)
-      .trigger(trigger)
-      .content(div().ml(find(layout(), "sidebar")?.size?.px ?? 268).mt(-52).child(this.agentDetails(t, a, all, name)));
   }
 
   agentDetails(t, a, all, name) {
@@ -654,7 +672,7 @@ export default class Agents extends View {
       const dropHere = this.drag?.moved && this.drop?.target === a.address;
       // A card that moved gets a new id and starts where it was, then slides to its place (noticeMoves).
       const slide = this.slides?.[a.address];
-      return this.agentCard(t, a, all, name, v_flex()
+      return (v_flex()
         .id(`ag-${a.address}-${this.moveGen?.[a.address] ?? 0}`)
         .relative()
         .top(slide ?? 0)
@@ -671,10 +689,11 @@ export default class Agents extends View {
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
         .on_hover((on, cx) => {
-          if (on) this.hovered = a.address;
-          else if (this.hovered === a.address) this.hovered = null;
+          if (on) { this.hovered = a.address; this.detailsEnter(a.address, cx); }
+          else { if (this.hovered === a.address) this.hovered = null; this.detailsLeave(a.address, cx); }
           cx.notify();
         })
+        .child(this.hang(a.address, this.agentDetails(t, a, all, name)))
         .when(draggable, el => el
           .on_mouse_down("left", (e) => { this.drag = { address: a.address, machine: machineOf(a.address), y: e.position.y, moved: false }; this.drop = null; })
           .on_mouse_move((e, cx) => {
