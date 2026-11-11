@@ -497,10 +497,11 @@ export default class Agents extends View {
     if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
       .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
-    // Idle: on the rail (compact) the ring filled to the context used, as the bar it has no room for; open, an empty ring,
-    // the spinner's circle at rest (the card's bar shows the context).
-    if (compact) return ring(`ring-${Math.round(percent)}`, known ? (percent > 90 ? "#d88179" : t.muted) : (t.idle ?? t.dim));
-    return ring("ring-0", t.idle ?? t.dim);
+    // Idle: on the rail (compact) a 14 px context bar, the open card's in small (gray, amber past 75%, red past 90%);
+    // open, an empty ring, the spinner's circle at rest (the card's bar shows the context).
+    if (compact) return div().w(14).h(3).flex_none().rounded_full().bg(t.border).when(Boolean(tip), d => d.tooltip(tip))
+      .when(known, el => el.child(div().h_full().rounded_full().w(Math.max(2, Math.round(14 * percent / 100))).bg(percent > 90 ? "#d88179" : percent > 75 ? t.working : t.muted)));
+    return ring("idle", t.idle ?? t.dim);
   }
 
   render(cx) {
