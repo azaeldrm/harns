@@ -82,6 +82,9 @@ export default class Agents extends View {
     this.refreshHosts(cx);
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
+    // The order of agents within each machine: dragged by hand, and an agent that finishes or needs you moves to the top.
+    this.order = JSON.parse(localStorage.getItem("order") ?? "[]");
+    this.drag = null; this.drop = null;
     cx.timer.every(1000, (cx) => { this.noticeTurns(cx); cx.notify(); });
     this.noticeTurns(cx);
     this.watchLocalContext(cx);
@@ -116,8 +119,16 @@ export default class Agents extends View {
   }
 
   track(list, now) {
-    // Stamps agents whose state changed.
+    // Stamps agents whose state changed; one that finished or started needing you, or is new, goes to the top of the order.
     let dirty = false;
+    const seeding = this.order.length === 0;
+    for (const a of list) {
+      const s = a.status === "done" ? "idle" : a.status;
+      if (seeding) { this.order.push(a.address); continue; }
+      const was = this.changed[a.address]?.s;
+      if (!this.order.includes(a.address) || (was !== s && (s === "blocked" || (s === "idle" && was === "working")))) this.toTop(a.address);
+    }
+    if (seeding && list.length) localStorage.setItem("order", JSON.stringify(this.order));
     for (const a of list) {
       const s = a.status === "done" ? "idle" : a.status;
       if (this.changed[a.address]?.s === s) continue;
@@ -127,7 +138,25 @@ export default class Agents extends View {
     if (!dirty) return;
     const listed = new Set(list.map((a) => a.address));
     for (const [k, c] of Object.entries(this.changed)) if (!listed.has(k) && now - c.at > 30 * 86400000) delete this.changed[k];
+    const kept = this.order.filter(k => listed.has(k) || this.changed[k]);
+    if (kept.length !== this.order.length) { this.order = kept; localStorage.setItem("order", JSON.stringify(kept)); }
     localStorage.setItem("changed", JSON.stringify(this.changed));
+  }
+
+  toTop(address) {
+    this.order = [address, ...this.order.filter(x => x !== address)];
+    localStorage.setItem("order", JSON.stringify(this.order));
+  }
+
+  moveTo(address, target, after) {
+    // A dragged agent, put before (or after) another.
+    if (address === target) return;
+    const rest = this.order.filter(x => x !== address);
+    const at = rest.indexOf(target);
+    if (at < 0) return;
+    rest.splice(after ? at + 1 : at, 0, address);
+    this.order = rest;
+    localStorage.setItem("order", JSON.stringify(this.order));
   }
 
   setPins(pins) {
@@ -356,6 +385,10 @@ export default class Agents extends View {
     const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
     const rankOf = (a) => urgency.get(a.address);
     if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
+    if (byMachine) {
+      const at = new Map(this.order.map((x, i) => [x, i]));
+      list = [...list].sort((x, y) => (at.get(x.address) ?? -1) - (at.get(y.address) ?? -1));
+    }
     this.prunePins(all);
     const pinned = this.pins.map((p) => list.find((a) => a.address === p)).filter(Boolean);
     const rest = list.filter((a) => !this.pins.includes(a.address));
@@ -441,16 +474,31 @@ export default class Agents extends View {
         .child(svg(`mods/harness-chrome/${isPinned ? "pin-off" : "pin"}.svg`).size(13));
       const full = byPriority || isPinned;
       const name = label(a) || a.space_name || "";
-      return h_flex()
+      // Line 2: where it works (folder · branch, and its space where the list doesn't group by it); context used as a small bar.
+      const tab = tabs.find(x => x.id === a.tab);
+      const folder = folderName((tab ? lead(tab) : null)?.cwd);
+      const branch = spaces().find(s => s.id === a.space)?.branch;
+      const where = [folder !== name ? folder : "", branch, full && a.space_name !== name ? a.space_name : ""].filter(Boolean).join(" \u00b7 ");
+      const context = (shared("agents.context") ?? {})[a.address];
+      const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
+      const bar = used == null ? null : div().w(36).h(3).flex_none().rounded_full().bg(t.border).tooltip(`Context: ${Math.round(used)}% used`)
+        .child(div().h_full().rounded_full().w(Math.max(2, Math.round(36 * used / 100))).bg(used > 90 ? "#d88179" : used > 75 ? t.working : t.muted));
+      // Dragging (by machine, not pinned): press, move over another agent of the same machine, release.
+      const machineOf = x => x.includes("/") ? x.split("/")[0] : "";
+      const draggable = byMachine && !isPinned;
+      const dragging = this.drag?.moved && this.drag.address === a.address;
+      const dropHere = this.drag?.moved && this.drop?.target === a.address;
+      return v_flex()
         .id(`ag-${a.address}`)
+        .relative()
         .px(8)
-        .h(30)
+        .py(6)
+        .gap(2)
         .flex_none()
-        .rounded(5)
-        .items_center()
-        .gap(9)
+        .rounded(6)
         .border_l(2).border_color(a.focused ? t.accent : t.surface)
         .when(a.focused, (el) => el.bg(t.selected))
+        .when(dragging, (el) => el.opacity(0.45))
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
         .on_hover((on, cx) => {
@@ -458,20 +506,45 @@ export default class Agents extends View {
           else if (this.hovered === a.address) this.hovered = null;
           cx.notify();
         })
-        .on_click(() => run("pane.focus", { pane: a.pane }))
-        .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
-          .when(subs.length > 0, el => el.on_click((_e, cx) => {
-            cx.stop_propagation();
-            this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
+        .when(draggable, el => el
+          .on_mouse_down("left", (e) => { this.drag = { address: a.address, machine: machineOf(a.address), y: e.position.y, moved: false }; this.drop = null; })
+          .on_mouse_move((e, cx) => {
+            const d = this.drag;
+            if (!d) return;
+            if (!d.moved && Math.abs(e.position.y - d.y) > 4) d.moved = true;
+            if (!d.moved) return;
+            const drop = d.address !== a.address && machineOf(a.address) === d.machine ? { target: a.address, after: e.local_position.y > 22 } : null;
+            if (drop?.target !== this.drop?.target || drop?.after !== this.drop?.after) { this.drop = drop; cx.notify(); }
+          })
+          .on_mouse_up("left", (_e, cx) => {
+            const d = this.drag;
+            if (d?.moved) {
+              if (this.drop) this.moveTo(d.address, this.drop.target, this.drop.after);
+              this.dragged = true;
+            }
+            this.drag = null; this.drop = null;
             cx.notify();
-          })).child(pic)))
-        .child(h_flex().flex_1().min_w(0).gap(5).items_center()
-          .child(div().min_w(0).max_w(full && a.space_name ? 120 : 200).truncate().text_color(idle ? t.muted : t.foreground).child(name))
-          .when(full && Boolean(a.space_name) && a.space_name !== name, el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${a.space_name}`))))
-        .when(subs.length > 0, el => el.child(fold(a, subs)))
-        .when(this.hovered === a.address, el => el.child(pin))
-        .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
-        .child(this.status(t, a, byPriority && !isPinned));
+          }))
+        .on_click(() => {
+          if (this.dragged) { this.dragged = false; return; }
+          run("pane.focus", { pane: a.pane });
+        })
+        .when(dropHere, el => el.child(div().absolute().left(6).right(6).h(2).rounded_full().bg(t.accent).when(this.drop.after, d => d.bottom(-1)).when(!this.drop.after, d => d.top(-1))))
+        .child(h_flex().w_full().gap(8).items_center()
+          .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
+            .when(subs.length > 0, el => el.on_click((_e, cx) => {
+              cx.stop_propagation();
+              this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
+              cx.notify();
+            })).child(pic)))
+          .child(div().flex_1().min_w(0).truncate().text_color(idle ? t.muted : t.foreground).child(name))
+          .when(subs.length > 0, el => el.child(fold(a, subs)))
+          .when(this.hovered === a.address, el => el.child(pin))
+          .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
+          .child(this.status(t, a, byPriority && !isPinned)))
+        .when(Boolean(where) || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
+          .child(div().flex_1().min_w(0).truncate().child(where))
+          .when(Boolean(bar), el => el.child(bar))));
     };
 
     const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
@@ -613,6 +686,10 @@ export default class Agents extends View {
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
-      .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always").children(rows));
+      .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always")
+        // A drag ends where the pointer leaves the list, or lets go outside an agent.
+        .on_hover((on, cx) => { if (!on && this.drag) { this.drag = null; this.drop = null; cx.notify(); } })
+        .on_mouse_up("left", (_e, cx) => { if (this.drag) { this.drag = null; this.drop = null; cx.notify(); } })
+        .children(rows));
   }
 }

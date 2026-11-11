@@ -36,17 +36,17 @@ export default class WorkspaceChrome extends View {
     const t = theme();
     const collapsed = narrow();
     if (props()?.footer) {
-      const row = (id, icon, label, dim, action) => h_flex().id(id).w_full().h(28).flex_none().px(8).gap(9).items_center().rounded(8)
-        .when(collapsed, el => el.px(0).justify_center())
-        .text_color(dim ? t.dim : t.muted).hover(s => s.bg(t.hover).text_color(t.foreground)).cursor_pointer()
-        .on_click(action).child(svg(`mods/harness-chrome/${icon}.svg`).size(14))
-        .when(!collapsed, el => el.child(label));
-      const settings = row("settings", "settings", "Settings", false, () => run("app.settings"))
-        .when(Boolean(updates().app.ready), el => el.child(div().size(6).rounded_full().bg(t.accent)));
-      return v_flex().size_full().bg(t.surface).justify_end().px(8).pt(4).pb(8).text_size(13)
-        .when(collapsed, el => el.px(0))
-        .child(settings)
-        .child(row("machine", "plus", "Add machine", true, () => run("mod.open", { name: "machine-add" })));
+      // Settings and Add machine as icons side by side (smaller on the rail, so both still fit); an update ready dots the gear.
+      const size = collapsed ? 24 : 28;
+      const icon = (id, name, tip, action, dot = false) => div().id(id).relative().size(size).flex_none().flex().items_center().justify_center()
+        .rounded(7).text_color(t.muted).hover(s => s.bg(t.hover).text_color(t.foreground)).cursor_pointer().tooltip(tip)
+        .on_click(action).child(svg(`mods/harness-chrome/${name}.svg`).size(15))
+        .when(dot, el => el.child(div().absolute().top(3).right(3).size(6).rounded_full().bg(t.accent)));
+      const ready = Boolean(updates().app.ready);
+      return h_flex().size_full().bg(t.surface).items_center().gap(2).px(collapsed ? 4 : 10)
+        .when(collapsed, el => el.justify_center())
+        .child(icon("settings", "settings", ready ? "Settings · update ready" : "Settings", () => run("app.settings"), ready))
+        .child(icon("machine", "server", "Add machine", () => run("mod.open", { name: "machine-add" })));
     }
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 14).pr(10).gap(4).items_center().text_size(13.5)
       .when(collapsed, el => el.pl(0).pr(0).child(div().flex_1().flex().items_center().justify_center()

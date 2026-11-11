@@ -32,8 +32,8 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     session's own title (else its folder, else the tab name), its age (`<1m`, `14h`,
     `1d`) and its status. Sub-agents hang under their parent as a tree (26 px rows).
     A machine with no agents says "No agents", "Connecting…" or "Offline".
-  - **Footer** (92 px): Settings (with an amber dot when an update is ready) and Add
-    machine.
+  - **Footer** (44 px): two icons side by side, Settings (a gear, with an amber dot when an update is ready) and Add
+    machine (a server).
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, and the window buttons on Windows and Linux.
