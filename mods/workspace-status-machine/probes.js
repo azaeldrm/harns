@@ -54,7 +54,7 @@ if ($wanted -contains 'Codex') {
       $info.UseShellExecute = $false; $info.RedirectStandardInput = $true; $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
       $proc = [Diagnostics.Process]::Start($info)
       function Ask($id, $method) {
-        $proc.StandardInput.WriteLine((@{ id = $id; method = $method; params = @{ clientInfo = @{ name = 'herdr-harness'; version = '1' } } } | ConvertTo-Json -Compress -Depth 4))
+        $proc.StandardInput.WriteLine((@{ id = $id; method = $method; params = @{ clientInfo = @{ name = 'harns'; version = '1' } } } | ConvertTo-Json -Compress -Depth 4))
         $proc.StandardInput.Flush()
         $deadline = (Get-Date).AddSeconds(10)
         while ((Get-Date) -lt $deadline) {
@@ -179,7 +179,7 @@ if 'Codex' in wanted:
                             return None
                         pending[0] += chunk
                 return None
-            ask(1, 'initialize', {'clientInfo': {'name': 'herdr-harness', 'version': '1'}})
+            ask(1, 'initialize', {'clientInfo': {'name': 'harns', 'version': '1'}})
             proc.stdin.write((json.dumps({'method': 'initialized', 'params': {}}) + '\\n').encode())
             proc.stdin.flush()
             m = ask(2, 'account/rateLimits/read') or {}

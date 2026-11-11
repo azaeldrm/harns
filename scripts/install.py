@@ -3,7 +3,7 @@ from pathlib import Path
 
 MODS = ['harness-chrome', 'harness-files', 'harness-pane', 'harness-tabs', 'machine-agents', 'machine-metrics',
         'machine-new-menu', 'machine-stats', 'workspace-status-machine']
-LAYOUT = 'herdr-harness'
+LAYOUT = 'harns'
 CHAT = 'herdr-chat'
 CHAT_REPO = 'https://github.com/azaeldrm/herdr-chat'
 

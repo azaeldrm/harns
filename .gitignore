@@ -17,8 +17,8 @@
 !/themes/harness.json
 !/layouts/
 /layouts/*
-!/layouts/herdr-harness.json
-!/layouts/herdr-harness.png
+!/layouts/harns.json
+!/layouts/harns.png
 !/mods/
 /mods/*
 !/mods/harness-chrome/

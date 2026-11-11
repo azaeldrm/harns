@@ -1,6 +1,6 @@
 // A Markdown file as a readable document: prose through TextView, code in titled boxes,
 // ```mermaid blocks as Pele diagrams, images from the cache images.js fills, front matter as a box.
-import { div, image } from "gpui-kit";
+import { div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView } from "gpui-base";
 import { settings } from "herdr";
 import { diagramFor } from "./diagrams.js";
@@ -9,13 +9,25 @@ import { imageTarget } from "./parse.js";
 
 export const COLUMN = 820;
 
+let copiedId = null;
+
 function codeBox(id, label, source, t) {
-  // A code block in a box titled with its language, in the terminal font, lines kept as written.
+  // A code block in a box titled with its language, in the terminal font, lines kept as written, with a copy button at the top right.
   const lines = source.replace(/\n$/, "").split("\n");
-  const shown = l => l.replace(/\t/g, "    ").replace(/^ +/, s => " ".repeat(s.length)) || " ";
+  const shown = l => l.replace(/\t/g, "    ").replace(/^ +/, s => " ".repeat(s.length)) || " ";
+  const copied = copiedId === id;
+  const copy = (_e, cx) => {
+    cx.stop_propagation();
+    cx.write_to_clipboard(source.replace(/\n$/, ""));
+    copiedId = id; cx.notify();
+    cx.timer.after(1500, cx => { if (copiedId === id) { copiedId = null; cx.notify(); } });
+  };
   return v_flex().id(id).w_full().rounded(8).border_1().border_color(t.border).bg(t.surface).overflow_hidden()
-    .child(h_flex().h(28).px(12).items_center().border_b(1).border_color(t.border)
-      .child(div().text_size(11.5).text_color(t.muted).child(label)))
+    .child(h_flex().h(28).px(12).gap(6).items_center().border_b(1).border_color(t.border)
+      .child(div().flex_1().text_size(11.5).text_color(t.muted).child(label))
+      .when(copied, el => el.child(div().text_size(11.5).text_color(t.muted).child("Copied")))
+      .child(div().id(`${id}-copy`).flex_none().cursor_pointer().on_click(copy)
+        .child(svg(`mods/harness-files/${copied ? "check" : "copy"}.svg`).size(14).flex_none().text_color(t.muted))))
     .child(v_flex().px(12).py(8).font_family(settings().font_family).text_size(12.5).text_color(t.foreground)
       .children(lines.map((l, k) => div().id(`${id}-l${k}`).w_full().min_h(18).child(shown(l)))));
 }
