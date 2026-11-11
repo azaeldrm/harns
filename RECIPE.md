@@ -132,7 +132,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   - `harness-tabs`: the tab bar; uses the shipped `new-menu` and `menu`.
   - `harness-simulator`: the Simulator panel. herdr draws with DirectComposition, which covers
     child windows, so `harns-dock` (built once from `dock.cs` with Windows' own `csc.exe` into
-    `cache/harness-simulator/`) makes the emulator's window a borderless popup owned by
+    `cache/harness-simulator/`) makes each emulator's window a borderless popup owned by
     herdr's, just above it. The mod writes the screen area, as gaps from the window's
     bottom-right corner, to `cache/harness-simulator/dock-state.txt` only when it changes; the
     helper follows herdr's window through WinEvent hooks and, after a click or key press in
@@ -168,7 +168,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   or Python 3 stats probe every second, `nvidia-smi`, `uname -s`, `hostname`, `hc read`, and
   for the usage meters a short-lived `codex app-server`;
 - with the Simulator panel open on Windows: the Android SDK's `emulator` and `adb` on this
-  computer, `csc.exe` once to build `harns-dock`, and that helper while the device is docked
+  computer, `csc.exe` once to build `harns-dock`, and that helper while emulators are docked
   (it hooks herdr's window and mouse/keyboard release events only to place the device window
   and notice herdr's popups; it reads no input content);
 - for each session on another machine with a running emulator: an SSH reverse tunnel to that

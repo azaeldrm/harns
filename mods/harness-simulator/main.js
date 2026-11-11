@@ -191,7 +191,9 @@ export default class Simulator extends View {
       next[avd] = serial;
       this.starting.delete(avd);
     }
-    for (const avd of Object.keys(this.running)) if (!next[avd]) await this.unshare(avd);
+    // Emulators that stopped: their tunnels close, and a "don't share" ends with them, so the
+    // next session to use the device gets it shared.
+    for (const avd of Object.keys(this.running)) if (!next[avd]) { await this.unshare(avd); this.declined.delete(avd); }
     this.running = next;
     if (this.mode === "dock" && !this.helper && (Object.keys(next).length || this.starting.size)) await this.dock();
   }
@@ -423,7 +425,6 @@ export default class Simulator extends View {
     if (!serial) return;
     this.status = `Stopping ${this.label(avd)}…`; cx.notify();
     await this.unshare(avd);
-    this.declined.delete(avd);
     // `emu kill` can hang on after the emulator is gone: watch the device list instead.
     exec(this.adb, ["-s", serial, "emu", "kill"], { timeout: 15000 }).catch(() => {});
     for (let i = 0; i < 40 && this.running[avd]; i++) { await cx.sleep(500); await this.refresh(); cx.notify(); }
