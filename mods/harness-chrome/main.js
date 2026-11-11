@@ -47,15 +47,15 @@ export default class WorkspaceChrome extends View {
       const ready = Boolean(updates().app.ready);
       const gear = icon("settings", "settings", ready ? "Settings · update ready" : "Settings", () => run("app.settings"), ready);
       const machine = icon("machine", "server", "Add machine", () => run("mod.open", { name: "machine-add" }));
-      // On the rail, the gear where it is open (centred 26 px in) and the server after it, narrower to fit the rail.
-      if (collapsed) return h_flex().size_full().bg(t.surface).items_center().pl(15).gap(0)
-        .child(gear.w(22)).child(machine.w(18));
+      // On the rail, the gear and the server centred side by side.
+      if (collapsed) return h_flex().size_full().bg(t.surface).items_center().justify_center().gap(2)
+        .child(gear.w(22)).child(machine.w(22));
       return h_flex().size_full().bg(t.surface).items_center().gap(2).px(12).child(gear).child(machine);
     }
     // The logo on the sidebar's icon axis, 26 px in (12 + half of 28), as the agents' icons and the footer's gear.
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 12).pr(10).gap(4).items_center().text_size(13.5)
-      // On the rail, the logo where it is open (12 px in), so it doesn't move as the sidebar folds.
-      .when(collapsed, el => el.pl(12).pr(0).child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Expand sidebar").cursor_pointer()))
+      // On the rail, the logo centred.
+      .when(collapsed, el => el.pl(0).pr(0).justify_center().child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Expand sidebar").cursor_pointer()))
       .when(window()?.platform === "macos" && !collapsed, el => el.pl(76))
       .when(!collapsed, el => el.child(h_flex().flex_1().gap(8).items_center()
         // The same 28 px button and logo as the rail's.
