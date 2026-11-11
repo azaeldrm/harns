@@ -492,7 +492,8 @@ export default class Agents extends View {
     const mark = el => div().size(14).flex_none().flex().items_center().justify_center().when(Boolean(tip), d => d.tooltip(tip)).child(el);
     const ring = (asset, tint, spinning = false) => mark(svg(`mods/machine-agents/context-rings/${asset}.svg`).size(12).flex_none().text_color(tint)
       .when(spinning, el => el.spin(900)));
-    if (a.status === "working") return ring("spinner", t.working, true);
+    // The spinner's picture has a clear margin (build-mods.py), so it draws at 15 px to show the same 12 px ring.
+    if (a.status === "working") return mark(svg("mods/machine-agents/context-rings/spinner.svg").size(15).flex_none().text_color(t.working).spin(900));
     if (a.status === "done") return mark(svg("mods/machine-agents/circle-check.svg").size(13).flex_none().text_color(t.ansi2 ?? t.done));
     if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
@@ -773,7 +774,7 @@ export default class Agents extends View {
               cx.stop_propagation();
               this.retry(name, cx);
             })
-            .child(svg(`mods/harness-chrome/${busy ? "spinner" : "rotate-cw"}.svg`).size(12)));
+            .child(svg(`mods/harness-chrome/${busy ? "spinner" : "rotate-cw"}.svg`).size(busy ? 15 : 12)));
         });
     };
     const rows = collapsed

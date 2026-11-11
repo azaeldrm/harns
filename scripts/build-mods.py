@@ -15,7 +15,10 @@ target.mkdir(parents=True, exist_ok=True)
 head = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round">'
 track = '<circle cx="12" cy="12" r="9.4" stroke-opacity="0.24"/>'
 (target / 'idle.svg').write_text(head + track + '</svg>\n', encoding='utf-8')
-(target / 'spinner.svg').write_text(head + track + '<path d="M12 2.6a9.4 9.4 0 0 1 9.4 9.4"/></svg>\n', encoding='utf-8')
+# The spinner has a clear margin (a 30-unit square around the 24): herdr turns it as a picture, and a turned square's corners
+# reach past it, where they'd pick up whatever icon lies next to it.
+padded = head.replace('width="24" height="24" viewBox="0 0 24 24"', 'width="30" height="30" viewBox="-3 -3 30 30"')
+(target / 'spinner.svg').write_text(padded + track + '<path d="M12 2.6a9.4 9.4 0 0 1 9.4 9.4"/></svg>\n', encoding='utf-8')
 
 for source, target in [('main.js', 'machine-data.js'), ('probes.js', 'probes.js'),
                        ('platforms.js', 'platforms.js'), ('gpus.js', 'gpus.js'), ('usage.js', 'usage.js'),
