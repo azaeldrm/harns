@@ -58,8 +58,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   rail the mark sits on the row's second line, under the icon.
   Tabs show the same spinner, or a dot for blocked and done.
 - **Context readings:** Claude Code and Pi report through the relays (Watch out). Codex's
-  reading is its footer's "Context N% left", so it shows when `context-remaining` is one of
-  Codex's `tui.status_line` items. A machine's readings are fetched when one of its agents
+  reading is its log's newest `token_count` (last input tokens of the model's window), from the
+  log herdr-chat found for it (shared `herdr-chat.paths`); else its footer's "Context N% left",
+  when `context-remaining` is one of its `tui.status_line` items and the terminal is wide enough
+  for Codex to show it. A machine's readings are fetched when one of its agents
   finishes a turn, appears or goes away, or the machine comes online, and cleared while it's
   unavailable.
 - **Logo:** it fades in and out while any agent is working and bobs up and down otherwise.
@@ -132,8 +134,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   account probe above (an HTTPS request to Anthropic and a short-lived `codex app-server`),
   `nvidia-smi`, `uname -s` and `hostname`. Context bars read the relays' snapshots after
   turns end: this computer's directly (no process, as the relays write them), another
-  machine's with `scripts/context-relay.py`'s collect() there; and Codex's footers with
-  `hc read`.
+  machine's with `scripts/context-relay.py`'s collect() there; and Codex's logs (a small
+  Python read of each one's newest `token_count`), else their footers with `hc read`.
 - **Art:** `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources), monochrome SVG
   icons in `harness-chrome` and `machine-stats`, a generated spinner, Windows
   window icons in `harness-tabs`, program icons in `brand-assets/` and `programs.json`.

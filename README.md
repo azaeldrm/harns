@@ -26,8 +26,9 @@ changed is kept beside the new one as `harns.json.before-install-<time>`.
 Optional:
 
 - **Context bars** (on each agent's card) come from relays: Claude Code's status line and a Pi extension
-  (`scripts/install-context.py`, on Windows, Linux and macOS). Codex's comes from its footer,
-  when `context-remaining` is one of its `tui.status_line` items. The Claude Code and Codex
+  (`scripts/install-context.py`, on Windows, Linux and macOS). Codex's comes from its log
+  (the one herdr-chat found for it), else its footer, when `context-remaining` is one of its
+  `tui.status_line` items. The Claude Code and Codex
   quota bars read the account from each service and need no relay.
   The installer sets the relays up on this computer (`--no-relays` to skip);
   for each connected machine run `python scripts/install-context.py --on MACHINE`. They write:
