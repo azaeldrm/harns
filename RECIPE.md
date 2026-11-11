@@ -26,7 +26,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   76 px on macOS):
   - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
     (16 px semibold), then Search and the sidebar toggle.
-  - **Agents:** an "Agents" heading (11.5 px, dim), grouped by machine. Each group has the machine's name (this computer's own name, or
+  - **Agents:** grouped by machine, with no heading. Each group has the machine's name (this computer's own name, or
     a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
     GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (else its folder, else the tab name) and its status; under it, in

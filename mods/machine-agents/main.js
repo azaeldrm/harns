@@ -571,6 +571,7 @@ export default class Agents extends View {
         .relative()
         .px(8)
         .py(6)
+        .mb(2)
         .gap(2)
         .flex_none()
         .rounded(6)
@@ -718,9 +719,9 @@ export default class Agents extends View {
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
       : groups.flatMap((g, index) => [
-        ...(byMachine && index > 0 ? [div().h(16).flex_none()] : []),
+        ...(byMachine && index > 0 ? [div().h(20).flex_none()] : []),
         // A machine's header and rings as one raised band, so each machine's agents read as a group.
-        ...(byMachine && g.machine ? [this.machineCard(t, g.machine, v_flex().w_full().mb(4).pb(3).rounded(8).bg(t.raised).border_1().border_color(t.border)
+        ...(byMachine && g.machine ? [this.machineCard(t, g.machine, v_flex().w_full().mb(8).pb(3).rounded(8).bg(t.raised).border_1().border_color(t.border)
           .child(header(g)).child(statsFor(g.machine.name ?? null, t)))] : [header(g)]),
         ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids) : byMachine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
       ]);
@@ -730,30 +731,8 @@ export default class Agents extends View {
       .min_h(0)
       .bg(t.surface)
       .text_size(13)
-      .when(collapsed, el => el.child(
-        h_flex()
-          .w_full()
-          .h(41)
-          .pt(14)
-          .pb(5)
-          .flex_none()
-          .items_center()
-          .justify_center()
-          .child(svg("mods/harness-chrome/server.svg").size(14).text_color(t.dim).tooltip("Agents")),
-      ))
-      .when(!collapsed, (el) =>
-        el.child(
-          h_flex()
-            .px(16)
-            .h(41)
-            .pt(14)
-            .pb(5)
-            .flex_none()
-            .items_center()
-            .justify_between()
-            .child(div().text_size(11.5).font_medium().text_color(t.dim).child("Agents")),
-        ),
-      )
+      // No heading: the machines' bands start the list.
+      .child(div().h(collapsed ? 8 : 10).flex_none())
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
