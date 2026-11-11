@@ -22,7 +22,7 @@ entries into yours.
 
 Left to right: a sidebar, then the work column. There's no system title bar.
 
-- **Sidebar** (268 px, `surface` `#0e1012`; drag 44–480 px, or fold to a 56 px rail,
+- **Sidebar** (268 px, `surface` `#0e1012`; drag 44–480 px, or fold to a 52 px rail, twice its 26 px icon axis so what the rail centres lines up with the open sidebar's icons;
   76 px on macOS):
   - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
     (16 px semibold), then Search and the sidebar toggle.
@@ -53,7 +53,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 - **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
   blocked is a "Needs you" badge (a "!" in the rail); done is a green check (the theme's
-  `ansi2`); idle shows nothing, its context being the card's bar (the percentage on hover).
+  `ansi2`); idle shows nothing open (the card's bar shows its context) and, on the rail, a 14 × 3 px
+  context bar, the card's in small (amber above 75%, red `#d88179` above 90%, the percentage on hover). On the
+  rail the mark sits on the row's second line, under the icon.
   Tabs show the same spinner, or a dot for blocked and done.
 - **Context readings:** Claude Code and Pi report through the relays (Watch out). Codex's
   reading is its footer's "Context N% left", so it shows when `context-remaining` is one of
@@ -70,7 +72,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   each machine top to bottom.
   A machine's whole band (name and rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
   installed there.
-- **Details cards** (an agent's, a machine's) hang from the row's top-right corner, beside the
+- **Details cards** (an agent's, a machine's) hang from the row's top-right corner, right against the
   sidebar: the first opens after 450 ms, and while one is up (or was, under 400 ms ago) moving to
   another row opens its card at once. A card closes 150 ms after the pointer leaves the row and the card.
 - **Agent card:** resting on an agent's card opens a 340 px card beside the

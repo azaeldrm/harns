@@ -8,7 +8,7 @@ import { machineDetails } from "./details.js";
 import { look, changedHosts, machinesChanged } from "./turns.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
-const statsFor = (machine, t, compact = false) => machineMetrics(machine, compact, t);
+const statsFor = (machine, t) => machineMetrics(machine, false, t);
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -176,21 +176,22 @@ export default class Agents extends View {
     });
   }
 
-  hang(key, card) {
-    // The card, hung beside the row from its top-right corner (the row must be relative), while it's the one up.
+  hang(key, card, edge = 8) {
+    // The card, hung from the row's top-right corner (the row must be relative), while it's the one up: `edge` px further,
+    // the row's distance from the sidebar's edge, so the card sits right against the sidebar.
     return Popup.new(`details-${key}`, div()).absolute().top(-1).right(-1).size(1)
-      .when(this.detailsKey === key && !this.drag?.moved, pop => pop.content(div().id(`details-hover-${key}`).pl(16)
+      .when(this.detailsKey === key && !this.drag?.moved, pop => pop.content(div().id(`details-hover-${key}`).pl(edge)
         .on_hover((on, cx) => { if (on) this.overCard = key; else { if (this.overCard === key) this.overCard = null; this.detailsLeave(key, cx); } })
         .child(card)));
   }
 
-  machineCard(t, machine, trigger) {
+  machineCard(t, machine, trigger, edge = 8) {
     // A machine's band (header and rings); resting on it shows its details beside the sidebar, level with it.
     const key = `m:${machine.name ?? "@local"}`;
     return div().id(`mtrig-${key}`).relative().w_full()
       .on_hover((on, cx) => { if (on) { this.wantDetails(machine.name, cx); this.detailsEnter(key, cx); } else this.detailsLeave(key, cx); })
       .child(trigger)
-      .child(this.hang(key, this.detailsCard(t, machine)));
+      .child(this.hang(key, this.detailsCard(t, machine), edge));
   }
 
   detailsCard(t, machine) {
@@ -315,6 +316,17 @@ export default class Agents extends View {
     if (moved) cx.timer.after(32, cx => { this.slides = {}; cx.notify(); });
   }
 
+  railCpu(t, machine) {
+    // The rail band's CPU reading: its ring alone, centred under the machine's icon, in the open rings row's 22 px.
+    const sample = (shared("machine.stats") ?? {})[machine ?? "@local"];
+    const value = sample && !sample.error && Date.now() - sample.at <= 15000 && Number.isFinite(sample.cpu) ? sample.cpu : null;
+    const name = machine ?? localMachineLabel();
+    return h_flex().h(22).flex_none().items_center().justify_center()
+      .child(div().id(`rail-cpu-${machine ?? "local"}`).tooltip(`${name} · CPU: ${value == null ? "unavailable" : `${Math.round(value)}%`}`)
+        .child(svg(`mods/machine-stats/rings/ring-${value == null ? 0 : Math.max(0, Math.min(100, Math.round(value)))}.svg`).size(12).flex_none()
+          .text_color(value == null ? t.dim : t.accent)));
+  }
+
   toTop(address) {
     this.order = [address, ...this.order.filter(x => x !== address)];
     localStorage.setItem("order", JSON.stringify(this.order));
@@ -419,7 +431,7 @@ export default class Agents extends View {
       .border_b(1)
       .border_color(t.border)
       .text_size(12)
-      .child(svg("mods/harness-chrome/server.svg").size(13).flex_none().text_color(t.dim))
+      .child(svg("mods/harness-chrome/hard-drive.svg").size(13).flex_none().text_color(t.dim))
       .child(div().flex_none().text_color(t.foreground).font_medium().child(`Log in to ${name}`))
       .child(div().flex_1().min_w(0).truncate().text_color(t.dim).child("Type the password or code below; this closes when it connects."))
       .child(div()
@@ -490,14 +502,16 @@ export default class Agents extends View {
     const state = { working: "Working", done: "Finished · not yet viewed", blocked: "Needs you" }[a.status];
     const tip = a.address ? `Context: ${known ? `${Math.round(percent)}% used` : "unavailable"}${state ? ` · ${state}` : ""}` : state;
     const mark = el => div().size(14).flex_none().flex().items_center().justify_center().when(Boolean(tip), d => d.tooltip(tip)).child(el);
-    const ring = (asset, tint, spinning = false) => mark(svg(`mods/machine-agents/context-rings/${asset}.svg`).size(12).flex_none().text_color(tint)
-      .when(spinning, el => el.spin(900)));
-    if (a.status === "working") return ring("spinner", t.working, true);
+    // The spinner's picture has a clear margin (build-mods.py), so it draws at 15 px to show the same 12 px ring.
+    if (a.status === "working") return mark(svg("mods/machine-agents/context-rings/spinner.svg").size(15).flex_none().text_color(t.working).spin(900));
     if (a.status === "done") return mark(svg("mods/machine-agents/circle-check.svg").size(13).flex_none().text_color(t.ansi2 ?? t.done));
     if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
       .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
-    // Idle shows nothing: the card's second line has the context bar.
+    // Idle: on the rail (compact) a 14 px context bar, the open card's in small (gray, amber past 75%, red past 90%);
+    // open, no mark (the card's bar shows the context).
+    if (compact) return div().w(14).h(3).flex_none().rounded_full().bg(t.border).when(Boolean(tip), d => d.tooltip(tip))
+      .when(known, el => el.child(div().h_full().rounded_full().w(Math.max(2, Math.round(14 * percent / 100))).bg(percent > 90 ? "#d88179" : percent > 75 ? t.working : t.muted)));
     return div().size(14).flex_none();
   }
 
@@ -563,19 +577,31 @@ export default class Agents extends View {
     const row = (a, i, subs = []) => {
       const pic = icon(a.program, 16, a.focused ? t.accent : t.muted);
       if (collapsed) {
-        return h_flex()
+        // The open card's box (border, padding, two lines of the same text sizes, kept by invisible text), so rows keep their
+        // height as the sidebar folds; on the rail everything is centred: the icon, and its status under it.
+        return v_flex()
           .id(`ag-${a.address}`)
-          .w_full()
-          .h(26)
-          .px(0)
+          .relative()
+          .py(6)
+          .gap(2)
           .flex_none()
-          .items_center()
-          .justify_center()
-          .gap(6)
+          .rounded(6)
+          // 8 px in from each edge, as the open cards (so the selected one's shade matches), and the focus stripe's 2 px
+          // matched on the right, so the centre stays the rail's (the open icon axis).
+          .mx(8).border_l(2).pr(2).border_color(a.focused ? t.accent : t.surface)
+          .when(a.focused, (el) => el.bg(t.selected))
+          .cursor_pointer()
           .hover((s) => s.bg(t.hover))
           .on_click(() => run("pane.focus", { pane: a.pane }))
-          .when(Boolean(pic), el => el.child(pic))
-          .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true)));
+          // Resting on it shows the agent's details card beside the rail, as open.
+          .on_hover((on, cx) => { if (on) this.detailsEnter(a.address, cx); else this.detailsLeave(a.address, cx); })
+          .child(this.hang(a.address, this.agentDetails(t, a, all, label(a) || a.space_name || "")))
+          .child(h_flex().items_center().justify_center()
+            .child(h_flex().w(16).flex_none().justify_center().when(Boolean(pic), el => el.child(pic)))
+            .child(div().w(0).overflow_hidden().child(" ")))
+          // The second line (its height from invisible text) holds the status mark, under the icon.
+          .child(div().relative().w_full().text_size(11.5).child(div().w(0).overflow_hidden().child(" "))
+            .child(h_flex().absolute().top(0).bottom(0).left(0).right(0).items_center().justify_center().child(this.status(t, a, true))));
       }
       const idle = a.status === "idle" && !a.focused;
       const isPinned = this.pins.includes(a.address);
@@ -670,12 +696,13 @@ export default class Agents extends View {
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .when(this.hovered === a.address, el => el.child(pin))
           .child(this.status(t, a)))
-        .when(where.length > 0 || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
+        // Always two lines (the rail's rows match their height).
+        .child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
           .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
             .children(where.map(([text, glyph]) => h_flex().min_w(0).gap(4).items_center()
               .child(svg(`mods/harness-chrome/${glyph}.svg`).size(11).flex_none().text_color(t.dim))
               .child(div().min_w(0).truncate().child(text)))))
-          .when(Boolean(bar), el => el.child(bar)))));
+          .when(Boolean(bar), el => el.child(bar))));
     };
 
     const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
@@ -714,8 +741,9 @@ export default class Agents extends View {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         }))
-        .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6)
-          .child(svg(`mods/harness-chrome/${g.machine?.name ? "server" : "monitor"}.svg`).size(13).flex_none().text_color(t.muted)))
+        // A machine's icon on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band border 1 + 10 + half of 14.
+        .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6).pl(10)
+          .child(svg(`mods/harness-chrome/${g.machine?.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
         .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
         .when(isMachine || !open, (el) => el.child(div().font_medium().text_size(11).text_color(t.dim).child(String(g.members.length))))
         .child(div().flex_1())
@@ -761,13 +789,20 @@ export default class Agents extends View {
               cx.stop_propagation();
               this.retry(name, cx);
             })
-            .child(svg(`mods/harness-chrome/${busy ? "spinner" : "rotate-cw"}.svg`).size(12)));
+            .child(svg(`mods/harness-chrome/${busy ? "spinner" : "rotate-cw"}.svg`).size(busy ? 15 : 12)));
         });
     };
     const rows = collapsed
-      ? machines().filter(machine => !machine.temporary).flatMap((machine) => [
-          div().h(18).flex_none(),
-          statsFor(machine.name ?? null, t, true),
+      ? machines().filter(machine => !machine.temporary).flatMap((machine, index) => [
+          // As open: the first machine right at the top, then 20 px between machines.
+          ...(index > 0 ? [div().h(20).flex_none()] : []),
+          // The open band's box, row for row: its header (30 px) and its rings row (22 px, the CPU alone), 8 px in from each edge
+          // and 8 px above the agents, so rows keep their height as the sidebar folds; the icon and the ring are centred.
+          // Resting on it shows the machine's details card, as open.
+          this.machineCard(t, machine, v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
+            .child(h_flex().h(30).pt(6).flex_none().items_center().justify_center()
+              .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
+            .child(this.railCpu(t, machine.name ?? null)), 0),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
@@ -788,7 +823,7 @@ export default class Agents extends View {
       .bg(t.surface)
       .text_size(13)
       // No heading: the machines' bands start the list.
-      .child(div().h(collapsed ? 8 : 10).flex_none())
+      .child(div().h(10).flex_none())
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )

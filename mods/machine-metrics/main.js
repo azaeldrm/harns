@@ -33,7 +33,8 @@ export function machineMetrics(machine, compact, t = theme()) {
   });
   return compact
     ? v_flex().w_full().flex_none().children(items)
-    : h_flex().h(22).px(8).flex_none().gap(10).items_center().children(items);
+    // The first icon on the sidebar's icon axis, under the machine's: band border 1 + 12 + half of 10 = 26 px in (with the list's 8).
+    : h_flex().h(22).pl(12).pr(8).flex_none().gap(10).items_center().children(items);
 }
 
 export default class MachineMetrics extends View {
