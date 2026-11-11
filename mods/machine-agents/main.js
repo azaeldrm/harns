@@ -766,8 +766,9 @@ export default class Agents extends View {
         });
     };
     const rows = collapsed
-      ? machines().filter(machine => !machine.temporary).flatMap((machine) => [
-          div().h(18).flex_none(),
+      ? machines().filter(machine => !machine.temporary).flatMap((machine, index) => [
+          // As open: the first machine right at the top, then 20 px between machines.
+          ...(index > 0 ? [div().h(20).flex_none()] : []),
           // The machine's rings in a raised band, as the open sidebar's, so its agents below read as its group.
           // 8 px in from each edge, as the open sidebar's bands (its list's padding); 56 - 16 still holds the rows' 36 px.
           v_flex().mx(8).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border)
@@ -796,7 +797,7 @@ export default class Agents extends View {
       .bg(t.surface)
       .text_size(13)
       // No heading: the machines' bands start the list.
-      .child(div().h(collapsed ? 8 : 10).flex_none())
+      .child(div().h(10).flex_none())
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
