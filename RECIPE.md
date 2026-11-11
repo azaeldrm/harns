@@ -73,7 +73,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Machine card:** resting on a machine's name or rings for 450 ms opens a 320 px card
   beside them: its OS and uptime, CPU model, cores, threads, load and temperature, memory
   used of total, each GPU's load, VRAM, temperature and power (NVIDIA, through
-  `nvidia-smi`), each disk, load averages and the motherboard. It's read on the machine
+  `nvidia-smi`; a GPU with no live readings is left out), each disk, load averages and the motherboard. It's read on the machine
   when the card opens and every 3 s while it's in use (Python 3 on Linux and macOS,
   PowerShell on Windows, where the CPU temperature needs administrator rights, so the card
   leaves it out).

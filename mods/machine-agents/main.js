@@ -211,7 +211,8 @@ export default class Agents extends View {
         meter(fresh ? s.cpu : null, pct(fresh ? s.cpu : null)),
         note([d.cpu.cores && `${d.cpu.cores} cores`, d.cpu.threads && `${d.cpu.threads} threads`, d.load && `load ${d.load.map(x => x?.toFixed(2)).join(" ")}`].filter(Boolean).join(" \u00b7 "))))
       .child(section("ram", "Memory", `${gb(used)} / ${gb(d.memory.total)} GB`, meter(memPct, pct(memPct))))
-      .children(d.gpus.map(g => section("gpu", g.name, g.temp != null ? `${Math.round(g.temp)}\u00b0C` : "",
+      // Only GPUs with something live to show (an integrated GPU nvidia-smi doesn't read is left out).
+      .children(d.gpus.filter(g => g.load != null || g.temp != null || g.memTotal).map(g => section("gpu", g.name, g.temp != null ? `${Math.round(g.temp)}\u00b0C` : "",
         g.load != null ? meter(g.load, pct(g.load)) : null,
         note([g.memTotal && `VRAM ${gb(g.memUsed)} / ${gb(g.memTotal)} GB`, g.power != null && `${Math.round(g.power)} W`].filter(Boolean).join(" \u00b7 ") || "No live readings", g.temp > 70 ? hot(g.temp) : t.dim))))
       .children(d.disks.map(k => section("usage", `Disk ${k.mount}`, `${gb(k.total - k.free)} / ${gb(k.total)} GB`, meter(100 * (k.total - k.free) / k.total, pct(100 * (k.total - k.free) / k.total)))))
