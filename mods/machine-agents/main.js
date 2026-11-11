@@ -785,7 +785,11 @@ export default class Agents extends View {
         .child(div().flex_1())
         .when(!open, (el) => el
           .when(!byPriority && top && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
-          .child(svg("mods/harness-chrome/chevron-right.svg").size(11).flex_none().text_color(t.dim)))
+          .when(!byMachine, el => el.child(svg("mods/harness-chrome/chevron-right.svg").size(11).flex_none().text_color(t.dim))))
+        // A machine always shows its fold arrow, left of the +: down while its agents show, right when folded.
+        .when(byMachine, el => el.child(div().size(14).flex_none().flex().items_center().justify_center()
+          .tooltip(open ? "Fold this machine's agents" : "Show this machine's agents")
+          .child(svg(`mods/harness-chrome/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim))))
         .when(byMachine && g.machine?.layout === "ready", el => el.child(div()
           .id(`add-${g.id}`)
           .size(14)
