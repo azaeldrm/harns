@@ -162,6 +162,7 @@ export default class Agents extends View {
   detailsEnter(key, cx) {
     const OPEN_AFTER = 450, LIVE = 400;
     this.hot = key;
+    if (this.muted === key) return;
     this.detailsTimer?.cancel();
     if (this.detailsKey || Date.now() - (this.detailsClosed ?? 0) < LIVE) { this.detailsKey = key; cx.notify(); return; }
     this.detailsTimer = cx.timer.after(OPEN_AFTER, cx => { if (this.hot === key && !this.drag?.moved) { this.detailsKey = key; cx.notify(); } });
@@ -189,7 +190,10 @@ export default class Agents extends View {
     // A machine's band (header and rings); resting on it shows its details beside the sidebar, level with it.
     const key = `m:${machine.name ?? "@local"}`;
     return div().id(`mtrig-${key}`).relative().w_full()
-      .on_hover((on, cx) => { if (on) { this.wantDetails(machine.name, cx); this.detailsEnter(key, cx); } else this.detailsLeave(key, cx); })
+      .on_hover((on, cx) => {
+        if (on) { this.wantDetails(machine.name, cx); this.detailsEnter(key, cx); }
+        else { if (this.muted === key) this.muted = null; this.detailsLeave(key, cx); }
+      })
       .child(trigger)
       .child(this.hang(key, this.detailsCard(t, machine), edge));
   }
@@ -767,6 +771,11 @@ export default class Agents extends View {
           .tooltip(`Add an agent on ${g.label}`)
           .on_click((_e, cx) => {
             cx.stop_propagation();
+            // The menu opens where the machine's card hangs: close the card, and keep it closed until the pointer leaves the box.
+            this.muted = `m:${g.machine.name ?? "@local"}`;
+            this.detailsTimer?.cancel();
+            if (this.detailsKey === this.muted) { this.detailsKey = null; this.detailsClosed = 0; }
+            cx.notify();
             openOverlay({ mod: "machine-new-menu", kind: "popup", width: 280, height: 500, props: { machine: g.machine.name } });
           })
           .child(svg("mods/harness-chrome/plus.svg").size(12))))
