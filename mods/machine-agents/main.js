@@ -490,8 +490,6 @@ export default class Agents extends View {
     const state = { working: "Working", done: "Finished · not yet viewed", blocked: "Needs you" }[a.status];
     const tip = a.address ? `Context: ${known ? `${Math.round(percent)}% used` : "unavailable"}${state ? ` · ${state}` : ""}` : state;
     const mark = el => div().size(14).flex_none().flex().items_center().justify_center().when(Boolean(tip), d => d.tooltip(tip)).child(el);
-    const ring = (asset, tint, spinning = false) => mark(svg(`mods/machine-agents/context-rings/${asset}.svg`).size(12).flex_none().text_color(tint)
-      .when(spinning, el => el.spin(900)));
     // The spinner's picture has a clear margin (build-mods.py), so it draws at 15 px to show the same 12 px ring.
     if (a.status === "working") return mark(svg("mods/machine-agents/context-rings/spinner.svg").size(15).flex_none().text_color(t.working).spin(900));
     if (a.status === "done") return mark(svg("mods/machine-agents/circle-check.svg").size(13).flex_none().text_color(t.ansi2 ?? t.done));
@@ -499,10 +497,10 @@ export default class Agents extends View {
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
       .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
     // Idle: on the rail (compact) a 14 px context bar, the open card's in small (gray, amber past 75%, red past 90%);
-    // open, an empty ring, the spinner's circle at rest (the card's bar shows the context).
+    // open, no mark (the card's bar shows the context).
     if (compact) return div().w(14).h(3).flex_none().rounded_full().bg(t.border).when(Boolean(tip), d => d.tooltip(tip))
       .when(known, el => el.child(div().h_full().rounded_full().w(Math.max(2, Math.round(14 * percent / 100))).bg(percent > 90 ? "#d88179" : percent > 75 ? t.working : t.muted)));
-    return ring("idle", t.idle ?? t.dim);
+    return div().size(14).flex_none();
   }
 
   render(cx) {

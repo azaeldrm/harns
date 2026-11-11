@@ -53,7 +53,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 - **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
   blocked is a "Needs you" badge (a "!" in the rail); done is a green check (the theme's
-  `ansi2`); idle is an empty ring open (the card's bar shows its context) and, on the rail, a 14 × 3 px
+  `ansi2`); idle shows nothing open (the card's bar shows its context) and, on the rail, a 14 × 3 px
   context bar, the card's in small (amber above 75%, red `#d88179` above 90%, the percentage on hover). On the
   rail the mark sits on the row's second line, under the icon.
   Tabs show the same spinner, or a dot for blocked and done.
@@ -135,7 +135,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   machine's with `scripts/context-relay.py`'s collect() there; and Codex's footers with
   `hc read`.
 - **Art:** `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources), monochrome SVG
-  icons in `harness-chrome` and `machine-stats`, a generated spinner and idle ring, Windows
+  icons in `harness-chrome` and `machine-stats`, a generated spinner, Windows
   window icons in `harness-tabs`, program icons in `brand-assets/` and `programs.json`.
 
 ## Watch out
