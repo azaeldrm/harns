@@ -8,7 +8,7 @@ import { machineDetails } from "./details.js";
 import { look, changedHosts, machinesChanged } from "./turns.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
-const statsFor = (machine, t, compact = false) => machineMetrics(machine, compact, t);
+const statsFor = (machine, t) => machineMetrics(machine, false, t);
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -580,6 +580,7 @@ export default class Agents extends View {
         // height as the sidebar folds; on the rail everything is centred: the icon, and its status under it.
         return v_flex()
           .id(`ag-${a.address}`)
+          .relative()
           .py(6)
           .gap(2)
           .flex_none()
@@ -591,6 +592,9 @@ export default class Agents extends View {
           .cursor_pointer()
           .hover((s) => s.bg(t.hover))
           .on_click(() => run("pane.focus", { pane: a.pane }))
+          // Resting on it shows the agent's details card beside the rail, as open.
+          .on_hover((on, cx) => { if (on) this.detailsEnter(a.address, cx); else this.detailsLeave(a.address, cx); })
+          .child(this.hang(a.address, this.agentDetails(t, a, all, label(a) || a.space_name || "")))
           .child(h_flex().items_center().justify_center()
             .child(h_flex().w(16).flex_none().justify_center().when(Boolean(pic), el => el.child(pic)))
             .child(div().w(0).overflow_hidden().child(" ")))
@@ -791,13 +795,13 @@ export default class Agents extends View {
       ? machines().filter(machine => !machine.temporary).flatMap((machine, index) => [
           // As open: the first machine right at the top, then 20 px between machines.
           ...(index > 0 ? [div().h(20).flex_none()] : []),
-          // The machine's rings in a raised band, as the open sidebar's, so its agents below read as its group.
           // The open band's box, row for row: its header (30 px) and its rings row (22 px, the CPU alone), 8 px in from each edge
           // and 8 px above the agents, so rows keep their height as the sidebar folds; the icon and the ring are centred.
-          v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
-            .child(h_flex().h(30).pt(6).flex_none().items_center().justify_center().tooltip(machine.name || localMachineLabel())
+          // Resting on it shows the machine's details card, as open.
+          this.machineCard(t, machine, v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
+            .child(h_flex().h(30).pt(6).flex_none().items_center().justify_center()
               .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
-            .child(this.railCpu(t, machine.name ?? null)),
+            .child(this.railCpu(t, machine.name ?? null))),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
