@@ -17,12 +17,16 @@ function find(node, id) {
 
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
 
+// The rail is twice the sidebar's icon axis (26 px in), so what it centres lines up with the open sidebar's icons; macOS
+// needs it wider for the traffic lights.
+const RAIL = 52;
+
 function toggleSidebar() {
   // To the rail (on macOS wide enough for the traffic lights), or back to the width it had.
   const width = find(layout(), "sidebar")?.size?.px;
   if (!narrow()) setShared("sidebar.width", width);
   setShared("sidebar.collapsed", !narrow());
-  run("layout.resize", { id: "sidebar", px: narrow() ? (shared("sidebar.width") ?? 268) : window()?.platform === "macos" ? 76 : 56 });
+  run("layout.resize", { id: "sidebar", px: narrow() ? (shared("sidebar.width") ?? 268) : window()?.platform === "macos" ? 76 : RAIL });
 }
 
 export default class WorkspaceChrome extends View {

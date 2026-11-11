@@ -22,7 +22,7 @@ entries into yours.
 
 Left to right: a sidebar, then the work column. There's no system title bar.
 
-- **Sidebar** (268 px, `surface` `#0e1012`; drag 44–480 px, or fold to a 56 px rail,
+- **Sidebar** (268 px, `surface` `#0e1012`; drag 44–480 px, or fold to a 52 px rail, twice its 26 px icon axis so what the rail centres lines up with the open sidebar's icons;
   76 px on macOS):
   - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
     (16 px semibold), then Search and the sidebar toggle.

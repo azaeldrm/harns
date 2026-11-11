@@ -585,7 +585,8 @@ export default class Agents extends View {
           .gap(2)
           .flex_none()
           .rounded(6)
-          .border_l(2).border_color(a.focused ? t.accent : t.surface)
+          // The focus stripe's 2 px on the left matched on the right, so the centre is the rail's (the open icon axis).
+          .border_l(2).pr(2).border_color(a.focused ? t.accent : t.surface)
           .when(a.focused, (el) => el.bg(t.selected))
           .cursor_pointer()
           .hover((s) => s.bg(t.hover))
