@@ -563,19 +563,25 @@ export default class Agents extends View {
     const row = (a, i, subs = []) => {
       const pic = icon(a.program, 16, a.focused ? t.accent : t.muted);
       if (collapsed) {
-        return h_flex()
+        // The open card's box (border, padding, two lines of the same text sizes, kept by invisible text), so every icon
+        // sits where it does open: 26 px in (2 + 16 + half of 16), the status after it.
+        return v_flex()
           .id(`ag-${a.address}`)
           .w_full()
-          .h(26)
-          .px(0)
+          .py(6)
+          .gap(2)
           .flex_none()
-          .items_center()
-          .justify_center()
-          .gap(6)
+          .rounded(6)
+          .border_l(2).border_color(a.focused ? t.accent : t.surface)
+          .when(a.focused, (el) => el.bg(t.selected))
+          .cursor_pointer()
           .hover((s) => s.bg(t.hover))
           .on_click(() => run("pane.focus", { pane: a.pane }))
-          .when(Boolean(pic), el => el.child(pic))
-          .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true)));
+          .child(h_flex().pl(16).gap(4).items_center()
+            .child(h_flex().w(16).flex_none().justify_center().when(Boolean(pic), el => el.child(pic)))
+            .child(div().w(0).overflow_hidden().child(" "))
+            .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true))))
+          .child(div().w(0).overflow_hidden().text_size(11.5).child(" "));
       }
       const idle = a.status === "idle" && !a.focused;
       const isPinned = this.pins.includes(a.address);
@@ -670,12 +676,13 @@ export default class Agents extends View {
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .when(this.hovered === a.address, el => el.child(pin))
           .child(this.status(t, a)))
-        .when(where.length > 0 || Boolean(bar), el => el.child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
+        // Always two lines (the rail's rows match their height).
+        .child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
           .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
             .children(where.map(([text, glyph]) => h_flex().min_w(0).gap(4).items_center()
               .child(svg(`mods/harness-chrome/${glyph}.svg`).size(11).flex_none().text_color(t.dim))
               .child(div().min_w(0).truncate().child(text)))))
-          .when(Boolean(bar), el => el.child(bar)))));
+          .when(Boolean(bar), el => el.child(bar))));
     };
 
     const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
@@ -770,12 +777,12 @@ export default class Agents extends View {
           // As open: the first machine right at the top, then 20 px between machines.
           ...(index > 0 ? [div().h(20).flex_none()] : []),
           // The machine's rings in a raised band, as the open sidebar's, so its agents below read as its group.
-          // 8 px in from each edge, as the open sidebar's bands (its list's padding); 56 - 16 still holds the rows' 36 px.
-          v_flex().mx(8).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border)
-            // On top, the machine's own icon (as beside its name when open), centred in the band.
-            .child(h_flex().w_full().h(26).flex_none().items_center().justify_center().tooltip(machine.name || localMachineLabel())
+          // The open band's box, row for row: its header (30 px, the icon 26 px in) and the start of its rings row (CPU alone),
+          // 8 px in from each edge and 8 px above the agents, so nothing moves when the sidebar folds.
+          v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
+            .child(h_flex().h(30).pt(6).pl(10).flex_none().items_center().tooltip(machine.name || localMachineLabel())
               .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
-            .child(statsFor(machine.name ?? null, t, true)),
+            .child(machineMetrics(machine.name ?? null, false, t, ["cpu"])),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
