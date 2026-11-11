@@ -18,7 +18,7 @@
 // key press in herdr, the helper asks `herdr-app status` whether an overlay is open, and steps
 // aside until it closes. Nothing runs while herdr is idle.
 //
-//   harns-dock run <device window title prefix> <state file> [herdr-app path]
+//   harns-dock run <device window title prefix> <state file>
 // Exits on its own when the emulator's window or herdr's goes away.
 using System;
 using System.Collections.Generic;
@@ -37,7 +37,6 @@ static class Dock {
   [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr h; public uint msg; public IntPtr w, l; public uint time; public POINT pt; }
 
   [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
-  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumProc f, IntPtr l);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
@@ -79,7 +78,7 @@ static class Dock {
   static double[] rect;          // right bottom w h, logical px from herdr's client bottom-right
   static bool visible, shown, overlay;
   static uint mainThread;
-  static string herdrApp = "herdr-app";
+  static string herdrApp = "herdr-app";   // herdr's own executable, once its window is found
   static int checking;           // an overlay check running (0/1)
   static WinEventProc keepEvents; static HookProc keepMouse, keepKeys;   // delegates kept alive
 
@@ -102,15 +101,14 @@ static class Dock {
       long a = (long)(r.r - r.l) * (r.b - r.t);
       if (a > area) { area = a; best = h; }
     }
+    // `herdr-app status` through the running app's own path: it needn't be on PATH.
+    if (best != IntPtr.Zero) try { herdrApp = Process.GetProcessById((int)Pid(best)).MainModule.FileName; } catch { }
     return best;
   }
 
   static IntPtr FindDevice(string prefix) {
     foreach (var h in TopLevel()) if (Title(h).StartsWith(prefix)) return h;
-    // Or still inside herdr's window, if an older build docked it as a child.
-    IntPtr found = IntPtr.Zero;
-    if (host != IntPtr.Zero) EnumChildWindows(host, (h, l) => { if (Title(h).StartsWith(prefix)) { found = h; return false; } return true; }, IntPtr.Zero);
-    return found;
+    return IntPtr.Zero;
   }
 
   static void Apply() {
@@ -192,10 +190,9 @@ static class Dock {
   }
 
   static int Main(string[] a) {
-    if (a.Length < 3 || a[0] != "run") { Console.Error.WriteLine("usage: harns-dock run <device window title prefix> <state file> [herdr-app path]"); return 1; }
+    if (a.Length < 3 || a[0] != "run") { Console.Error.WriteLine("usage: harns-dock run <device window title prefix> <state file>"); return 1; }
     SetProcessDpiAwarenessContext(new IntPtr(-4)); // per-monitor v2: positions in real pixels
     string prefix = a[1], state = Path.GetFullPath(a[2]);
-    if (a.Length > 3 && a[3].Length > 0) herdrApp = a[3];
     mainThread = GetCurrentThreadId();
 
     host = FindHost();

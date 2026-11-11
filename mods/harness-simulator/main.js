@@ -50,6 +50,7 @@ function insets(node, id) {
 
 const hash = text => { let h = 5381; for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 const quote = s => `'${String(s).replace(/'/g, "''")}'`;   // a PowerShell literal
+const zoom = () => Number(settings()?.zoom) || 1;   // herdr scales the mod's px by this
 const ps = script => exec("powershell", ["-NoProfile", "-NonInteractive", "-Command", script]);
 
 export default class Simulator extends View {
@@ -63,8 +64,7 @@ export default class Simulator extends View {
     try { this.mode = localStorage.getItem("mode") === "window" ? "window" : "dock"; } catch {}
     this.helper = false;         // a harns-dock is running for this device
     this.written = null;         // the state file's last contents
-    this.windows = window()?.platform === "windows";
-    if (!this.windows) { this.status = "The Simulator panel runs on Windows for now."; return; }
+    if (window()?.platform !== "windows") { this.status = "The Simulator panel runs on Windows for now."; return; }
     cx.spawn(async cx => {
       await this.setup();
       cx.notify();
@@ -189,14 +189,14 @@ export default class Simulator extends View {
     // the window's right and bottom edges plus a size, in real logical px.
     const d = this.device, a = this.area;
     if (!d?.width || !a?.width || !a?.height) return null;
-    const zoom = Number(settings()?.zoom) || 1;
+    const z = zoom();
     const edge = insets(layout(), BLOCK);
     if (!edge) return null;
     const scale = Math.min(a.width / d.width, a.height / d.height);
     const w = Math.floor(d.width * scale), h = Math.floor(d.height * scale);
     return {
-      right: edge.right * zoom + PAD * zoom + (a.width - w) / 2,
-      bottom: edge.bottom * zoom + PAD * zoom + (a.height - h) / 2,
+      right: (edge.right + PAD) * z + (a.width - w) / 2,
+      bottom: (edge.bottom + PAD) * z + (a.height - h) / 2,
       w, h,
     };
   }
@@ -231,7 +231,6 @@ export default class Simulator extends View {
     cx.notify();
   }
 
-
   async stop(cx) {
     if (!this.device) return;
     this.busy = "stopping"; this.status = `Stopping ${this.device.avd}…`; cx.notify();
@@ -252,11 +251,11 @@ export default class Simulator extends View {
   render() {
     const t = theme();
     const d = this.device;
-    const stop = (_e, cx) => cx.stop_propagation();
+    const swallow = (_e, cx) => cx.stop_propagation();
     const button = (id, icon, label, action, opts = {}) => h_flex().id(id).h(26).px(8).gap(5).flex_none().items_center().rounded(6)
       .text_size(12).text_color(opts.primary ? t.accent_foreground : t.muted).bg(opts.primary ? t.accent : t.chrome)
       .when(!opts.disabled, el => el.cursor_pointer().hover(s => s.bg(opts.primary ? t.accent : t.hover).text_color(opts.primary ? t.accent_foreground : t.foreground))
-        .on_mouse_down("left", stop)
+        .on_mouse_down("left", swallow)
         // The actions await programs: they run as a task, with a context of their own (an
         // event's cx isn't usable after an await).
         .on_click((_e, cx) => { cx.spawn(async acx => { await action(acx); acx.notify(); }); }))
@@ -284,7 +283,7 @@ export default class Simulator extends View {
       const g = this.geometry();
       body = div().id("sim-area").size_full().flex().items_center().justify_center().on_size_change(sizeArea)
         .when(!this.helper && Boolean(this.status), el => el.child(div().max_w(260).text_size(12.5).text_color(t.muted).text_center().child(this.status)))
-        .when(this.helper && Boolean(g), el => el.child(div().w(g.w / (Number(settings()?.zoom) || 1)).h(g.h / (Number(settings()?.zoom) || 1)).rounded(8).bg(t.background)));
+        .when(this.helper && Boolean(g), el => el.child(div().w(g.w / zoom()).h(g.h / zoom()).rounded(8).bg(t.background)));
     } else if (d) {
       body = div().id("sim-area").size_full().on_size_change(sizeArea).child(v_flex().size_full().items_center().justify_center().gap(10)
         .child(div().text_size(12.5).text_color(t.muted).child(`${d.avd} is in its own window.`))

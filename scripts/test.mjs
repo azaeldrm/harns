@@ -16,7 +16,7 @@ const steps = [
   ['Pele matches its pin', process.execPath, ['scripts/vendor-pele.mjs', '--check']],
 ].filter(Boolean);
 
-let failed = python ? [] : ['Python tests (Python 3 not found as python3, python or py -3)'];
+const failed = python ? [] : ['Python tests (Python 3 not found as python3, python or py -3)'];
 for (const [name, exe, args] of steps) {
   console.log(`\n== ${name}`);
   if (spawnSync(exe, args, { cwd: repo, stdio: 'inherit' }).status !== 0) failed.push(name);
