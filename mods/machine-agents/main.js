@@ -714,8 +714,9 @@ export default class Agents extends View {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         }))
-        .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6)
-          .child(svg(`mods/harness-chrome/${g.machine?.name ? "server" : "monitor"}.svg`).size(13).flex_none().text_color(t.muted)))
+        // A machine's icon on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band border 1 + 10 + half of 14.
+        .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6).pl(10)
+          .child(svg(`mods/harness-chrome/${g.machine?.name ? "server" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
         .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
         .when(isMachine || !open, (el) => el.child(div().font_medium().text_size(11).text_color(t.dim).child(String(g.members.length))))
         .child(div().flex_1())
@@ -767,7 +768,8 @@ export default class Agents extends View {
     const rows = collapsed
       ? machines().filter(machine => !machine.temporary).flatMap((machine) => [
           div().h(18).flex_none(),
-          statsFor(machine.name ?? null, t, true),
+          // The machine's rings in a raised band, as the open sidebar's, so its agents below read as its group.
+          v_flex().mx(6).py(2).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).child(statsFor(machine.name ?? null, t, true)),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
         ])
