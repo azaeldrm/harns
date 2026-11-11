@@ -171,7 +171,8 @@ export default class Agents extends View {
     return HoverCard.new(`mcard-${key}`).anchor("top_left").open_delay(450).close_delay(250)
       .trigger(div().id(`mtrig-${key}`).w_full().on_hover((on, cx) => { if (on) this.wantDetails(machine.name, cx); }).child(trigger))
       // Beside the sidebar rather than over its agents: shifted right by the sidebar's width (the pointer's way there keeps it open).
-      .content(div().ml(find(layout(), "sidebar")?.size?.px ?? 268).child(this.detailsCard(t, machine)));
+      // Pinned under the band it opens from: raised by the band's height (header 30, rings 22, padding, border and gap: 61) to sit level with it.
+      .content(div().ml(find(layout(), "sidebar")?.size?.px ?? 268).mt(-61).child(this.detailsCard(t, machine)));
   }
 
   detailsCard(t, machine) {
