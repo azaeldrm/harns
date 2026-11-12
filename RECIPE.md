@@ -32,7 +32,10 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     session's own title (else its folder, else the tab name) and its status; under it, in
     11.5 px dim, its folder and git branch and a 36 × 3 px bar of the context window used
     (amber above 75%, red `#d88179` above 90%). Sub-agents hang under their parent as a
-    tree (26 px rows).
+    tree (26 px rows). Its terminals that aren't agents (a shell, a dev server, lazygit) follow its agents, a 28 px row
+    each: the program's icon in the agents' icon column, the program running now and its folder; a click focuses it and
+    shows the Terminal view. The machine's name is followed by its counts, each with its icon: agents (a bot), and
+    terminals (`>_`) when it has any.
     A machine with no agents says "No agents", "Connecting…" or "Offline".
   - **Footer** (44 px): two icons side by side, Settings (a gear, with an amber dot when an update is ready) and Add
     machine (a server).
