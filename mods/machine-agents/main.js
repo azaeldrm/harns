@@ -34,13 +34,18 @@ function harnessSessionTitle(l) {
   const live = clean(l?.title);
   const prefixes = [prog, l?.program?.key, l?.app === "pi" ? "\u03c0" : null].filter(Boolean);
   let session = live;
+  const separators = [" - ", " \u2014 ", " \u2013 ", " | ", ": "];
   for (const prefix of prefixes) {
     const start = session.toLowerCase();
     const name = prefix.toLowerCase();
-    const separator = [" - ", " \u2014 ", " \u2013 ", " | ", ": "].find(s => start.startsWith(`${name}${s}`));
+    const separator = separators.find(s => start.startsWith(`${name}${s}`));
     if (separator) { session = session.slice(prefix.length + separator.length).trim(); break; }
   }
-  const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key && session !== folderName(l?.cwd);
+  const folder = folderName(l?.cwd);
+  const suffix = folder && separators.find(s => session.endsWith(`${s}${folder}`));
+  if (suffix) session = session.slice(0, -(suffix.length + folder.length)).trim();
+  else if ((l?.app === "codex" || l?.program?.key === "codex") && session.includes(" | ")) session = session.slice(0, session.lastIndexOf(" | ")).trim();
+  const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key && session !== folder;
   return telling ? session : "";
 }
 // The agent's own branch: its pane's folder's, as Herdr reads it (panes().branch), else its space's (the first terminal's
