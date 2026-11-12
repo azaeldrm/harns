@@ -49,6 +49,14 @@ Optional:
   keep running, hidden. Closing a tab stops its emulator and keeps the device. For Expo apps,
   run `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
 
+  Each emulator starts with 4 GB of RAM, 4 cores and the graphics card (`-gpu host`), over what
+  its virtual device says; storage is the virtual device's own. These are limits rather than
+  reservations: cores are threads Windows runs anywhere, and memory is taken as Android uses
+  it (though memory Android has filled isn't given back until the emulator stops). Change them
+  in `mods/harness-simulator/emulator.json` (`memory` in MB, `cores`, `gpu`), under `default`,
+  or under `devices` by a virtual device's name for that one; the panel title's tooltip shows
+  what the session's emulator uses. A new value applies the next time it starts.
+
   Sessions on other machines reach their emulator with that machine's own `adb`. The panel
   shares each one there through an SSH reverse tunnel (Windows' OpenSSH, with the same ssh
   config as herdr's machines, so ssh to the machine needs to work with a key), listening only

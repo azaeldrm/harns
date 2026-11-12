@@ -113,7 +113,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   Start (a free virtual device, or a copy of one); the header pops the emulators out into
   their own windows and back, and stops this session's. Closing a tab stops its emulator and
   keeps the device. A session on another machine has its emulator shared there, shown as the
-  machine's name in the header, with × to stop.
+  machine's name in the header, with × to stop. Emulators start with the specs in
+  `emulator.json` (by default 4096 MB, 4 cores, `-gpu host`; a
+  device listed by name under `devices` gets its own), passed as `emulator` flags so they
+  apply to every copy of a device too; the title's tooltip shows them.
 - **Status bar:** each quota bar shows the 5-hour window and switches to 7 days while
   hovered, red above 90%; the tooltip gives the reset time. The last item opens the
   command palette.

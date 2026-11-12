@@ -74,6 +74,7 @@ export default class Simulator extends View {
     this.area = null;            // the screen area's size, real logical px
     this.avds = [];              // virtual devices on this computer
     this.info = {};              // avd -> { width, height, label }, from its config.ini
+    this.specs = { default: {}, devices: {} }; // emulator.json: what each emulator starts with
     this.running = {};           // avd -> adb serial ("emulator-5554"), every running emulator
     this.owners = {};            // tab -> avd: each session's emulator, kept across restarts
     try { this.owners = JSON.parse(localStorage.getItem("owners") ?? "{}"); } catch {}
@@ -121,6 +122,7 @@ export default class Simulator extends View {
     this.emulator = `${this.sdk}\\emulator\\emulator.exe`;
     this.cache = `${appHome()}\\cache\\harness-simulator`;
     this.stateFile = `${this.cache}\\dock-state.txt`;
+    try { Object.assign(this.specs, JSON.parse(await readTextFile(`${appHome()}\\mods\\harness-simulator\\emulator.json`))); } catch {}
     await fs.mkdir(this.cache, { recursive: true }).catch(() => {});
     // Tunnels a previous copy of this mod left (a reload, or a crash) close; they open again.
     await ps(`Get-CimInstance Win32_Process -Filter "Name='ssh.exe'" | Where-Object { $_.CommandLine -like '*harns-simulator*' } | ` +
@@ -154,6 +156,30 @@ export default class Simulator extends View {
   }
 
   label(avd) { return this.info[avd]?.label ?? avd; }
+
+  spec(avd) {
+    // emulator.json's defaults, and the device's own values over them. Copies of a device
+    // (harns_phone_2) take the defaults unless listed by their own name.
+    return { ...this.specs.default, ...this.specs.devices?.[avd] };
+  }
+
+  launchArgs(avd) {
+    // Launch flags, so they win over the device's config.ini on every start (copies included).
+    // They're limits, not reservations: cores are threads Windows schedules anywhere, memory is
+    // used as Android touches it. Storage stays the device's (config.ini's
+    // disk.dataPartition.size): -partition-size takes at most 2047 MB.
+    const s = this.spec(avd), args = ["-avd", avd, "-no-boot-anim"];
+    if (s.memory) args.push("-memory", String(s.memory));
+    if (s.cores) args.push("-cores", String(s.cores));
+    if (s.gpu) args.push("-gpu", String(s.gpu));
+    return args;
+  }
+
+  specText(avd) {
+    const s = this.spec(avd), gb = mb => `${+(mb / 1024).toFixed(1)} GB`;
+    return [s.memory && `${gb(s.memory)} RAM`, s.cores && `${s.cores} cores`, s.gpu && `${s.gpu} GPU`]
+      .filter(Boolean).join(", ");
+  }
 
   async clone(base) {
     // Another virtual device like `base`, for one more session: its config.ini without its
@@ -409,7 +435,7 @@ export default class Simulator extends View {
     this.starting.add(avd); this.status = `Starting ${this.label(avd)}…`; cx.notify();
     // Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it as
     // soon as it appears, so it boots inside the panel.
-    const started = await ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(this.emulator)} -ArgumentList '-avd',${quote(avd)},'-no-boot-anim'`)
+    const started = await ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(this.emulator)} -ArgumentList ${this.launchArgs(avd).map(quote).join(",")}`)
       .then(() => true, err => { this.status = `Couldn't start ${this.label(avd)}: ${errorText(err)}`; return false; });
     if (started && this.mode === "dock" && !this.helper) await this.dock();
     // A fresh copy boots cold, which takes a while the first time.
@@ -455,7 +481,7 @@ export default class Simulator extends View {
       .child(svg(`mods/harness-simulator/${icon}.svg`).size(13)).when(Boolean(label), el => el.child(label));
 
     const header = h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-      .child(div().id("sim-title").font_semibold().child("Simulator").when(Boolean(avd), el => el.tooltip(`This session's: ${this.label(avd)}`)))
+      .child(div().id("sim-title").font_semibold().child("Simulator").when(Boolean(avd), el => el.tooltip(`This session's: ${this.label(avd)} (${this.specText(avd)})`)))
       .child(div().flex_1())
       .when(Boolean(share && !share.pending), el => el.child(h_flex().id("sim-share").h(22).px(6).gap(4).flex_none().items_center().rounded(5)
         .border_1().border_color(t.border).text_size(11).text_color(share.error ? t.blocked : t.muted)
