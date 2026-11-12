@@ -509,17 +509,20 @@ export default class Agents extends View {
     if (!own.length) return [];
     this.terminalsOpen ??= new Set();
     const open = this.terminalsOpen.has(key), shown = focused()?.pane;
-    const head = h_flex().id(`terms-${key || "local"}`).pl(29).pr(8).h(26).flex_none().gap(5).items_center().rounded(8)
-      .text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+    // Led by a terminal icon in the agent cards' icon column (their 2 px stripe and 8 px padding), the word and the count after.
+    const head = h_flex().id(`terms-${key || "local"}`).pl(10).pr(8).h(28).flex_none().gap(10).items_center().rounded(6)
+      .text_size(12.5).text_color(open ? t.foreground : t.muted).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .tooltip(open ? "Hide this machine's terminals" : "Show this machine's terminals")
       .on_click((_e, cx) => { open ? this.terminalsOpen.delete(key) : this.terminalsOpen.add(key); cx.notify(); })
-      .child(svg(`mods/harness-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none())
+      .child(h_flex().size(16).flex_none().items_center().justify_center()
+        .child(svg("mods/harness-chrome/terminal.svg").size(15).flex_none().text_color(open ? t.foreground : t.muted)))
       .child(div().child("Terminals"))
-      .child(div().font_medium().child(String(own.length)));
+      .child(div().text_size(11).font_medium().text_color(t.dim).child(String(own.length)));
     if (!open) return [head];
     return [head, ...own.map((p) => {
       const on = p.pane === shown, name = p.program?.name || p.title || "shell", where = folderName(p.cwd);
       const pic = icon(p.program, 14, on ? t.accent : t.muted);
-      return h_flex().id(`term-${p.pane}`).pl(39).pr(8).h(26).flex_none().gap(8).items_center().rounded(8).text_size(12.5)
+      return h_flex().id(`term-${p.pane}`).pl(36).pr(8).h(26).flex_none().gap(8).items_center().rounded(8).text_size(12.5)
         .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
         .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
         .on_click(() => {
