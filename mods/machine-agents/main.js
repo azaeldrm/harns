@@ -498,6 +498,40 @@ export default class Agents extends View {
       .child(this.status(t, { status: st }, compact));
   }
 
+  terminalRows(t, machine) {
+    // A machine's panes that aren't agents (a shell, a dev server, lazygit), under its agents: one "Terminals" row with their
+    // count, folded at first, and when open a row each (program icon, the program running now, its folder). A click
+    // focuses the pane and shows the Terminal view, as a shell has no chat. Nothing when the machine has none.
+    const key = machine.name ?? "";
+    const agentPanes = new Set(agents().map((a) => a.pane).filter(Boolean));
+    const own = panes().filter((p) => p.terminal && !agentPanes.has(p.pane)
+      && (p.terminal.includes("/") ? p.terminal.split("/")[0] : "") === key);
+    if (!own.length) return [];
+    this.terminalsOpen ??= new Set();
+    const open = this.terminalsOpen.has(key), shown = focused()?.pane;
+    const head = h_flex().id(`terms-${key || "local"}`).pl(29).pr(8).h(26).flex_none().gap(5).items_center().rounded(8)
+      .text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .on_click((_e, cx) => { open ? this.terminalsOpen.delete(key) : this.terminalsOpen.add(key); cx.notify(); })
+      .child(svg(`mods/harness-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none())
+      .child(div().child("Terminals"))
+      .child(div().font_medium().child(String(own.length)));
+    if (!open) return [head];
+    return [head, ...own.map((p) => {
+      const on = p.pane === shown, name = p.program?.name || p.title || "shell", where = folderName(p.cwd);
+      const pic = icon(p.program, 14, on ? t.accent : t.muted);
+      return h_flex().id(`term-${p.pane}`).pl(39).pr(8).h(26).flex_none().gap(8).items_center().rounded(8).text_size(12.5)
+        .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
+        .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
+        .on_click(() => {
+          run("pane.focus", { pane: p.pane });
+          run("layout.select", { stack: "chat-view", child: "terminal-panel" });
+        })
+        .when(Boolean(pic), (el) => el.child(pic))
+        .child(div().flex_none().text_color(on ? t.foreground : t.muted).child(name))
+        .when(Boolean(where), (el) => el.child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.dim).child(where)));
+    })];
+  }
+
   status(t, a, compact = false) {
     // An agent's status mark (compact: a ! for blocked, under a "Needs you" header); hovering any of them gives the context window used.
     const context = a.address ? (shared('agents.context') ?? {})[a.address] : null;
@@ -824,6 +858,7 @@ export default class Agents extends View {
           .on_click((_e, cx) => { this.folded.has(g.id) ? this.folded.delete(g.id) : this.folded.add(g.id); cx.notify(); })
           .child(header(g)).child(statsFor(g.machine.name ?? null, t)))] : [header(g)]),
         ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids)   : g.machine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
+        ...(this.folded.has(g.id) || !g.machine ? [] : this.terminalRows(t, g.machine)),
       ]);
 
     return v_flex()
