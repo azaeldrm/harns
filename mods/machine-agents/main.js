@@ -91,9 +91,10 @@ export default class Agents extends View {
     // How far the list is scrolled, and how tall it and its rows are (px, as laid out): the edges fade where
     // more is out of sight. The scroll position can't be read, so the wheel's movements are followed.
     this.scrollY = 0; this.viewH = 0; this.rowsH = 0;
-    // Each machine's system, for its icon (os.js), asked once and kept: machine name ("" for this computer) -> icon name.
+    // Each machine's system, for its icon (os.js), kept from the last run and asked again in this one: machine name ("" for this computer) -> icon name.
     try { this.osIcons = JSON.parse(localStorage.getItem("os") ?? "{}"); } catch { this.osIcons = {}; }
     this.osAsked = {};
+    this.osConfirmed = new Set();
     // A reload starts the list at the top, where scrollY starts (the list would otherwise keep its old place).
     this.scrollHandle = ScrollHandle.new();
     this.scrollHandle.scroll_to_item(0);
@@ -130,14 +131,16 @@ export default class Agents extends View {
   }
 
   noticeOs(cx) {
-    // Asks each machine that answers what it runs, once; one that couldn't say is asked again a minute later.
+    // Asks each machine that answers what it runs, once a run (the icon kept from the last run shows until it answers);
+    // one that couldn't say is asked again a minute later.
     for (const m of machines()) {
       const key = m.name ?? "";
-      if (this.osIcons[key] || Date.now() - (this.osAsked[key] ?? 0) < 60000 || (m.name && m.layout !== "ready")) continue;
+      if (this.osConfirmed.has(key) || Date.now() - (this.osAsked[key] ?? 0) < 60000 || (m.name && m.layout !== "ready")) continue;
       this.osAsked[key] = Date.now();
       cx.spawn(async (cx) => {
         const os = await osOf(m.name ?? null);
         if (!os) return;
+        this.osConfirmed.add(key);
         this.osIcons[key] = os;
         try { localStorage.setItem("os", JSON.stringify(this.osIcons)); } catch {}
         cx.notify();
@@ -848,10 +851,12 @@ export default class Agents extends View {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         }))
-        // A machine's icon on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band border 1 + 10 + half of 14.
-        .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6).pl(10)
-          .child(svg(this.machineIcon(g.machine)).size(14).flex_none().text_color(t.muted)))
-        .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
+        // A machine's icon in a 16 px slot on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band
+        // border 1 + 9 + half of 16; its name then starts where an agent's title does, in the same size, gray as the icons.
+        .when(isMachine, el => el.gap(8).text_size(13).font_semibold().pt(6).pl(9)
+          .child(div().size(16).flex_none().flex().items_center().justify_center()
+            .child(svg(this.machineIcon(g.machine)).size(14).flex_none().text_color(t.muted))))
+        .child(div().truncate().text_color(isMachine ? t.muted : t[g.status] ?? t.dim).child(g.label))
         // A machine's counts, each with its icon: its agents, then its plain terminals (listed under the agents) when it has any.
         .when(isMachine, (el) => {
           const n = this.plainTerminals(g.machine).length, count = (id, glyph, value, tip) => h_flex().id(id).gap(3).items_center()
