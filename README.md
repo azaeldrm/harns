@@ -8,6 +8,44 @@ status bar. Everything goes through herdr's own machine connections.
 
 [RECIPE.md](RECIPE.md) describes it in full, as a brief to build it from.
 
+## Features
+
+**Organized by machine.** Each machine in the sidebar shows its system (Windows, macOS or the Linux distribution),
+its CPU, RAM and GPU load, its agents with their folders, branches and context, and its plain terminals. Its **+**
+starts an agent there from the ones installed on it, or a terminal, a new space or a worktree. Alt+Up and Alt+Down
+walk the agents; Alt+Shift+Up and Alt+Shift+Down jump to the next machine's.
+
+![Starting an agent on a machine](docs/new-agent.png)
+
+**Details on hover.** Rest on an agent for its status, space, folder, branch and context window, or on a machine for
+its system, CPU, memory, GPUs and disks.
+
+![An agent's details](docs/agent-card.png)
+
+![A machine's details](docs/machine-card.png)
+
+**A chat for every agent.** An agent's tab is a chat ([herdr-chat](https://github.com/azaeldrm/herdr-chat)) or its
+live terminal, one click apart. Mermaid diagrams in replies are drawn by [Pele](https://github.com/obsidianmd/pele).
+
+![A mermaid diagram in the chat](docs/diagram.png)
+
+**Something to look at while it starts.** A new conversation opens on a dimmed animation behind its welcome: sharks,
+jellyfish, a night sky or rain.
+
+![The welcome's animation](docs/welcome.webp)
+
+**Markdown, rendered.** Click a Markdown or `.mmd` file in the Files panel and it opens rendered in a floating
+window, with its images and mermaid diagrams.
+
+![A Markdown file in its floating window](docs/files.png)
+
+**An Android emulator per session** (Windows). The Simulator panel runs one beside each agent, shared with the machine
+the agent runs on (below).
+
+![The Simulator panel](docs/simulator.png)
+
+The status bar shows the Claude Code and Codex quota left.
+
 ## Install
 
 Needs the Herdr app and Python 3 on each machine. The chat in agent tabs is
