@@ -1,6 +1,6 @@
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, Popup } from "gpui-base";
-import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
+import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, nextCommand, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
@@ -42,6 +42,9 @@ function harnessSessionTitle(l) {
   const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key;
   return telling ? session : "";
 }
+// The agent's own branch: its pane's folder's, as Herdr reads it (panes().branch), else its space's (the first terminal's
+// there): every agent in one space showed that one branch, as all of a remote machine's sessions in its home space.
+const paneBranch = a => panes().find(p => p.pane === a.pane)?.branch ?? spaces().find(s => s.id === a.space)?.branch ?? null;
 const folderName = path => String(path ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? "";
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
 const kidStatus = (k, listed) => {
@@ -85,6 +88,26 @@ export default class Agents extends View {
     });
     this.noticeTurns(cx);
     this.watchLocalContext(cx);
+    // Keys bound to "machine-agents.next-machine" / ".prev-machine" (Alt+Shift+Down / Up in harns): the next machine's top agent.
+    cx.spawn(async () => {
+      for (;;) {
+        const c = await nextCommand();
+        if (c === "next-machine") this.jumpMachine(1);
+        else if (c === "prev-machine") this.jumpMachine(-1);
+      }
+    });
+  }
+
+  jumpMachine(dir) {
+    // Shows the top agent of the next machine (dir 1) or the previous one (-1) that has agents, in the list's order,
+    // from the machine of the agent or terminal in front; past the last it comes round to the first.
+    const listed = this.machineTops ?? [];
+    if (!listed.length) return;
+    const f = focused(), shown = agents().find(a => a.focused)?.address ?? f?.terminal ?? "";
+    const here = shown.includes("/") ? shown.split("/")[0] : "";
+    const at = listed.findIndex(m => m.machine === here);
+    const next = at < 0 ? (dir > 0 ? 0 : listed.length - 1) : (at + dir + listed.length) % listed.length;
+    if (next !== at) run("agent.focus", { terminal: listed[next].top });
   }
 
   noticeTurns(cx) {
@@ -263,7 +286,7 @@ export default class Agents extends View {
     const machine = a.address.includes("/") ? a.address.split("/")[0] : localMachineLabel();
     const tab = spaces().flatMap(s => s.tabs).find(x => x.id === a.tab);
     const folder = (tab ? lead(tab) : null)?.cwd;
-    const branch = spaces().find(s => s.id === a.space)?.branch;
+    const branch = paneBranch(a);
     const context = (shared("agents.context") ?? {})[a.address];
     const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
     const LABEL = 64;
@@ -498,6 +521,35 @@ export default class Agents extends View {
       .child(this.status(t, { status: st }, compact));
   }
 
+  plainTerminals(machine) {
+    // The machine's panes that aren't agents: a shell, a dev server, lazygit.
+    const key = machine.name ?? "";
+    const agentPanes = new Set(agents().map((a) => a.pane).filter(Boolean));
+    return panes().filter((p) => p.terminal && !agentPanes.has(p.pane)
+      && (p.terminal.includes("/") ? p.terminal.split("/")[0] : "") === key);
+  }
+
+  terminalRows(t, machine) {
+    // The machine's plain terminals at the bottom of its group, under its agents, a row each: the program's icon in the
+    // agent cards' icon column (their 2 px stripe and 8 px padding), the program running now, its folder. A click focuses
+    // the pane and shows the Terminal view, as a shell has no chat. Their count is in the machine's header.
+    const shown = focused()?.pane;
+    return this.plainTerminals(machine).map((p) => {
+      const on = p.pane === shown, name = p.program?.name || p.title || "shell", where = folderName(p.cwd);
+      const pic = icon(p.program, 16, on ? t.accent : t.muted) ?? svg("mods/harness-chrome/terminal.svg").size(15).flex_none().text_color(on ? t.accent : t.muted);
+      return h_flex().id(`term-${p.pane}`).pl(10).pr(8).h(28).flex_none().gap(10).items_center().rounded(6).text_size(12.5)
+        .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
+        .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
+        .on_click(() => {
+          run("pane.focus", { pane: p.pane });
+          if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" });
+        })
+        .child(h_flex().size(16).flex_none().items_center().justify_center().child(pic))
+        .child(div().flex_none().text_color(on ? t.foreground : t.muted).child(name))
+        .when(Boolean(where), (el) => el.child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.dim).child(where)));
+    });
+  }
+
   status(t, a, compact = false) {
     // An agent's status mark (compact: a ! for blocked, under a "Needs you" header); hovering any of them gives the context window used.
     const context = a.address ? (shared('agents.context') ?? {})[a.address] : null;
@@ -630,7 +682,7 @@ export default class Agents extends View {
       // Line 2: where it works (folder · branch, and its space where the list doesn't group by it); context used as a small bar.
       const tab = tabs.find(x => x.id === a.tab);
       const folder = folderName((tab ? lead(tab) : null)?.cwd);
-      const branch = spaces().find(s => s.id === a.space)?.branch;
+      const branch = paneBranch(a);
       // Line 2's pieces, each with its icon: the folder, the branch, and the space where the list doesn't group by it.
       const where = [[folder !== name ? folder : "", "folder"], [branch, "branch"], [full && a.space_name !== name ? a.space_name : "", "layers"]].filter(([text]) => text);
       const context = (shared("agents.context") ?? {})[a.address];
@@ -722,6 +774,8 @@ export default class Agents extends View {
     }
     // agent.next / agent.prev (Alt+Down / Alt+Up) walk the agents as the list shows them: Pinned, then each machine top to bottom.
     setAgentOrder(groups.flatMap(g => g.members).map(a => a.address));
+    // Each machine with agents listed under it and its top one, in the list's order, for jumpMachine (Alt+Shift+Down / Up).
+    this.machineTops = groups.filter(g => g.machine && g.members.length).map(g => ({ machine: g.machine.name ?? "", top: g.members[0].address }));
 
     const header = (g) => {
       // A group's header: a machine's (inside its band, which folds it) or Pinned's (which folds itself).
@@ -749,7 +803,16 @@ export default class Agents extends View {
         .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6).pl(10)
           .child(svg(`mods/harness-chrome/${g.machine?.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
         .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
-        .when(isMachine || !open, (el) => el.child(div().font_medium().text_size(11).text_color(t.dim).child(String(g.members.length))))
+        // A machine's counts, each with its icon: its agents, then its plain terminals (listed under the agents) when it has any.
+        .when(isMachine, (el) => {
+          const n = this.plainTerminals(g.machine).length, count = (id, glyph, value, tip) => h_flex().id(id).gap(3).items_center()
+            .font_medium().text_size(11).text_color(t.dim).tooltip(tip)
+            .child(svg(`mods/harness-chrome/${glyph}.svg`).size(12).flex_none()).child(String(value));
+          return el.child(h_flex().gap(8).items_center()
+            .child(count(`agents-${g.id}`, "bot", g.members.length, `${g.members.length} agent${g.members.length === 1 ? "" : "s"}`))
+            .when(n > 0, (row) => row.child(count(`terms-${g.id}`, "terminal", n, `${n} terminal${n === 1 ? "" : "s"} besides the agents`))));
+        })
+        .when(!isMachine && !open, (el) => el.child(div().font_medium().text_size(11).text_color(t.dim).child(String(g.members.length))))
         .child(div().flex_1())
         .when(!open, (el) => el
           .when(Boolean(top) && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
@@ -824,6 +887,7 @@ export default class Agents extends View {
           .on_click((_e, cx) => { this.folded.has(g.id) ? this.folded.delete(g.id) : this.folded.add(g.id); cx.notify(); })
           .child(header(g)).child(statsFor(g.machine.name ?? null, t)))] : [header(g)]),
         ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids)   : g.machine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
+        ...(this.folded.has(g.id) || !g.machine ? [] : this.terminalRows(t, g.machine)),
       ]);
 
     return v_flex()

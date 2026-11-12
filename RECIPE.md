@@ -32,7 +32,10 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     session's own title (else its folder, else the tab name) and its status; under it, in
     11.5 px dim, its folder and git branch and a 36 × 3 px bar of the context window used
     (amber above 75%, red `#d88179` above 90%). Sub-agents hang under their parent as a
-    tree (26 px rows).
+    tree (26 px rows). Its terminals that aren't agents (a shell, a dev server, lazygit) follow its agents, a 28 px row
+    each: the program's icon in the agents' icon column, the program running now and its folder; a click focuses it and
+    shows the Terminal view. The machine's name is followed by its counts, each with its icon: agents (a bot), and
+    terminals (`>_`) when it has any.
     A machine with no agents says "No agents", "Connecting…" or "Offline".
   - **Footer** (44 px): two icons side by side, Settings (a gear, with an amber dot when an update is ready) and Add
     machine (a server).
@@ -71,7 +74,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   moves to the top, and dragging a card onto another of the same machine puts it there.
   A card that changes place slides there (280 ms, ease-out), and the ones it passes slide too.
   Alt+Down and Alt+Up (`agent.next`, `agent.prev`) walk the agents in the list's order: Pinned, then
-  each machine top to bottom.
+  each machine top to bottom. Alt+Shift+Down and Alt+Shift+Up jump to the next or previous machine's top
+  agent, coming round past the last; keys.json binds them in its `layout:harns` section:
+  `"alt-shift-down": "machine-agents.next-machine"`, `"alt-shift-up": "machine-agents.prev-machine"`.
   A machine's whole band (name and rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
   installed there.
 - **Details cards** (an agent's, a machine's) hang from the row's top-right corner, right against the
@@ -159,7 +164,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   - `workspace-status-machine`: the status bar. It also collects the stats: a built copy of
     `machine-stats` publishes shared `machine.stats`, `machine.usage` and
     `machine.local-label`.
-  - `herdr-chat` (separate repo): the chat panel and the pane header with the toggle.
+  - `herdr-chat` (separate repo): the chat panel and the pane header with the toggle. The chat
+    block passes it `backdrop: true`: an empty chat (a new session's welcome, or no agent in
+    view) plays an animated scene behind it, dimmed (sharks, jellyfish, a night sky, rain),
+    switched with a button at its bottom right; the reply box goes see-through while it plays.
   - Shipped: the `changes` block; `picker`, `machine-add`, `new-menu`, `menu` and
     `worktree` as overlays; icons from `pane`, `files` and `changes`.
 - **Programs it runs** through `exec(..., {on: machine})`: per platform
