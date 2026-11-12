@@ -31,8 +31,9 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     `uname`), asked once per machine and kept, a drive or a screen until it answers; the machine's name (this computer's own
     name, or a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
     GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
-    session's own title (else its folder, else the tab name) and its status; under it, in
-    11.5 px dim, its folder and git branch and a 36 × 3 px bar of the context window used
+    session's own title (without the harness's prefix, and the folder Pi and Codex add after it; else the
+    program's name) and its status; under it, in 11.5 px dim, its folder (the session's, from the log
+    herdr-chat found for it, shared `herdr-chat.paths`; else the pane's) and git branch and a 36 × 3 px bar of the context window used
     (amber above 75%, red `#d88179` above 90%). Sub-agents hang under their parent as a
     tree (26 px rows). Its terminals that aren't agents (a shell, a dev server, lazygit) follow its agents, a 28 px row
     each: the program's icon in the agents' icon column, the program running now and its folder; a click focuses it and
