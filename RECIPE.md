@@ -151,7 +151,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   - `workspace-status-machine`: the status bar. It also collects the stats: a built copy of
     `machine-stats` publishes shared `machine.stats`, `machine.usage` and
     `machine.local-label`.
-  - `herdr-chat` (separate repo): the chat panel and the pane header with the toggle.
+  - `herdr-chat` (separate repo): the chat panel and the pane header with the toggle. The chat block passes it
+    `backdrop: true`: an empty chat (a new session's welcome, or no agent in view) plays an animated scene behind it, dimmed
+    (sharks, jellyfish, a night sky, rain), switched with a button at its bottom right.
   - Shipped: the `changes` block; `picker`, `machine-add`, `new-menu`, `menu` and
     `worktree` as overlays; icons from `pane`, `files` and `changes`.
 - **Programs it runs** through `exec(..., {on: machine})`: per platform
