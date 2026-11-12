@@ -45,6 +45,22 @@ function harnessSessionTitle(l) {
 // The agent's own branch: its pane's folder's, as Herdr reads it (panes().branch), else its space's (the first terminal's
 // there): every agent in one space showed that one branch, as all of a remote machine's sessions in its home space.
 const paneBranch = a => panes().find(p => p.pane === a.pane)?.branch ?? spaces().find(s => s.id === a.space)?.branch ?? null;
+// What a command line runs, by name: its program's (path and .exe off), or for `docker exec` / `docker run` (and podman),
+// the command inside the container (else, for run, the image). A shell running nothing else is just the shell.
+const VALUED = new Set(["-u", "--user", "-w", "--workdir", "-e", "--env", "--env-file", "-v", "--volume", "-p", "--publish", "--name",
+  "--network", "--entrypoint", "-l", "--label", "--mount", "--platform", "--hostname", "-h", "--add-host", "--device", "--gpus", "--detach-keys"]);
+function runningName(argv) {
+  const base = s => String(s ?? "").split(/[\\/]/).at(-1).replace(/\.exe$/i, "");
+  const prog = base(argv[0]);
+  if ((prog === "docker" || prog === "podman") && (argv[1] === "exec" || argv[1] === "run")) {
+    let i = 2;
+    while (i < argv.length && argv[i].startsWith("-")) i += argv[i].includes("=") || !VALUED.has(argv[i]) ? 1 : 2;
+    const target = argv[i], inner = argv[i + 1];
+    return inner ? base(inner) : argv[1] === "run" && target ? base(target.split(":")[0]) : prog;
+  }
+  return prog || null;
+}
+
 const folderName = path => String(path ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? "";
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
 const kidStatus = (k, listed) => {
@@ -509,17 +525,41 @@ export default class Agents extends View {
       && (p.terminal.includes("/") ? p.terminal.split("/")[0] : "") === key);
   }
 
-  terminalRows(t, machine) {
+  foreground(address, cx) {
+    // What a plain terminal runs now, from hc get (panes() has the program Herdr recognized, which for `docker exec … hermes
+    // chat` is Docker): its name, the command inside the container for docker exec and run; looked up at most every 5 s
+    // per terminal, off the render, and null until known.
+    this.fg ??= {};
+    const known = this.fg[address];
+    if (!known || (Date.now() - known.at > 5000 && !known.busy)) {
+      this.fg[address] = { ...(known ?? {}), at: Date.now(), busy: true };
+      cx.spawn(async cx => {
+        let name = null, argv = null;
+        try {
+          const r = await hc(["get", address, "--json"]);
+          argv = r.code === 0 ? JSON.parse(r.stdout)?.foreground?.argv ?? null : null;
+          name = argv ? runningName(argv) : null;
+        } catch {}
+        const was = this.fg[address];
+        this.fg[address] = { name, argv, at: Date.now(), busy: false };
+        if (was?.name !== name) cx.notify();
+      });
+    }
+    return this.fg[address] ?? null;
+  }
+
+  terminalRows(t, machine, cx) {
     // The machine's plain terminals at the bottom of its group, under its agents, a row each: the program's icon in the
     // agent cards' icon column (their 2 px stripe and 8 px padding), the program running now, its folder. A click focuses
     // the pane and shows the Terminal view, as a shell has no chat. Their count is in the machine's header.
     const shown = focused()?.pane;
     return this.plainTerminals(machine).map((p) => {
-      const on = p.pane === shown, name = p.program?.name || p.title || "shell", where = folderName(p.cwd);
+      const fg = this.foreground(p.terminal, cx);
+      const on = p.pane === shown, name = fg?.name || p.program?.name || p.title || "shell", where = folderName(p.cwd);
       const pic = icon(p.program, 16, on ? t.accent : t.muted) ?? svg("mods/harness-chrome/terminal.svg").size(15).flex_none().text_color(on ? t.accent : t.muted);
       return h_flex().id(`term-${p.pane}`).pl(10).pr(8).h(28).flex_none().gap(10).items_center().rounded(6).text_size(12.5)
         .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
-        .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
+        .tooltip([fg?.argv ? fg.argv.join(" ") : name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
         .on_click(() => {
           run("pane.focus", { pane: p.pane });
           if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" });
@@ -865,7 +905,7 @@ export default class Agents extends View {
           .on_click((_e, cx) => { this.folded.has(g.id) ? this.folded.delete(g.id) : this.folded.add(g.id); cx.notify(); })
           .child(header(g)).child(statsFor(g.machine.name ?? null, t)))] : [header(g)]),
         ...(this.folded.has(g.id) ? [] : g.members.length ? g.members.flatMap(withKids)   : g.machine ? [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")] : []),
-        ...(this.folded.has(g.id) || !g.machine ? [] : this.terminalRows(t, g.machine)),
+        ...(this.folded.has(g.id) || !g.machine ? [] : this.terminalRows(t, g.machine, cx)),
       ]);
 
     return v_flex()
