@@ -28,7 +28,8 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     (16 px semibold), then Search and the sidebar toggle.
   - **Agents:** grouped by machine, with no heading. Each group has its system's icon (Windows, macOS, or the Linux
     distribution: os-release's ID, else its family, else Tux; Omarchy by its `~/.local/share/omarchy`; the BSDs by
-    `uname`), asked once per machine and kept, a drive or a screen until it answers; the machine's name (this computer's own
+    `uname`; Windows only when `cmd.exe /c ver` says so), asked each machine once a run and kept for the next, which shows
+    it until the machine answers again (a drive or a screen before it ever has); the machine's name (this computer's own
     name, or a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
     GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (without the harness's prefix, and the folder Pi and Codex add after it; else the

@@ -23,14 +23,14 @@ export const PLATFORMS = {
 const known = {};
 
 export async function platformOf(machine) {
-  // The platform a machine runs (windows, linux or macos), asked once and remembered.
+  // The platform a machine runs (windows, linux or macos), asked once and remembered; throws while the machine can't say.
   if (machine === null) return PLATFORMS[appWindow().platform] ? appWindow().platform : 'linux';
   if (known[machine]) return known[machine];
-  try {
-    const r = await exec('uname', ['-s'], { on: machine });
-    if (r.code === 0) return (known[machine] = r.stdout.trim() === 'Darwin' ? 'macos' : 'linux');
-  } catch {}
-  return (known[machine] = 'windows');
+  const unix = await exec('uname', ['-s'], { on: machine }).catch(() => null);
+  if (unix?.code === 0) return (known[machine] = unix.stdout.trim() === 'Darwin' ? 'macos' : 'linux');
+  const windows = await exec('cmd.exe', ['/c', 'ver'], { on: machine }).catch(() => null);
+  if (windows?.code === 0 && /windows/i.test(windows.stdout)) return (known[machine] = 'windows');
+  throw new Error(`${machine} can't say which system it runs`);
 }
 
 export function forgetPlatform(machine) {

@@ -94,6 +94,7 @@ export default class Agents extends View {
     // Each machine's system, for its icon (os.js), asked once and kept: machine name ("" for this computer) -> icon name.
     try { this.osIcons = JSON.parse(localStorage.getItem("os") ?? "{}"); } catch { this.osIcons = {}; }
     this.osAsked = {};
+    this.osConfirmed = new Set();
     // A reload starts the list at the top, where scrollY starts (the list would otherwise keep its old place).
     this.scrollHandle = ScrollHandle.new();
     this.scrollHandle.scroll_to_item(0);
@@ -130,14 +131,16 @@ export default class Agents extends View {
   }
 
   noticeOs(cx) {
-    // Asks each machine that answers what it runs, once; one that couldn't say is asked again a minute later.
+    // Asks each machine that answers what it runs, once a run (the icon kept from the last run shows until it answers);
+    // one that couldn't say is asked again a minute later.
     for (const m of machines()) {
       const key = m.name ?? "";
-      if (this.osIcons[key] || Date.now() - (this.osAsked[key] ?? 0) < 60000 || (m.name && m.layout !== "ready")) continue;
+      if (this.osConfirmed.has(key) || Date.now() - (this.osAsked[key] ?? 0) < 60000 || (m.name && m.layout !== "ready")) continue;
       this.osAsked[key] = Date.now();
       cx.spawn(async (cx) => {
         const os = await osOf(m.name ?? null);
         if (!os) return;
+        this.osConfirmed.add(key);
         this.osIcons[key] = os;
         try { localStorage.setItem("os", JSON.stringify(this.osIcons)); } catch {}
         cx.notify();
