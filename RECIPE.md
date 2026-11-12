@@ -112,14 +112,19 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   herdr minimizes; it follows the window as it moves or resizes. A session without one gets
   Start (a free virtual device, or a copy of one); the header pops the emulators out into
   their own windows and back, restarts this session's (a shutdown, then a cold boot with
-  `-no-snapshot-load`, so it doesn't resume Stop's snapshot) and stops it. Every 30 s, each
-  shared emulator is looked for in its machine's `adb devices`; a missing one is connected
-  again, or its tunnel opened again. Closing a tab stops its emulator and
+  `-no-snapshot-load`, so it doesn't resume Stop's snapshot) and stops it; both wait while one
+  runs. Every 30 s, each shared emulator is looked for in its machine's `adb devices`; a missing
+  or offline one is connected again, or its tunnel opened again. A share that couldn't be set up
+  keeps its error showing and is tried again after 30 s, then twice as long each time, up to
+  10 min. Errors in one round are shown and the next round still runs. Closing a tab stops its emulator and
   keeps the device. A session on another machine has its emulator shared there, shown as the
   machine's name in the header, with × to stop. Emulators start with the specs in
   `emulator.json` (by default 4096 MB, 4 cores, `-gpu host`; a
-  device listed by name under `devices` gets its own), passed as `emulator` flags so they
-  apply to every copy of a device too; the title's tooltip shows them.
+  device listed by name under `devices` gets its own) under the person's own, from
+  `harness.json`'s `emulator` key (same shape; installs don't overwrite it), read again at each
+  start. They're passed as `emulator` flags so they apply to every copy of a device too: memory
+  and cores only as whole numbers, gpu as one word, anything else left out and named in the
+  status. The title's tooltip shows them.
 - **Status bar:** each quota bar shows the 5-hour window and switches to 7 days while
   hovered, red above 90%; the tooltip gives the reset time. The last item opens the
   command palette.
