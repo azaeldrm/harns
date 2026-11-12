@@ -1,5 +1,5 @@
 import { View, div, image, svg } from "gpui-kit";
-import { v_flex, h_flex, Popup } from "gpui-base";
+import { v_flex, h_flex, Popup, ScrollHandle } from "gpui-base";
 import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, nextCommand, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
@@ -81,6 +81,12 @@ export default class Agents extends View {
     // The order of agents within each machine: dragged by hand, and an agent that finishes or needs you moves to the top.
     this.order = JSON.parse(localStorage.getItem("order") ?? "[]");
     this.drag = null; this.drop = null;
+    // How far the list is scrolled, and how tall it and its rows are (px, as laid out): the edges fade where
+    // more is out of sight. The scroll position can't be read, so the wheel's movements are followed.
+    this.scrollY = 0; this.viewH = 0; this.rowsH = 0;
+    // A reload starts the list at the top, where scrollY starts (the list would otherwise keep its old place).
+    this.scrollHandle = ScrollHandle.new();
+    this.scrollHandle.scroll_to_item(0);
     cx.timer.every(1000, (cx) => {
       this.noticeTurns(cx);
       if (this.detailsWanted && Date.now() < this.detailsWanted.until) this.readDetails(this.detailsWanted.name, cx);
@@ -529,21 +535,29 @@ export default class Agents extends View {
       && (p.terminal.includes("/") ? p.terminal.split("/")[0] : "") === key);
   }
 
-  terminalRows(t, machine) {
+  terminalRows(t, machine, compact = false) {
     // The machine's plain terminals at the bottom of its group, under its agents, a row each: the program's icon in the
     // agent cards' icon column (their 2 px stripe and 8 px padding), the program running now, its folder. A click focuses
-    // the pane and shows the Terminal view, as a shell has no chat. Their count is in the machine's header.
+    // the pane and shows the Terminal view, as a shell has no chat. Their count is in the machine's header. On the rail
+    // (compact) just the icon, centred as the agents' are, with the rest in its tooltip.
     const shown = focused()?.pane;
     return this.plainTerminals(machine).map((p) => {
       const on = p.pane === shown, name = p.program?.name || p.title || "shell", where = folderName(p.cwd);
       const pic = icon(p.program, 16, on ? t.accent : t.muted) ?? svg("mods/harness-chrome/terminal.svg").size(15).flex_none().text_color(on ? t.accent : t.muted);
+      const open = () => {
+        run("pane.focus", { pane: p.pane });
+        if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" });
+      };
+      if (compact) return h_flex().id(`term-${p.pane}`).h(28).flex_none().items_center().justify_center().rounded(6)
+        .mx(8).border_l(2).pr(2).border_color(on ? t.accent : t.surface).when(on, (el) => el.bg(t.selected))
+        .hover((s) => s.bg(t.hover)).cursor_pointer()
+        .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
+        .on_click(open)
+        .child(h_flex().w(16).flex_none().justify_center().child(pic));
       return h_flex().id(`term-${p.pane}`).pl(10).pr(8).h(28).flex_none().gap(10).items_center().rounded(6).text_size(12.5)
         .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
         .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
-        .on_click(() => {
-          run("pane.focus", { pane: p.pane });
-          if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" });
-        })
+        .on_click(open)
         .child(h_flex().size(16).flex_none().items_center().justify_center().child(pic))
         .child(div().flex_none().text_color(on ? t.foreground : t.muted).child(name))
         .when(Boolean(where), (el) => el.child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.dim).child(where)));
@@ -877,6 +891,8 @@ export default class Agents extends View {
             .child(this.railCpu(t, machine.name ?? null)), 0),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
+          // Its plain terminals under its agents, as open.
+          ...this.terminalRows(t, machine, true),
         ])
       : groups.flatMap((g, index) => [
         ...(index > 0 ? [div().h(20).flex_none()] : []),
@@ -900,10 +916,44 @@ export default class Agents extends View {
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
-      .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always")
+      .child(this.scrollArea(t, collapsed, rows));
+  }
+
+  scrollArea(t, collapsed, rows) {
+    // The list scrolls without a bar, and fades at the top (under the logo) and the bottom (over settings)
+    // wherever more is out of sight that way.
+    const max = Math.max(0, this.rowsH - this.viewH);
+    if (this.scrollY > max) this.scrollY = max;
+    const above = this.scrollY > 1, below = this.scrollY < max - 1;
+    // As the chat's: thin bands of the background, more opaque toward the edge (a painted gradient comes out flat).
+    const STEPS = 12;
+    const fade = top => v_flex().absolute().left(0).right(0).h(32).when(top, el => el.top(0)).when(!top, el => el.bottom(0))
+      .children(Array.from({ length: STEPS }, (_, i) => div().w_full().flex_1().bg(t.surface).opacity(top ? (STEPS - i) / STEPS : (i + 1) / STEPS)));
+    const edges = () => [above, below];
+    return v_flex().flex_1().min_h(0).relative()
+      .child(v_flex().id("ag-list").size_full().px(collapsed ? 0 : 8).overflow_y_scroll().track_scroll(this.scrollHandle)
+        .on_size_change((size, cx) => { const was = edges(); this.viewH = size.height; this.refade(was, cx); })
+        .on_scroll_wheel((e, cx) => {
+          const was = edges(), room = Math.max(0, this.rowsH - this.viewH);
+          this.scrollY = Math.min(room, Math.max(0, this.scrollY - (e.delta?.y ?? 0)));
+          this.refade(was, cx);
+        })
         // A drag ends where the pointer leaves the list, or lets go outside an agent.
         .on_hover((on, cx) => { if (!on && this.drag) { this.drag = null; this.drop = null; cx.notify(); } })
         .on_mouse_up("left", (_e, cx) => { if (this.drag) { this.drag = null; this.drop = null; cx.notify(); } })
-        .children(rows));
+        // The list's first child: the top, for scroll_to_item(0).
+        .child(div().w_full().h(0).flex_none())
+        .child(v_flex().w_full().flex_none()
+          .on_size_change((size, cx) => { const was = edges(); this.rowsH = size.height; this.refade(was, cx); })
+          .children(rows)))
+      .when(above, el => el.child(fade(true)))
+      .when(below, el => el.child(fade(false)));
+  }
+
+  refade(was, cx) {
+    // Redraws only when a fade comes or goes.
+    const max = Math.max(0, this.rowsH - this.viewH);
+    const now = [this.scrollY > 1, this.scrollY < max - 1];
+    if (now[0] !== was[0] || now[1] !== was[1]) cx.notify();
   }
 }
