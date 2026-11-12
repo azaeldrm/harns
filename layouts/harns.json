@@ -97,7 +97,8 @@
                                                                                         "content":  {
                                                                                                         "mod":  "herdr-chat",
                                                                                                         "props":  {
-                                                                                                                      "role":  "chat"
+                                                                                                                      "role":  "chat",
+                                                                                                                      "backdrop":  true
                                                                                                                   }
                                                                                                     }
                                                                                     },
