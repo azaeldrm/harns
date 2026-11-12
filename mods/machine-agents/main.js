@@ -91,7 +91,7 @@ export default class Agents extends View {
     // How far the list is scrolled, and how tall it and its rows are (px, as laid out): the edges fade where
     // more is out of sight. The scroll position can't be read, so the wheel's movements are followed.
     this.scrollY = 0; this.viewH = 0; this.rowsH = 0;
-    // Each machine's system, for its icon (os.js), asked once and kept: machine name ("" for this computer) -> icon name.
+    // Each machine's system, for its icon (os.js), kept from the last run and asked again in this one: machine name ("" for this computer) -> icon name.
     try { this.osIcons = JSON.parse(localStorage.getItem("os") ?? "{}"); } catch { this.osIcons = {}; }
     this.osAsked = {};
     this.osConfirmed = new Set();

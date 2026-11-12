@@ -30,8 +30,8 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     distribution: os-release's ID, else its family, else Tux; Omarchy by its `~/.local/share/omarchy`; the BSDs by
     `uname`; Windows only when `cmd.exe /c ver` says so), asked each machine once a run and kept for the next, which shows
     it until the machine answers again (a drive or a screen before it ever has); the machine's name (this computer's own
-    name, or a nickname; 13 px and gray like the icons, starting where its agents' titles do), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
-    GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
+    name, or a nickname; 13 px and gray like the icons, starting where its agents' titles do), a + to start an agent
+    there, a row of CPU, RAM and GPU rings (one per GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (without the harness's prefix, and the folder Pi and Codex add after it; else the
     program's name) and its status; under it, in 11.5 px dim, its folder (the session's, from the log
     herdr-chat found for it, shared `herdr-chat.paths`; else the pane's) and git branch and a 36 × 3 px bar of the context window used
