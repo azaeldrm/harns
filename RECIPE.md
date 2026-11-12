@@ -47,7 +47,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     machine (a server).
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
-  then +, Files, Changes, Simulator (Windows), and the window buttons on Windows and Linux.
+  then +, Files, Changes, Simulator (Windows and Linux), and the window buttons on Windows and Linux.
 - **Work area** (12 px padding): the shown tab, as a chat (where a new agent session starts) or as terminal cards (10 px
   radius, 1 px `border`, a 42 px header with the Chat / Terminal toggle). Files,
   Changes or Simulator open in a 368 px panel on the right.
@@ -119,8 +119,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Tab bar:** click selects, double-click renames, drag reorders, right-click opens the
   tab menu, the scroll wheel moves between tabs. Files, Changes and Simulator toggle the right
   panel, remembered per space.
-- **Simulator** (Windows): one Android emulator per session (tab), shared by its sub-agents.
-  The panel shows the focused session's emulator's own window over its screen area, at the
+- **Simulator** (Windows and Linux; setup below): one Android emulator per session (tab), shared by its sub-agents.
+  On Windows and on Linux under Hyprland, the panel shows the focused session's emulator's own window over its screen
+  area; on other Linux desktops each emulator has its own window, with the panel's controls the same. Docked, it's at the
   device's aspect ratio, so it draws and takes input natively; the other sessions' keep
   running, hidden. It hides with the panel, while one of herdr's popups is open, and when
   herdr minimizes; it follows the window as it moves or resizes. A session without one gets
@@ -169,7 +170,13 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
     For a session on another machine, the mod writes `~/.config/harness/devices` there (each
     terminal of the tab, its panes' and the sub-agents under them from `terminals()` `parent`,
     and the emulator's serial there) and installs `adb.sh` as `~/.local/bin/adb`, which sets
-    `ANDROID_SERIAL` from `HC_TERMINAL_ID` and filters `adb devices`.
+    `ANDROID_SERIAL` from `HC_TERMINAL_ID` and filters `adb devices`. What differs by system is in `windows.js`
+    (PowerShell, Windows' OpenSSH, `harns-dock`) and `linux.js` (`sh`, OpenSSH, `setsid`). On Hyprland,
+    `dock-hyprland.py` (Python 3) reads the same state file: while it runs, a window rule (`harns-simulator`) opens
+    every `Emulator`-class window floating and borderless on the hidden workspace `special:harns-simulator`, so one
+    never tiles beside herdr or takes its maximized place; the shown one is brought onto herdr's workspace over the
+    panel, checked against where it really is every 100 ms through Hyprland's socket, and hidden while herdr's own
+    socket says an overlay is open. `quit` turns the rule off and gives the windows back.
   - `workspace-status-machine`: the status bar. It also collects the stats: a built copy of
     `machine-stats` publishes shared `machine.stats`, `machine.usage` and
     `machine.local-label`.
@@ -191,6 +198,24 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   SOURCES.md), a generated spinner, Windows
   window icons in `harness-tabs`, program icons in `brand-assets/` and `programs.json`.
 
+## Simulator setup
+
+The panel needs the Android SDK's `emulator` and `platform-tools` and one virtual device on this computer, and says
+what's missing. Sessions on other machines need only `adb` there, and ssh to them with a key.
+
+- **Windows:** Android Studio installs the SDK in `%LOCALAPPDATA%\Android\Sdk`; create a device in its Device Manager.
+- **Linux** (the SDK in `~/Android/Sdk`, or `ANDROID_HOME`):
+  1. A JDK 17 or newer, for `sdkmanager` and `avdmanager` only: `mise install java@temurin-21`, or the distribution's
+     OpenJDK.
+  2. Google's command-line tools, `commandlinetools-linux-*_latest.zip` (developer.android.com/studio, "Command line
+     tools only"), unpacked as `~/Android/Sdk/cmdline-tools/latest`.
+  3. With `JAVA_HOME` set: `sdkmanager --licenses`, which the person accepts (Google's license), then
+     `sdkmanager --install platform-tools emulator "system-images;android-35;google_apis;x86_64"`.
+  4. `avdmanager create avd -n harns_phone -k "system-images;android-35;google_apis;x86_64" -d pixel_8`.
+  5. KVM: `/dev/kvm` readable and writable by the person (most distributions: the `kvm` group).
+- **Expo:** `npx expo start --android` (Expo Go or an installed dev build) needs only `adb`. `npx expo run:android`
+  builds locally, so the agent's shell needs `ANDROID_HOME`, `JAVA_HOME` and `$ANDROID_HOME/platform-tools` on `PATH`.
+
 ## Watch out
 
 **What it accesses:**
@@ -202,8 +227,11 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   computer, `csc.exe` once to build `harns-dock`, and that helper while emulators are docked
   (it hooks herdr's window and mouse/keyboard release events only to place the device window
   and notice herdr's popups; it reads no input content);
+- with the Simulator panel open on Linux: the SDK's `emulator` and `adb`, and on Hyprland `python3` running
+  `dock-hyprland.py` while emulators are docked (it talks only to Hyprland's and herdr's sockets, to place the device
+  window and notice herdr's popups, and adds and removes its one window rule);
 - for each session on another machine with a running emulator: an SSH reverse tunnel to that
-  machine (Windows' OpenSSH, `ssh -N -R 127.0.0.1:<port>:127.0.0.1:<emulator adb port>`, bound
+  machine (OpenSSH, Windows' own there, `ssh -N -R 127.0.0.1:<port>:127.0.0.1:<emulator adb port>`, bound
   to its localhost), `adb connect` / `adb disconnect` there, and two files there:
   `~/.local/bin/adb` (harns's `adb.sh`, never over an `adb` that isn't its own) and
   `~/.config/harness/devices`; on this computer, copies of a virtual device in
@@ -265,8 +293,8 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
 ## Done when
 
 - `herdr-app check` passes for every mod and `herdr-app status` shows no errors.
-- On Windows, Simulator starts a virtual device inside the panel; the + menu shows over it, and
-  Files hides it. Two sessions on another machine each get their own emulator: `adb devices`
+- On Windows and on Linux under Hyprland, Simulator starts a virtual device inside the panel; the + menu shows over
+  it, and Files hides it. On other Linux desktops it starts in its own window. Two sessions on another machine each get their own emulator: `adb devices`
   in each lists only its own, a sub-agent's lists its session's, and closing a tab stops its
   emulator.
 - Each connected machine has a group with live CPU, RAM and GPU rings, and its agents

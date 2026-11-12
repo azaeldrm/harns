@@ -40,7 +40,7 @@ window, with its images and mermaid diagrams.
 
 ![A Markdown file in its floating window](docs/files.png)
 
-**An Android emulator per session** (Windows). The Simulator panel runs one beside each agent, shared with the machine
+**An Android emulator per session** (Windows and Linux). The Simulator panel runs one beside each agent, shared with the machine
 the agent runs on (below).
 
 ![The Simulator panel](docs/simulator.png)
@@ -80,20 +80,21 @@ Optional:
   - in `~/.codex/config.toml`, only removing a `notify` line an older relay added.
 
   Pi sessions already running pick up the relay after `/reload`, typed in their terminal.
-- **Simulator** (Windows): the panel beside Files and Changes runs Android virtual devices
-  from the Android SDK (`ANDROID_HOME`, or `%LOCALAPPDATA%\Android\Sdk`). Create one first in
-  Android Studio's Device Manager or with `avdmanager`. Each session (an agent's tab) gets its
+- **Simulator** (Windows and Linux): the panel beside Files and Changes runs Android virtual devices
+  from the Android SDK (`ANDROID_HOME`, else `%LOCALAPPDATA%\Android\Sdk` on Windows and `~/Android/Sdk` on
+  Linux). RECIPE.md's "Simulator setup" lists what to install and how to create a device. Each session (an agent's tab) gets its
   own emulator, and its sub-agents use the same one; when another session needs one, the panel
   copies a virtual device for it. The panel shows the focused session's emulator, its own
   window placed over the panel so it runs at full speed with its own input, and the others
-  keep running, hidden. Stop saves where Android was, and the next Start resumes it; Restart
+  keep running, hidden. That's on Windows and on Linux under Hyprland; on other Linux desktops each
+  emulator opens in its own window, and the panel's buttons work the same. Stop saves where Android was, and the next Start resumes it; Restart
   (the circular arrow) shuts the emulator down and boots it fresh, keeping its apps and data.
   Closing a tab stops its emulator and keeps the device. For Expo apps,
   run `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
 
   Each emulator starts with 4 GB of RAM, 4 cores and the graphics card (`-gpu host`), over what
   its virtual device says; storage is the virtual device's own. These are limits rather than
-  reservations: cores are threads Windows runs anywhere, and memory is taken as Android uses
+  reservations: cores are threads the system runs anywhere, and memory is taken as Android uses
   it (though memory Android has filled isn't given back until the emulator stops). The defaults
   are in `mods/harness-simulator/emulator.json`; change them in `~/.config/herdr-app/harness.json`,
   which updates don't overwrite, as `{ "emulator": { "default": { "memory": 6144 }, "devices":
@@ -103,7 +104,7 @@ Optional:
   and named while it starts.
 
   Sessions on other machines reach their emulator with that machine's own `adb`. The panel
-  shares each one there through an SSH reverse tunnel (Windows' OpenSSH, with the same ssh
+  shares each one there through an SSH reverse tunnel (OpenSSH, with the same ssh
   config as herdr's machines, so ssh to the machine needs to work with a key), listening only
   on that machine's localhost, and installs a small `~/.local/bin/adb` script there that points
   each session's terminals at their own emulator before running the machine's own adb. In
@@ -117,11 +118,11 @@ Optional:
 
 ## Platforms
 
-| | CPU and RAM | GPUs |
-|---|---|---|
-| Windows | PowerShell counters | NVIDIA |
-| Linux | Python 3, `/proc` | NVIDIA |
-| macOS | Python 3, `top` and `vm_stat` | — |
+| | CPU and RAM | GPUs | Simulator |
+|---|---|---|---|
+| Windows | PowerShell counters | NVIDIA | In the panel |
+| Linux | Python 3, `/proc` | NVIDIA | In the panel on Hyprland, else its own window |
+| macOS | Python 3, `top` and `vm_stat` | — | — |
 
 Each machine's platform is detected once (`mods/machine-stats/platforms.js`). GPU vendors
 are entries in `mods/machine-stats/gpus.js`, with a place for AMD, Intel and Apple.

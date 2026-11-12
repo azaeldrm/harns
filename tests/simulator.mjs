@@ -1,5 +1,5 @@
-// Exercises the Simulator fixes with herdr's APIs stubbed: specs merge and validation, and checkShares
-// surviving a share that Stop removes mid-check, and repairing an offline device.
+// Exercises the Simulator with herdr's APIs stubbed: specs merge and validation, checkShares surviving a share that
+// Stop removes mid-check and repairing an offline device, and (on Linux) copying a virtual device.
 import { mkdirSync, writeFileSync, cpSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -40,8 +40,8 @@ globalThis.files = {
   "HOME\\mods\\harness-simulator\\emulator.json": JSON.stringify({ default: { memory: 4096, cores: 4, gpu: "host" }, devices: { a: { gpu: "swiftshader_indirect" } } }),
   "HOME\\harness.json": JSON.stringify({ localMachineName: "pc", emulator: { default: { memory: 6144 }, devices: { a: { cores: 6 }, b: { memory: "4GB", gpu: "host gpu" } } } }),
 };
-const s = { specs: null };
-for (const k of ["loadSpecs", "spec", "goodSpec", "badSpec", "launchArgs", "specText"]) s[k] = P[k].bind(s);
+const s = { specs: null, host: { sep: "\\" } };
+for (const k of ["path", "loadSpecs", "spec", "goodSpec", "badSpec", "launchArgs", "specText"]) s[k] = P[k].bind(s);
 await s.loadSpecs();
 check("a device gets the defaults, harness.json's defaults over them, and its own values over both", s.spec("a"), { memory: 6144, cores: 6, gpu: "swiftshader_indirect" });
 check("a device not listed takes the merged defaults", s.spec("z"), { memory: 6144, cores: 4, gpu: "host" });
@@ -80,6 +80,25 @@ globalThis.execStub = async (cmd, args) => {
 await P.checkShares.call(sim);
 check("an offline device is disconnected, then connected again", calls, ["adb devices", "adb disconnect 127.0.0.1:15555", "adb connect 127.0.0.1:15555"]);
 check("and its error clears", sim.shares.a.error, undefined);
+
+// Linux: a copy of a virtual device is its config.ini without its data, named for itself, beside an .ini pointing at it.
+if (process.platform !== "win32") {
+  const { execFile } = await import("child_process");
+  const { readFileSync } = await import("fs");
+  globalThis.execStub = (cmd, args) => new Promise(done => execFile(cmd, args, (err, stdout, stderr) => done({ code: err ? err.code ?? 1 : 0, stdout, stderr })));
+  const avd = join(work, "avd");
+  mkdirSync(join(avd, "phone.avd"), { recursive: true });
+  writeFileSync(join(avd, "phone.avd", "config.ini"), "AvdId=phone\navd.ini.displayname=phone\nhw.lcd.width=1080\nhw.lcd.height = 2400\n");
+  writeFileSync(join(avd, "phone.ini"), "avd.ini.encoding=UTF-8\npath=/x/phone.avd\npath.rel=avd/phone.avd\ntarget=android-35\n");
+  const { linuxHost } = await import(pathToFileURL(join(work, "mod", "linux.js")).href);
+  const host = await linuxHost();
+  host.avdHome = avd;
+  await host.copyDevice("phone", "phone_2");
+  check("the copy's config.ini keeps the device's settings and takes its own name",
+    readFileSync(join(avd, "phone_2.avd", "config.ini"), "utf8"), "hw.lcd.width=1080\nhw.lcd.height = 2400\nAvdId=phone_2\navd.ini.displayname=phone_2\n");
+  check("and its .ini points at it, with the device's target",
+    readFileSync(join(avd, "phone_2.ini"), "utf8"), `avd.ini.encoding=UTF-8\npath=${join(avd, "phone_2.avd")}\npath.rel=avd/phone_2.avd\ntarget=android-35\n`);
+}
 
 rmSync(work, { recursive: true, force: true });
 process.exit(failed ? 1 : 0);
