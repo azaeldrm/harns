@@ -5,7 +5,7 @@
 import { appHome, exec, window } from "herdr";
 import * as fs from "fs/promises";
 import { Buffer } from "buffer";
-import { hashBytes, sniff } from "./bytes.js";
+import { hashBytes, sniff, toBase64 } from "./bytes.js";
 
 const DIR = "cache/harness-files/images";
 const MAX_BYTES = 20 * 1024 * 1024, KEPT = 300, PARALLEL = 4;
@@ -65,12 +65,29 @@ async function load(target, where) {
   const have = (await readBytes(dest))?.length ?? -1;
   if (have !== bytes.length) {
     await fs.mkdir(dir, { recursive: true }).catch(() => {});
-    await fs.writeFile(dest, bytes);
-    // herdr's writeFile can report success having written nothing (see herdr-chat's images.js).
-    const back = (await readBytes(dest))?.length ?? -1;
-    if (back !== bytes.length) { await fs.unlink(dest).catch(() => {}); throw new Error("Couldn't save a copy to show"); }
+    if (!await save(dest, bytes)) { await fs.unlink(dest).catch(() => {}); throw new Error("Couldn't save a copy to show"); }
   }
   return { rel: `${DIR}/${name}`, width: info.width || 400, height: info.height || 300 };
+}
+
+async function save(dest, bytes) {
+  // herdr's writeFile writes binary data as an empty file while reporting success (text comes out whole), so a copy
+  // only counts once it reads back whole. Otherwise it goes down as base64 text, decoded beside it by the system's
+  // own tools: PowerShell on Windows, Python 3 (else base64) elsewhere.
+  await fs.writeFile(dest, bytes).catch(() => {});
+  if (((await readBytes(dest))?.length ?? -1) === bytes.length) return true;
+  const text = `${dest}.b64`;
+  await fs.writeFile(text, toBase64(bytes));
+  const quoted = p => `'${p.replace(/['‘’‚‛]/g, "$&$&")}'`;
+  if (onWindows()) {
+    await exec("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+      `& { param($s, $d) [IO.File]::WriteAllBytes($d, [Convert]::FromBase64String([IO.File]::ReadAllText($s))) } ${quoted(text)} ${quoted(dest)}`]).catch(() => null);
+  } else {
+    const py = await exec("python3", ["-c", "import base64,sys;open(sys.argv[2],'wb').write(base64.b64decode(open(sys.argv[1]).read()))", text, dest]).catch(() => null);
+    if (py?.code !== 0) await exec("sh", ["-c", 'base64 -d < "$1" > "$2"', "sh", text, dest]).catch(() => null);
+  }
+  await fs.unlink(text).catch(() => {});
+  return ((await readBytes(dest))?.length ?? -1) === bytes.length;
 }
 
 async function bytesOf(target, { root, on }) {
@@ -119,4 +136,5 @@ async function shellBytes(path, on) {
 
 // herdr's Buffer decodes natively; a per-character loop over megabytes of base64 stalls its engine.
 function fromBase64(text) { return new Uint8Array(Buffer.from(text, "base64")); }
+
 function fromText(text) { return new Uint8Array(Buffer.from(text, "utf8")); }

@@ -3,7 +3,7 @@
 // source. Started from herdr's `files` mod; Preview/Source in the header switches views.
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState } from "gpui-base";
-import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, window, appHome, props } from "herdr";
+import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, window, appHome, props, openOverlay, closeOverlay } from "herdr";
 import { MARKDOWN, MERMAID, parse, resolveLink } from "./parse.js";
 import { document } from "./markdown.js";
 import { hasQueuedDiagrams, renderQueuedDiagrams, hash } from "./diagrams.js";
@@ -61,6 +61,8 @@ export default class Files extends View {
     this.saved = new Map();
     this.entries = new Map(); this.folders = new Set(); this.pending = new Set(); this.marks = {};
     this.source = false; this.width = 600; this.zoom = 1; this.px = 0;
+    // Opened as a floating window (openDoc): its header drags it, everything else in it keeps its presses.
+    this.window = Boolean(p.overlay);
     this.refresh(cx);
     if (this.fixed) this.show(this.fixed.name, cx);
     cx.timer.every(10000, cx => this.refresh(cx));
@@ -204,6 +206,13 @@ export default class Files extends View {
     cx.notify();
   }
 
+  openDoc(path) {
+    // A readable file (Markdown, mermaid) opens in a floating window over the work, with this panel's reading view;
+    // the panel stays on its folder. One window: another file replaces it, where it was left.
+    openOverlay({ mod: "harness-files", kind: "window", key: "harness-files-doc", width: 0.6, height: 0.82,
+      props: { file: `${String(this.root).replace(/\\/g, "/")}/${path}`, on: this.on ?? null } });
+  }
+
   link(url, cx) {
     // A link in a document: a file beside it opens here, a web address in the browser.
     const target = this.file ? resolveLink(this.file, url) : null;
@@ -217,7 +226,7 @@ export default class Files extends View {
       if (out.length >= TOTAL) break;
       const path = prefix ? `${prefix}/${entry.name}` : entry.name, open = this.folders.has(path), mark = this.marks[`${this.root}/${path}`];
       out.push(h_flex().id(`file-${path}`).h(28).flex_none().pl(8 + depth * 18).pr(8).gap(7).items_center().rounded(7).cursor_pointer().hover(s => s.bg(t.hover))
-        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : this.show(path, cx))
+        .on_click((_e, cx) => entry.dir ? this.toggle(path, cx) : readable(path) ? this.openDoc(path) : this.show(path, cx))
         .child(entry.dir ? svg(`mods/harness-files/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim) : div().w(12).flex_none())
         .child(svg(`mods/harness-files/${entry.dir ? "folder" : "file"}.svg`).size(14).flex_none().text_color(t.muted))
         .child(div().flex_1().min_w(0).truncate().child(entry.name))
@@ -233,7 +242,8 @@ export default class Files extends View {
       .when(this.source === source, el => el.bg(t.selected).text_color(t.foreground))
       .when(this.source !== source, el => el.text_color(t.muted).hover(s => s.bg(t.hover)))
       .on_click((_e, cx) => this.setSource(source, cx)).child(label);
-    return h_flex().flex_none().p(2).gap(2).rounded(7).border_1().border_color(t.border).child(option("Preview", false)).child(option("Source", true));
+    return h_flex().flex_none().p(2).gap(2).rounded(7).border_1().border_color(t.border).on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .child(option("Preview", false)).child(option("Source", true));
   }
 
   body(t) {
@@ -253,12 +263,17 @@ export default class Files extends View {
         .on_size_change((size, cx) => { const z = size.width > 0 ? size.width / PROBE : 1; if (Math.abs(z - this.zoom) > 0.001) { this.zoom = z; if (this.px) this.width = this.px / z; cx.notify(); } }))
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .when(Boolean(this.file) && !this.fixed, el => el.child(div().id("files-back").w(20).cursor_pointer().text_color(t.muted).on_click((_e, cx) => { this.show(null); cx.notify(); }).child("←")))
-        .child(div().font_semibold().child(this.fixed ? "Preview" : "Files"))
-        .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim).child(this.file ?? this.root?.split(/[\\/]/).pop() ?? ""))
-        .when(Boolean(this.file) && readable(this.file ?? ""), el => el.child(this.viewToggle(t))))
+        // In a floating window (openDoc), the file's name heads it and its header is where it's dragged; × closes it.
+        .child(div().font_semibold().child(this.window ? (this.file ?? "") : this.fixed ? "Preview" : "Files"))
+        .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim).child(this.window ? (this.root?.split(/[\\/]/).pop() ?? "") : this.file ?? this.root?.split(/[\\/]/).pop() ?? ""))
+        .when(Boolean(this.file) && readable(this.file ?? ""), el => el.child(this.viewToggle(t)))
+        .when(this.window, el => el.child(div().id("files-close").size(22).flex_none().flex().items_center().justify_center().rounded(5)
+          .cursor_pointer().text_color(t.muted).hover(s => s.bg(t.hover).text_color(t.foreground))
+          .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+          .on_click(() => closeOverlay(props().overlay)).child(svg("mods/harness-chrome/x.svg").size(12)))))
       .when(!this.file, el => el.child(v_flex().id("files-tree").flex_1().min_h(0).overflow_y_scrollbar().p(6).children(this.rows("", 0, [], t))
         .when(Boolean(this.error) || !this.entries.get("")?.length, el => el.child(div().p(8).text_size(12).text_color(t.dim).child(this.error || (this.loading ? "Loading files…" : this.root ? "No files" : "No folder"))))
         .when(this.limited, el => el.child(div().p(8).text_size(11).text_color(t.dim).child("File list limited to 500 entries per folder and 5,000 total")))))
-      .when(Boolean(this.file), el => el.child(this.body(t)));
+      .when(Boolean(this.file), el => el.child(this.window ? div().flex_1().min_h(0).flex().flex_col().on_mouse_down("left", (_e, cx) => cx.stop_propagation()).child(this.body(t)) : this.body(t)));
   }
 }

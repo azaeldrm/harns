@@ -1,7 +1,7 @@
 // harness-files: Markdown split into prose, code, mermaid and front matter; links resolved.
 import assert from "node:assert/strict";
 import { parse, resolveLink, imageTarget } from "../mods/harness-files/parse.js";
-import { sniff, hashBytes } from "../mods/harness-files/bytes.js";
+import { sniff, hashBytes, toBase64 } from "../mods/harness-files/bytes.js";
 
 const doc = parse([
   "---", "title: Notes", "---",
@@ -82,6 +82,11 @@ assert.deepEqual(sniff(png), { type: "png", width: 3, height: 2 });
 assert.deepEqual(sniff(Buffer.from("R0lGODlhBQAEAIAAAAAAAP///yH5BAEAAAAALAAAAAAFAAQAAAIEhI+pWAA7", "base64")), { type: "gif", width: 5, height: 4 });
 const jpg = Buffer.alloc(40); jpg.set([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 7, 0, 9]);
 assert.deepEqual(sniff(jpg), { type: "jpg", width: 9, height: 7 });
+// The base64 an image is saved through (herdr's own writes binary data as an empty file): Node's, at every padding.
+for (const len of [0, 1, 2, 3, 4, 5, 64, 65537]) {
+  const bytes = new Uint8Array(len).map((_, i) => (i * 37 + 11) & 255);
+  assert.equal(toBase64(bytes), Buffer.from(bytes).toString("base64"), `toBase64 of ${len} bytes`);
+}
 assert.deepEqual(sniff(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"></svg>')), { type: "svg", width: 40, height: 20 });
 assert.deepEqual(sniff(Buffer.from('<?xml version="1.0"?><svg width="100px" viewBox="0 0 40 20">')), { type: "svg", width: 100, height: 50 });
 assert.equal(sniff(Buffer.from("just text, not an image")), null);
