@@ -135,7 +135,7 @@ are entries in `mods/machine-stats/gpus.js`, with a place for AMD, Intel and App
   as `python3`, `python` or `py -3`, so it runs as installed on Windows, Linux and macOS. The
   stats and account probes are tested the way each platform runs them: PowerShell on Windows,
   Python on Linux and macOS.
-- `harness-files` is herdr's Files panel where Markdown and `.mmd` files open as a readable
+- `harness-files` is herdr's Files panel where Markdown and `.mmd` files open in a floating window as a readable
   document: images (beside the file or on its machine; web images show as links, never fetched) and
   mermaid blocks drawn by Pele (the same pinned version as herdr-chat). Preview and
   Source in its header switch views. To update Pele, change the pin in `package.json`, then run
