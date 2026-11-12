@@ -851,10 +851,12 @@ export default class Agents extends View {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         }))
-        // A machine's icon on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band border 1 + 10 + half of 14.
-        .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6).pl(10)
-          .child(svg(this.machineIcon(g.machine)).size(14).flex_none().text_color(t.muted)))
-        .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
+        // A machine's icon in a 16 px slot on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band
+        // border 1 + 9 + half of 16; its name then starts where an agent's title does, in the same size, gray as the icons.
+        .when(isMachine, el => el.gap(8).text_size(13).font_semibold().pt(6).pl(9)
+          .child(div().size(16).flex_none().flex().items_center().justify_center()
+            .child(svg(this.machineIcon(g.machine)).size(14).flex_none().text_color(t.muted))))
+        .child(div().truncate().text_color(isMachine ? t.muted : t[g.status] ?? t.dim).child(g.label))
         // A machine's counts, each with its icon: its agents, then its plain terminals (listed under the agents) when it has any.
         .when(isMachine, (el) => {
           const n = this.plainTerminals(g.machine).length, count = (id, glyph, value, tip) => h_flex().id(id).gap(3).items_center()
