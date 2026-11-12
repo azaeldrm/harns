@@ -60,6 +60,28 @@ def merge_programs(ours_path, theirs_path):
     temp.replace(theirs_path)
 
 
+def merge_keys(ours_path, theirs_path, backup):
+    """Adds the layout's keys to keys.json's layout section, each only where that keystroke isn't bound there yet. Returns
+    the keystrokes added, or None when keys.json doesn't exist (Herdr writes it on its first start)."""
+    if not theirs_path.exists():
+        return None
+    theirs = json.loads(theirs_path.read_text(encoding='utf-8-sig'))
+    section = theirs.get(f'layout:{LAYOUT}')
+    if not isinstance(section, dict):
+        section = theirs[f'layout:{LAYOUT}'] = {}
+    ours = json.loads(ours_path.read_text(encoding='utf-8-sig'))
+    added = [key for key in ours if key not in section]
+    if not added:
+        return added
+    shutil.copy2(theirs_path, backup)
+    for key in added:
+        section[key] = ours[key]
+    temp = theirs_path.with_suffix('.json.tmp')
+    temp.write_text(json.dumps(theirs, indent=2) + '\n', encoding='utf-8')
+    temp.replace(theirs_path)
+    return added
+
+
 def back_up_if_changed(target, new, backup):
     """Keeps a copy of `target` as `backup` before `new` replaces it, only when their contents differ."""
     if not target.exists():
@@ -134,6 +156,12 @@ def main():
         shutil.copy2(repo / 'layouts' / f'{LAYOUT}.json', layout_target)
 
         merge_programs(repo / 'programs.json', home / 'programs.json')
+
+        added = merge_keys(repo / 'layouts' / f'{LAYOUT}.keys.json', home / 'keys.json', home / f'keys.json.before-install-{stamp}')
+        if added is None:
+            print(f'note: {home / "keys.json"} does not exist yet. Open Herdr once, then run this again for the layout\'s keys.')
+        elif added:
+            print(f'Added the layout\'s keys to keys.json: {", ".join(added)}')
 
     if chat:
         try:

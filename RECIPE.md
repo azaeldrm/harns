@@ -15,8 +15,8 @@ installer adds it, and adding this layout by hand means adding that repository's
 To add it, run `./install.sh` from a clone (or `python scripts/install.py`). By hand, copy
 more than the layout and its mods: `layouts/harns.json` with its picture
 `layouts/harns.png`, every folder in `mods/` (the rings' images live in
-`machine-stats`), `themes/harness.json` and `brand-assets/`, and merge `programs.json`'s
-entries into yours.
+`machine-stats`), `themes/harness.json` and `brand-assets/`, merge `programs.json`'s
+entries into yours, and add `layouts/harns.keys.json` to your `keys.json` as its `layout:harns` section.
 
 ## What you see
 
@@ -80,8 +80,11 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   A card that changes place slides there (280 ms, ease-out), and the ones it passes slide too.
   Alt+Down and Alt+Up (`agent.next`, `agent.prev`) walk the agents in the list's order: Pinned, then
   each machine top to bottom. Alt+Shift+Down and Alt+Shift+Up jump to the next or previous machine's top
-  agent, coming round past the last; keys.json binds them in its `layout:harns` section:
-  `"alt-shift-down": "machine-agents.next-machine"`, `"alt-shift-up": "machine-agents.prev-machine"`.
+  agent, coming round past the last (`machine-agents.next-machine`, `.prev-machine`). Alt+Left and Alt+Right show
+  the agent's Chat or Terminal (`layout.select` on the `chat-view` stack; herdr-chat follows). These keys are
+  `layouts/harns.keys.json`; the installer adds each to keys.json's `layout:harns` section unless that keystroke is
+  bound there already, and keeps the old file as `keys.json.before-install-<time>` when it changes. Without a
+  keys.json (Herdr not opened yet) it adds none and says so.
   A machine's whole band (name and rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
   installed there.
 - **Details cards** (an agent's, a machine's) hang from the row's top-right corner, right against the

@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -47,6 +48,41 @@ class InstallChatTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 install.install_chat(home, str(Path(directory) / 'missing'))
             self.assertFalse((home / 'mods/herdr-chat').exists())
+
+
+class MergeKeysTests(unittest.TestCase):
+    OURS = Path(__file__).parents[1] / 'layouts/harns.keys.json'
+
+    def test_missing_keys_are_added_and_the_rest_kept(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keys = root / 'keys.json'
+            keys.write_text(json.dumps({'global': {'alt-left': 'pane.go:left'}, 'layout:harns': {'alt-left': 'mine'}}))
+            added = install.merge_keys(self.OURS, keys, root / 'backup.json')
+            data = json.loads(keys.read_text())
+            self.assertNotIn('alt-left', added)
+            self.assertEqual(data['layout:harns']['alt-left'], 'mine')
+            self.assertEqual(data['layout:harns']['alt-right']['args']['child'], 'terminal-panel')
+            self.assertEqual(data['layout:harns']['alt-shift-down'], 'machine-agents.next-machine')
+            self.assertEqual(data['global'], {'alt-left': 'pane.go:left'})
+            self.assertTrue((root / 'backup.json').exists())
+
+    def test_a_second_run_changes_nothing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keys = root / 'keys.json'
+            keys.write_text(json.dumps({'global': {}}))
+            install.merge_keys(self.OURS, keys, root / 'first.json')
+            before = keys.read_text()
+            self.assertEqual(install.merge_keys(self.OURS, keys, root / 'second.json'), [])
+            self.assertEqual(keys.read_text(), before)
+            self.assertFalse((root / 'second.json').exists())
+
+    def test_no_keys_file_is_left_for_herdr_to_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertIsNone(install.merge_keys(self.OURS, root / 'keys.json', root / 'backup.json'))
+            self.assertFalse((root / 'keys.json').exists())
 
 
 class BackupTests(unittest.TestCase):
