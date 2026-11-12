@@ -1,6 +1,6 @@
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, Popup } from "gpui-base";
-import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
+import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, nextCommand, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
@@ -88,6 +88,26 @@ export default class Agents extends View {
     });
     this.noticeTurns(cx);
     this.watchLocalContext(cx);
+    // Keys bound to "machine-agents.next-machine" / ".prev-machine" (Alt+Shift+Down / Up in harns): the next machine's top agent.
+    cx.spawn(async () => {
+      for (;;) {
+        const c = await nextCommand();
+        if (c === "next-machine") this.jumpMachine(1);
+        else if (c === "prev-machine") this.jumpMachine(-1);
+      }
+    });
+  }
+
+  jumpMachine(dir) {
+    // Shows the top agent of the next machine (dir 1) or the previous one (-1) that has agents, in the list's order,
+    // from the machine of the agent or terminal in front; past the last it comes round to the first.
+    const listed = this.machineTops ?? [];
+    if (!listed.length) return;
+    const f = focused(), shown = agents().find(a => a.focused)?.address ?? f?.terminal ?? "";
+    const here = shown.includes("/") ? shown.split("/")[0] : "";
+    const at = listed.findIndex(m => m.machine === here);
+    const next = at < 0 ? (dir > 0 ? 0 : listed.length - 1) : (at + dir + listed.length) % listed.length;
+    if (next !== at) run("agent.focus", { terminal: listed[next].top });
   }
 
   noticeTurns(cx) {
@@ -754,6 +774,8 @@ export default class Agents extends View {
     }
     // agent.next / agent.prev (Alt+Down / Alt+Up) walk the agents as the list shows them: Pinned, then each machine top to bottom.
     setAgentOrder(groups.flatMap(g => g.members).map(a => a.address));
+    // Each machine with agents listed under it and its top one, in the list's order, for jumpMachine (Alt+Shift+Down / Up).
+    this.machineTops = groups.filter(g => g.machine && g.members.length).map(g => ({ machine: g.machine.name ?? "", top: g.members[0].address }));
 
     const header = (g) => {
       // A group's header: a machine's (inside its band, which folds it) or Pinned's (which folds itself).

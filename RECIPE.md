@@ -74,7 +74,9 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   moves to the top, and dragging a card onto another of the same machine puts it there.
   A card that changes place slides there (280 ms, ease-out), and the ones it passes slide too.
   Alt+Down and Alt+Up (`agent.next`, `agent.prev`) walk the agents in the list's order: Pinned, then
-  each machine top to bottom.
+  each machine top to bottom. Alt+Shift+Down and Alt+Shift+Up jump to the next or previous machine's top
+  agent, coming round past the last; keys.json binds them in its `layout:harns` section:
+  `"alt-shift-down": "machine-agents.next-machine"`, `"alt-shift-up": "machine-agents.prev-machine"`.
   A machine's whole band (name and rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
   installed there.
 - **Details cards** (an agent's, a machine's) hang from the row's top-right corner, right against the
