@@ -26,8 +26,10 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   76 px on macOS):
   - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
     (16 px semibold), then Search and the sidebar toggle.
-  - **Agents:** grouped by machine, with no heading. Each group has the machine's name (this computer's own name, or
-    a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
+  - **Agents:** grouped by machine, with no heading. Each group has its system's icon (Windows, macOS, or the Linux
+    distribution: os-release's ID, else its family, else Tux; Omarchy by its `~/.local/share/omarchy`; the BSDs by
+    `uname`), asked once per machine and kept, a drive or a screen until it answers; the machine's name (this computer's own
+    name, or a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
     GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (else its folder, else the tab name) and its status; under it, in
     11.5 px dim, its folder and git branch and a 36 × 3 px bar of the context window used
@@ -180,7 +182,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   machine's with `scripts/context-relay.py`'s collect() there; and Codex's logs (a small
   Python read of each one's newest `token_count`), else their footers with `hc read`.
 - **Art:** `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources), monochrome SVG
-  icons in `harness-chrome` and `machine-stats`, a generated spinner, Windows
+  icons in `harness-chrome` and `machine-stats`, system icons in `machine-agents/os` (Simple Icons, CC0; see its
+  SOURCES.md), a generated spinner, Windows
   window icons in `harness-tabs`, program icons in `brand-assets/` and `programs.json`.
 
 ## Watch out

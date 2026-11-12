@@ -5,6 +5,7 @@ import { machines, agents, terminals, panes, focused, spaces, run, theme, shared
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
 import { machineDetails } from "./details.js";
+import { osOf } from "./os.js";
 import { look, changedHosts, machinesChanged } from "./turns.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
@@ -84,10 +85,14 @@ export default class Agents extends View {
     // How far the list is scrolled, and how tall it and its rows are (px, as laid out): the edges fade where
     // more is out of sight. The scroll position can't be read, so the wheel's movements are followed.
     this.scrollY = 0; this.viewH = 0; this.rowsH = 0;
+    // Each machine's system, for its icon (os.js), asked once and kept: machine name ("" for this computer) -> icon name.
+    try { this.osIcons = JSON.parse(localStorage.getItem("os") ?? "{}"); } catch { this.osIcons = {}; }
+    this.osAsked = {};
     // A reload starts the list at the top, where scrollY starts (the list would otherwise keep its old place).
     this.scrollHandle = ScrollHandle.new();
     this.scrollHandle.scroll_to_item(0);
     cx.timer.every(1000, (cx) => {
+      this.noticeOs(cx);
       this.noticeTurns(cx);
       if (this.detailsWanted && Date.now() < this.detailsWanted.until) this.readDetails(this.detailsWanted.name, cx);
       cx.notify();
@@ -114,6 +119,28 @@ export default class Agents extends View {
     const at = listed.findIndex(m => m.machine === here);
     const next = at < 0 ? (dir > 0 ? 0 : listed.length - 1) : (at + dir + listed.length) % listed.length;
     if (next !== at) run("agent.focus", { terminal: listed[next].top });
+  }
+
+  noticeOs(cx) {
+    // Asks each machine that answers what it runs, once; one that couldn't say is asked again a minute later.
+    for (const m of machines()) {
+      const key = m.name ?? "";
+      if (this.osIcons[key] || Date.now() - (this.osAsked[key] ?? 0) < 60000 || (m.name && m.layout !== "ready")) continue;
+      this.osAsked[key] = Date.now();
+      cx.spawn(async (cx) => {
+        const os = await osOf(m.name ?? null);
+        if (!os) return;
+        this.osIcons[key] = os;
+        try { localStorage.setItem("os", JSON.stringify(this.osIcons)); } catch {}
+        cx.notify();
+      });
+    }
+  }
+
+  machineIcon(machine) {
+    // Its system's icon once known, else a drive (another machine) or a screen (this computer).
+    const os = this.osIcons?.[machine?.name ?? ""];
+    return os ? `mods/machine-agents/os/${os}.svg` : `mods/harness-chrome/${machine?.name ? "hard-drive" : "monitor"}.svg`;
   }
 
   noticeTurns(cx) {
@@ -815,7 +842,7 @@ export default class Agents extends View {
         }))
         // A machine's icon on the sidebar's icon axis (26 px in, as the agents' and the footer's): list 8 + band border 1 + 10 + half of 14.
         .when(isMachine, el => el.text_size(12.5).font_semibold().pt(6).pl(10)
-          .child(svg(`mods/harness-chrome/${g.machine?.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
+          .child(svg(this.machineIcon(g.machine)).size(14).flex_none().text_color(t.muted)))
         .child(div().truncate().text_color(isMachine ? t.foreground : t[g.status] ?? t.dim).child(g.label))
         // A machine's counts, each with its icon: its agents, then its plain terminals (listed under the agents) when it has any.
         .when(isMachine, (el) => {
@@ -887,7 +914,7 @@ export default class Agents extends View {
           // Resting on it shows the machine's details card, as open.
           this.machineCard(t, machine, v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
             .child(h_flex().h(30).pt(6).flex_none().items_center().justify_center()
-              .child(svg(`mods/harness-chrome/${machine.name ? "hard-drive" : "monitor"}.svg`).size(14).flex_none().text_color(t.muted)))
+              .child(svg(this.machineIcon(machine)).size(14).flex_none().text_color(t.muted)))
             .child(this.railCpu(t, machine.name ?? null)), 0),
           ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
             .flatMap(a => withKids(a, list.indexOf(a))),
