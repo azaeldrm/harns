@@ -7,6 +7,7 @@ import { refreshContext } from "./context.js";
 import { machineDetails } from "./details.js";
 import { osOf } from "./os.js";
 import { look, changedHosts, machinesChanged } from "./turns.js";
+import { agentFolder } from "./sessions.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
 const statsFor = (machine, t) => machineMetrics(machine, false, t);
@@ -33,14 +34,19 @@ function harnessSessionTitle(l) {
   const prog = l?.program?.name;
   const live = clean(l?.title);
   const prefixes = [prog, l?.program?.key, l?.app === "pi" ? "\u03c0" : null].filter(Boolean);
+  const separators = [" - ", " \u2014 ", " \u2013 ", " | ", ": "];
   let session = live;
   for (const prefix of prefixes) {
     const start = session.toLowerCase();
     const name = prefix.toLowerCase();
-    const separator = [" - ", " \u2014 ", " \u2013 ", " | ", ": "].find(s => start.startsWith(`${name}${s}`));
+    const separator = separators.find(s => start.startsWith(`${name}${s}`));
     if (separator) { session = session.slice(prefix.length + separator.length).trim(); break; }
   }
-  const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key;
+  const folder = folderName(l?.cwd);
+  const suffix = folder && separators.find(s => session.endsWith(`${s}${folder}`));
+  if (suffix) session = session.slice(0, -(suffix.length + folder.length)).trim();
+  else if ((l?.app === "codex" || l?.program?.key === "codex") && session.includes(" | ")) session = session.slice(0, session.lastIndexOf(" | ")).trim();
+  const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key && session !== folder;
   return telling ? session : "";
 }
 // The agent's own branch: its pane's folder's, as Herdr reads it (panes().branch), else its space's (the first terminal's
@@ -114,7 +120,9 @@ export default class Agents extends View {
     // from the machine of the agent or terminal in front; past the last it comes round to the first.
     const listed = this.machineTops ?? [];
     if (!listed.length) return;
-    const f = focused(), shown = agents().find(a => a.focused)?.address ?? f?.terminal ?? "";
+    const f = focused(), list = agents();
+    const shown = f?.terminal ?? f?.agent ?? list.find(a => a.tab === f?.tab && a.space === f?.space)?.address
+      ?? list.find(a => a.focused)?.address ?? "";
     const here = shown.includes("/") ? shown.split("/")[0] : "";
     const at = listed.findIndex(m => m.machine === here);
     const next = at < 0 ? (dir > 0 ? 0 : listed.length - 1) : (at + dir + listed.length) % listed.length;
@@ -318,7 +326,7 @@ export default class Agents extends View {
     const color = { working: t.working, blocked: t.blocked, done: t.ansi2 ?? t.done }[a.status] ?? t.muted;
     const machine = a.address.includes("/") ? a.address.split("/")[0] : localMachineLabel();
     const tab = spaces().flatMap(s => s.tabs).find(x => x.id === a.tab);
-    const folder = (tab ? lead(tab) : null)?.cwd;
+    const folder = agentFolder(a, tab ? lead(tab) : null, all);
     const branch = paneBranch(a);
     const context = (shared("agents.context") ?? {})[a.address];
     const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
@@ -668,7 +676,7 @@ export default class Agents extends View {
       const tab = tabs.find(tab => tab.id === a.tab);
       const pane = tab ? lead(tab) : null;
       const source = pane ?? { title: a.title, program: a.program, app: a.app };
-      return harnessSessionTitle(source) || folderName(pane?.cwd) || tab?.name || "";
+      return harnessSessionTitle(source) || source.program?.name || folderName(pane?.cwd) || tab?.name || "";
     };
 
     const row = (a, i, subs = []) => {
@@ -722,7 +730,7 @@ export default class Agents extends View {
       const name = label(a) || a.space_name || "";
       // Line 2: where it works (folder · branch, and its space where the list doesn't group by it); context used as a small bar.
       const tab = tabs.find(x => x.id === a.tab);
-      const folder = folderName((tab ? lead(tab) : null)?.cwd);
+      const folder = folderName(agentFolder(a, tab ? lead(tab) : null));
       const branch = paneBranch(a);
       // Line 2's pieces, each with its icon: the folder, the branch, and the space where the list doesn't group by it.
       const where = [[folder !== name ? folder : "", "folder"], [branch, "branch"], [full && a.space_name !== name ? a.space_name : "", "layers"]].filter(([text]) => text);

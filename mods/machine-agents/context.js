@@ -3,6 +3,7 @@ import { readdir, readFile } from 'fs/promises';
 import { hostOf } from './turns.js';
 import { contextProbe } from './context-probe.js';
 import { newestSnapshots } from './snapshots.js';
+import { sessionOf } from './sessions.js';
 
 export function refreshContext(view, cx, only, { footers = true } = {}) {
   // Reads the context of every machine's agents (or `only`'s) into shared `agents.context`: relay snapshots, and Codex footers with `footers`.
@@ -87,11 +88,9 @@ print(json.dumps(out))
 export async function codexLogContext(host, codex) {
   // Each Codex agent's context as its log's newest token_count gives it (last input tokens of the model's window), for the
   // agents whose log herdr-chat found (its shared 'herdr-chat.paths', by address and start); { address: snapshot }.
-  const paths = shared('herdr-chat.paths') ?? {};
   const all = terminals();
   const list = codex.map(a => {
-    const t = all.find(x => x.address === a.address);
-    const path = t ? paths[`${a.address}:${t.created_ms}`]?.path : null;
+    const path = sessionOf(a.address, all)?.path;
     return path ? [a.address, path] : null;
   }).filter(Boolean);
   if (!list.length) return {};
