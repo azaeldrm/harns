@@ -46,8 +46,21 @@ Optional:
   own emulator, and its sub-agents use the same one; when another session needs one, the panel
   copies a virtual device for it. The panel shows the focused session's emulator, its own
   window placed over the panel so it runs at full speed with its own input, and the others
-  keep running, hidden. Closing a tab stops its emulator and keeps the device. For Expo apps,
+  keep running, hidden. Stop saves where Android was, and the next Start resumes it; Restart
+  (the circular arrow) shuts the emulator down and boots it fresh, keeping its apps and data.
+  Closing a tab stops its emulator and keeps the device. For Expo apps,
   run `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
+
+  Each emulator starts with 4 GB of RAM, 4 cores and the graphics card (`-gpu host`), over what
+  its virtual device says; storage is the virtual device's own. These are limits rather than
+  reservations: cores are threads Windows runs anywhere, and memory is taken as Android uses
+  it (though memory Android has filled isn't given back until the emulator stops). The defaults
+  are in `mods/harness-simulator/emulator.json`; change them in `~/.config/herdr-app/harness.json`,
+  which updates don't overwrite, as `{ "emulator": { "default": { "memory": 6144 }, "devices":
+  { "harns_phone": { "cores": 6 } } } }` (`memory` in MB, `cores`, `gpu`; `devices` by a virtual
+  device's name, for that one only). The panel title's tooltip shows what the session's emulator
+  uses. A new value applies the next time it starts; one the emulator wouldn't take is left out
+  and named while it starts.
 
   Sessions on other machines reach their emulator with that machine's own `adb`. The panel
   shares each one there through an SSH reverse tunnel (Windows' OpenSSH, with the same ssh
@@ -56,7 +69,9 @@ Optional:
   each session's terminals at their own emulator before running the machine's own adb. In
   that session, `adb devices` lists its emulator (and any phones, but not other sessions'
   emulators), and `adb`, `adb install` and `expo run:android` reach it. An `adb` already in
-  `~/.local/bin` that isn't harns's is left alone.
+  `~/.local/bin` that isn't harns's is left alone. If that machine's adb server restarts, or a
+  connection drops, the panel connects it again within a minute. A share that can't be set up
+  (no ssh key, someone else's `adb` there) shows why and is tried again later, less and less often.
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
