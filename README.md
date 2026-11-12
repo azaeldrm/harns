@@ -46,7 +46,9 @@ Optional:
   own emulator, and its sub-agents use the same one; when another session needs one, the panel
   copies a virtual device for it. The panel shows the focused session's emulator, its own
   window placed over the panel so it runs at full speed with its own input, and the others
-  keep running, hidden. Closing a tab stops its emulator and keeps the device. For Expo apps,
+  keep running, hidden. Stop saves where Android was, and the next Start resumes it; Restart
+  (the circular arrow) shuts the emulator down and boots it fresh, keeping its apps and data.
+  Closing a tab stops its emulator and keeps the device. For Expo apps,
   run `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
 
   Each emulator starts with 4 GB of RAM, 4 cores and the graphics card (`-gpu host`), over what
@@ -64,7 +66,8 @@ Optional:
   each session's terminals at their own emulator before running the machine's own adb. In
   that session, `adb devices` lists its emulator (and any phones, but not other sessions'
   emulators), and `adb`, `adb install` and `expo run:android` reach it. An `adb` already in
-  `~/.local/bin` that isn't harns's is left alone.
+  `~/.local/bin` that isn't harns's is left alone. If that machine's adb server restarts, or a
+  connection drops, the panel connects it again within about 30 seconds.
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 

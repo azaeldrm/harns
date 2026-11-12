@@ -25,6 +25,7 @@ const PAD = 12;           // around the screen area, in the mod's px (herdr zoom
 const BORDER = 1;         // the card's border, as on Files and Changes
 const POLL = 4000;        // how often the emulators are read (ms)
 const SHARE_PORT = 15555; // the first port tried on another machine for an emulator's adb
+const CHECK = 30000;      // how often shared emulators are checked on their machines (ms)
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -88,6 +89,7 @@ export default class Simulator extends View {
     this.declined = new Set();   // avds the user stopped sharing, until they stop
     this.maps = {};              // machine -> the devices file last written there
     this.scripts = {};           // machine -> true once its adb script is in place
+    this.checked = 0;            // when the shares were last checked on their machines
     if (window()?.platform !== "windows") { this.status = "The Simulator panel runs on Windows for now."; return; }
     cx.spawn(async cx => {
       await this.setup();
@@ -253,7 +255,30 @@ export default class Simulator extends View {
       this.shares[avd] = { machine: m, pending: true };
       this.shares[avd] = await this.share(m, avd).catch(err => ({ machine: m, error: errorText(err) }));
     }
+    if (Date.now() - this.checked > CHECK) { this.checked = Date.now(); await this.checkShares(); }
     await this.writeMaps();
+  }
+
+  async checkShares() {
+    // Shares mend themselves: a machine's adb server that restarted forgets its connections,
+    // and a connect can time out and still finish. Each is checked against that machine's
+    // `adb devices`; one that's missing connects again, and one that can't is set up again.
+    const byMachine = {};
+    for (const [avd, share] of Object.entries(this.shares)) if (!share.pending) (byMachine[share.machine] ??= []).push(avd);
+    for (const [m, avds] of Object.entries(byMachine)) {
+      if (!this.ready(m)) continue;
+      const list = await exec("adb", ["devices"], { on: m, timeout: 10000 }).catch(() => null);
+      if (!list || list.code !== 0) continue;
+      const connected = new Set(list.stdout.split(/\r?\n/).map(l => l.split(/\s+/)).filter(([, st]) => st === "device").map(([s]) => s));
+      for (const avd of avds) {
+        const share = this.shares[avd];
+        if (!share.pid) { delete this.shares[avd]; continue; }   // no tunnel: the next round opens one
+        if (connected.has(share.serial)) { delete share.error; continue; }
+        const c = await exec("adb", ["connect", share.serial], { on: m, timeout: 10000 }).catch(() => null);
+        if (/connected to/.test(c?.stdout ?? "")) delete share.error;
+        else await this.unshare(avd);   // the tunnel is gone too: the next round opens a new one
+      }
+    }
   }
 
   // Sharing a session's emulator with its machine. An SSH reverse tunnel (Windows' OpenSSH, with
@@ -432,10 +457,15 @@ export default class Simulator extends View {
     this.saveOwners();
     this.status = "";
     if (this.running[avd]) { cx.notify(); return; }
+    await this.boot(avd, cx);
+  }
+
+  async boot(avd, cx, extra = []) {
     this.starting.add(avd); this.status = `Starting ${this.label(avd)}…`; cx.notify();
     // Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it as
     // soon as it appears, so it boots inside the panel.
-    const started = await ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(this.emulator)} -ArgumentList ${this.launchArgs(avd).map(quote).join(",")}`)
+    const args = [...this.launchArgs(avd), ...extra];
+    const started = await ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(this.emulator)} -ArgumentList ${args.map(quote).join(",")}`)
       .then(() => true, err => { this.status = `Couldn't start ${this.label(avd)}: ${errorText(err)}`; return false; });
     if (started && this.mode === "dock" && !this.helper) await this.dock();
     // A fresh copy boots cold, which takes a while the first time.
@@ -450,11 +480,26 @@ export default class Simulator extends View {
     const avd = this.owners[this.session()], serial = avd && this.running[avd];
     if (!serial) return;
     this.status = `Stopping ${this.label(avd)}…`; cx.notify();
+    await this.shutdown(avd, cx);
+    this.status = ""; cx.notify();
+  }
+
+  async shutdown(avd, cx) {
     await this.unshare(avd);
     // `emu kill` can hang on after the emulator is gone: watch the device list instead.
-    exec(this.adb, ["-s", serial, "emu", "kill"], { timeout: 15000 }).catch(() => {});
-    for (let i = 0; i < 40 && this.running[avd]; i++) { await cx.sleep(500); await this.refresh(); cx.notify(); }
-    this.status = ""; cx.notify();
+    exec(this.adb, ["-s", this.running[avd], "emu", "kill"], { timeout: 15000 }).catch(() => {});
+    for (let i = 0; i < 60 && this.running[avd]; i++) { await cx.sleep(500); await this.refresh(); cx.notify(); }
+    return !this.running[avd];
+  }
+
+  async reset(cx) {
+    // A full restart: the emulator shuts down and boots cold (-no-snapshot-load), so Android
+    // starts fresh instead of resuming where Stop left it. Apps and data stay.
+    const avd = this.owners[this.session()];
+    if (!avd || !this.running[avd]) return;
+    this.status = `Restarting ${this.label(avd)}…`; cx.notify();
+    if (!await this.shutdown(avd, cx)) { this.status = `${this.label(avd)} didn't shut down.`; cx.notify(); return; }
+    await this.boot(avd, cx, ["-no-snapshot-load"]);
   }
 
   async setMode(mode, cx) {
@@ -495,6 +540,7 @@ export default class Simulator extends View {
         .child(this.mode === "dock"
           ? button("sim-pop", "pop-out", null, cx => this.setMode("window", cx)).tooltip("Open in their own windows")
           : button("sim-dock", "dock", null, cx => this.setMode("dock", cx)).tooltip("Show in the panel"))
+        .child(button("sim-reset", "restart", null, cx => this.reset(cx)).tooltip("Restart this session's emulator: shut it down and boot it fresh (apps and data stay)"))
         .child(button("sim-stop", "stop", null, cx => this.stop(cx)).tooltip("Stop this session's emulator")));
 
     const sizeArea = (size, cx) => {

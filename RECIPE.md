@@ -111,7 +111,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   running, hidden. It hides with the panel, while one of herdr's popups is open, and when
   herdr minimizes; it follows the window as it moves or resizes. A session without one gets
   Start (a free virtual device, or a copy of one); the header pops the emulators out into
-  their own windows and back, and stops this session's. Closing a tab stops its emulator and
+  their own windows and back, restarts this session's (a shutdown, then a cold boot with
+  `-no-snapshot-load`, so it doesn't resume Stop's snapshot) and stops it. Every 30 s, each
+  shared emulator is looked for in its machine's `adb devices`; a missing one is connected
+  again, or its tunnel opened again. Closing a tab stops its emulator and
   keeps the device. A session on another machine has its emulator shared there, shown as the
   machine's name in the header, with × to stop. Emulators start with the specs in
   `emulator.json` (by default 4096 MB, 4 cores, `-gpu host`; a
