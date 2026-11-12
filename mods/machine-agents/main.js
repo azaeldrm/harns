@@ -42,6 +42,9 @@ function harnessSessionTitle(l) {
   const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key;
   return telling ? session : "";
 }
+// The agent's own branch: its pane's folder's, as Herdr reads it (panes().branch), else its space's (the first terminal's
+// there): every agent in one space showed that one branch, as all of a remote machine's sessions in its home space.
+const paneBranch = a => panes().find(p => p.pane === a.pane)?.branch ?? spaces().find(s => s.id === a.space)?.branch ?? null;
 const folderName = path => String(path ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? "";
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
 const kidStatus = (k, listed) => {
@@ -263,7 +266,7 @@ export default class Agents extends View {
     const machine = a.address.includes("/") ? a.address.split("/")[0] : localMachineLabel();
     const tab = spaces().flatMap(s => s.tabs).find(x => x.id === a.tab);
     const folder = (tab ? lead(tab) : null)?.cwd;
-    const branch = spaces().find(s => s.id === a.space)?.branch;
+    const branch = paneBranch(a);
     const context = (shared("agents.context") ?? {})[a.address];
     const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
     const LABEL = 64;
@@ -659,7 +662,7 @@ export default class Agents extends View {
       // Line 2: where it works (folder · branch, and its space where the list doesn't group by it); context used as a small bar.
       const tab = tabs.find(x => x.id === a.tab);
       const folder = folderName((tab ? lead(tab) : null)?.cwd);
-      const branch = spaces().find(s => s.id === a.space)?.branch;
+      const branch = paneBranch(a);
       // Line 2's pieces, each with its icon: the folder, the branch, and the space where the list doesn't group by it.
       const where = [[folder !== name ? folder : "", "folder"], [branch, "branch"], [full && a.space_name !== name ? a.space_name : "", "layers"]].filter(([text]) => text);
       const context = (shared("agents.context") ?? {})[a.address];
