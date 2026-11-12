@@ -34,9 +34,11 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     (amber above 75%, red `#d88179` above 90%). Sub-agents hang under their parent as a
     tree (26 px rows). Its terminals that aren't agents (a shell, a dev server, lazygit) follow its agents, a 28 px row
     each: the program's icon in the agents' icon column, the program running now and its folder; a click focuses it and
-    shows the Terminal view. The machine's name is followed by its counts, each with its icon: agents (a bot), and
-    terminals (`>_`) when it has any.
+    shows the Terminal view; on the rail, just the icon, on the agents' axis, with the rest in its tooltip. The machine's
+    name is followed by its counts, each with its icon: agents (a bot), and terminals (`>_`) when it has any.
     A machine with no agents says "No agents", "Connecting…" or "Offline".
+    The list scrolls without a scrollbar; where more is out of sight, its top (under the logo) and bottom (over the
+    footer) fade, as 32 px of 12 bands of `surface`. The position is followed from the wheel (a mod can't read it).
   - **Footer** (44 px): two icons side by side, Settings (a gear, with an amber dot when an update is ready) and Add
     machine (a server).
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
