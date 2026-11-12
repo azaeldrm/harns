@@ -519,7 +519,7 @@ export default class Agents extends View {
         .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
         .on_click(() => {
           run("pane.focus", { pane: p.pane });
-          run("layout.select", { stack: "chat-view", child: "terminal-panel" });
+          if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" });
         })
         .child(h_flex().size(16).flex_none().items_center().justify_center().child(pic))
         .child(div().flex_none().text_color(on ? t.foreground : t.muted).child(name))
