@@ -40,7 +40,7 @@ function harnessSessionTitle(l) {
     const separator = [" - ", " \u2014 ", " \u2013 ", " | ", ": "].find(s => start.startsWith(`${name}${s}`));
     if (separator) { session = session.slice(prefix.length + separator.length).trim(); break; }
   }
-  const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key;
+  const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key && session !== folderName(l?.cwd);
   return telling ? session : "";
 }
 // The agent's own branch: its pane's folder's, as Herdr reads it (panes().branch), else its space's (the first terminal's
@@ -670,7 +670,7 @@ export default class Agents extends View {
       const tab = tabs.find(tab => tab.id === a.tab);
       const pane = tab ? lead(tab) : null;
       const source = pane ?? { title: a.title, program: a.program, app: a.app };
-      return harnessSessionTitle(source) || folderName(pane?.cwd) || tab?.name || "";
+      return harnessSessionTitle(source) || source.program?.name || folderName(pane?.cwd) || tab?.name || "";
     };
 
     const row = (a, i, subs = []) => {
