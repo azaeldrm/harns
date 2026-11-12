@@ -114,7 +114,9 @@ export default class Agents extends View {
     // from the machine of the agent or terminal in front; past the last it comes round to the first.
     const listed = this.machineTops ?? [];
     if (!listed.length) return;
-    const f = focused(), shown = agents().find(a => a.focused)?.address ?? f?.terminal ?? "";
+    const f = focused(), list = agents();
+    const shown = f?.terminal ?? f?.agent ?? list.find(a => a.tab === f?.tab && a.space === f?.space)?.address
+      ?? list.find(a => a.focused)?.address ?? "";
     const here = shown.includes("/") ? shown.split("/")[0] : "";
     const at = listed.findIndex(m => m.machine === here);
     const next = at < 0 ? (dir > 0 ? 0 : listed.length - 1) : (at + dir + listed.length) % listed.length;
