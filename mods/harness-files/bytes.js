@@ -55,3 +55,18 @@ export function sniff(b) {
   }
   return svgSize(b);
 }
+
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+// herdr's Buffer encodes bytes to base64 as an empty string, so this does it: three bytes to four characters,
+// joined a chunk at a time (one long concatenation is slow in herdr's engine).
+export function toBase64(bytes) {
+  const n = bytes.length, chunks = [];
+  let out = "";
+  for (let i = 0; i < n; i += 3) {
+    const a = bytes[i], b = i + 1 < n ? bytes[i + 1] : 0, c = i + 2 < n ? bytes[i + 2] : 0;
+    out += B64[a >> 2] + B64[((a & 3) << 4) | (b >> 4)] + (i + 1 < n ? B64[((b & 15) << 2) | (c >> 6)] : "=") + (i + 2 < n ? B64[c & 63] : "=");
+    if (out.length >= 16384) { chunks.push(out); out = ""; }
+  }
+  chunks.push(out);
+  return chunks.join("");
+}

@@ -12,7 +12,7 @@ const python = [['python3'], ['python'], ['py', '-3']].find(([exe, ...args]) =>
 
 const steps = [
   python ? ['Python tests', python[0], [...python.slice(1), '-m', 'unittest', 'discover', '-s', 'tests']] : null,
-  ...['usage', 'turns', 'probes', 'snapshots', 'markdown', 'simulator'].map(t => [`tests/${t}.mjs`, process.execPath, [`tests/${t}.mjs`]]),
+  ...['usage', 'turns', 'probes', 'snapshots', 'markdown', 'simulator', 'os-icons'].map(t => [`tests/${t}.mjs`, process.execPath, [`tests/${t}.mjs`]]),
   ['Pele matches its pin', process.execPath, ['scripts/vendor-pele.mjs', '--check']],
 ].filter(Boolean);
 

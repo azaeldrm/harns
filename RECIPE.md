@@ -26,8 +26,10 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   76 px on macOS):
   - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
     (16 px semibold), then Search and the sidebar toggle.
-  - **Agents:** grouped by machine, with no heading. Each group has the machine's name (this computer's own name, or
-    a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
+  - **Agents:** grouped by machine, with no heading. Each group has its system's icon (Windows, macOS, or the Linux
+    distribution: os-release's ID, else its family, else Tux; Omarchy by its `~/.local/share/omarchy`; the BSDs by
+    `uname`), asked once per machine and kept, a drive or a screen until it answers; the machine's name (this computer's own
+    name, or a nickname), a + to start an agent there, a row of CPU, RAM and GPU rings (one per
     GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (else its folder, else the tab name) and its status; under it, in
     11.5 px dim, its folder and git branch and a 36 × 3 px bar of the context window used
@@ -180,7 +182,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   machine's with `scripts/context-relay.py`'s collect() there; and Codex's logs (a small
   Python read of each one's newest `token_count`), else their footers with `hc read`.
 - **Art:** `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources), monochrome SVG
-  icons in `harness-chrome` and `machine-stats`, a generated spinner, Windows
+  icons in `harness-chrome` and `machine-stats`, system icons in `machine-agents/os` (Simple Icons, CC0; see its
+  SOURCES.md), a generated spinner, Windows
   window icons in `harness-tabs`, program icons in `brand-assets/` and `programs.json`.
 
 ## Watch out
@@ -216,6 +219,11 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
 
 **Notes for building it:**
 
+- herdr's `fs.writeFile` writes binary data as an empty file while reporting success (text is
+  written whole), and its `Buffer` encodes bytes to base64 as an empty string. `harness-files`
+  saves images for `image()` by checking each copy reads back whole and, when it doesn't,
+  writing it as base64 text (its own `toBase64` in `bytes.js`) for PowerShell, else Python 3
+  or `base64`, to decode beside it.
 - Each herdr mod imports from its own folder, so `scripts/build-mods.py` copies shared code:
   `machine-metrics` and `machine-stats`'s `details.js` (with what it runs on) into
   `machine-agents`, `machine-stats` into
@@ -240,7 +248,11 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
   `install.py`.
 - `harness-files` replaces herdr's `files` block (same block id, so its clicks survive). It is
   herdr's Files plus a Markdown view, and `vendor/pele` comes from `npm run vendor:pele`. Don't
-  edit the vendored copy. With props `{ file }` it is a viewer for that one file.
+  edit the vendored copy. With props `{ file }` it is a viewer for that one file. Clicking a
+  Markdown or `.mmd` file in the tree opens it as that viewer in a floating window (`openOverlay`
+  `kind: "window"`, key `harness-files-doc`: one at a time, reopened where it was dropped), headed
+  by the file's name with Preview/Source and ×; the panel stays on its folder. Other files preview
+  in the panel, with ← back.
 - `harness-pane` is a pane header for layouts that want one; harns itself uses herdr-chat's.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
   its rail.
