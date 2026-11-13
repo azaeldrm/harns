@@ -1,8 +1,8 @@
 # harns
 
 A dark, amber-accented herdr window organized by machine. The sidebar lists every
-connected machine with live CPU, RAM and per-GPU load rings (hover it for a card of all its
-details) and the agents running on it, each a two-line card with its session title, status,
+connected machine (hover it for a card of all its details; the Classic style adds live CPU, RAM
+and per-GPU load rings) and the agents running on it, each a two-line card with its session title, status,
 folder and branch, and context used. Agent tabs open as a
 chat (from [herdr-chat](https://github.com/azaeldrm/herdr-chat)) or their live terminal.
 A status bar shows where you are and how much Claude Code and Codex quota is left.
@@ -43,8 +43,14 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     A machine with no agents says "No agents", "Connecting…" or "Offline".
     The list scrolls without a scrollbar; where more is out of sight, its top (under the logo) and bottom (over the
     footer) fade, as 32 px of 12 bands of `surface`. The position is followed from the wheel (a mod can't read it).
-  - **Footer** (44 px): two icons side by side, Settings (a gear, with an amber dot when an update is ready) and Add
-    machine (a server).
+    That's the Classic style (shared `harness.sidebar` `classic`); the Tree style (the default) drops the band's box,
+    system icon, rings and counts and hangs each machine's agents and terminals from its icon (a laptop or a server) on
+    1 px lines, each agent's bot icon with its program's icon small at its corner. In both, machines can be dragged into
+    an order by their bands (kept in the mod's localStorage, `machines.order`).
+  - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
+    harns's Settings (the logo, a 760 px dialog from `harness-settings`: General, Sidebar, Chat, Status bar, Simulator,
+    which write shared `harness.local-name`, `harness.sidebar`, `herdr-chat.chat`, `herdr-chat.animation`,
+    `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and `harness.simulator`).
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, Simulator (Windows and Linux), and the window buttons on Windows and Linux.
@@ -53,7 +59,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   Changes or Simulator open in a 368 px panel on the right.
 - **Status bar** (42 px, `surface`): the shown space's machine and branch, the focused
   pane's folder, "N needs you" when agents on that machine are blocked, then Claude Code and Codex quota bars (44 × 4 px)
-  and "Ctrl Shift P commands".
+  and "Ctrl Shift P commands" (each can be turned off in harns's Settings, and the bar hidden).
 
 The theme is `harness`: background `#080a0b`, canvas `#060708`, text `#dededb`, accent and
 working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are herdr's.
@@ -86,7 +92,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   `layouts/harns.keys.json`; the installer adds each to keys.json's `layout:harns` section unless that keystroke is
   bound there already, and keeps the old file as `keys.json.before-install-<time>` when it changes. Without a
   keys.json (Herdr not opened yet) it adds none and says so.
-  A machine's whole band (name and rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
+  A machine's whole band (its name, and in Classic its rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
   installed there.
 - **Details cards** (an agent's, a machine's) hang from the row's top-right corner, right against the
   sidebar: the first opens after 450 ms, and while one is up (or was, under 400 ms ago) moving to
@@ -300,8 +306,8 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
   it, and Files hides it. On other Linux desktops it starts in its own window. Two sessions on another machine each get their own emulator: `adb devices`
   in each lists only its own, a sub-agent's lists its session's, and closing a tab stops its
   emulator.
-- Each connected machine has a group with live CPU, RAM and GPU rings, and its agents
-  under it; a working agent spins and the logo fades.
+- Each connected machine has a group with its agents under it (in Classic, with live CPU, RAM and GPU rings),
+  and dragging a band reorders the machines; a working agent spins and the logo fades.
 - Folding the sidebar leaves icons, rings and statuses centered in the rail.
 - The status bar names the focused pane's machine and folder and fills the quota bars.
 - A new Claude Code tab opens on its chat and toggles to Terminal from its header.

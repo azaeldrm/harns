@@ -10,8 +10,9 @@ status bar. Everything goes through herdr's own machine connections.
 
 ## Features
 
-**Organized by machine.** Each machine in the sidebar shows its system (Windows, macOS or the Linux distribution),
-its CPU, RAM and GPU load, its agents with their folders, branches and context, and its plain terminals. Its **+**
+**Organized by machine.** Each machine in the sidebar lists its agents with their folders, branches and context, and
+its plain terminals, hanging from it on lines; the Classic style boxes each machine with its system (Windows, macOS or
+the Linux distribution) and its CPU, RAM and GPU load, which the machine's card shows in either. Its **+**
 starts an agent there from the ones installed on it, or a terminal, a new space or a worktree. Alt+Up and Alt+Down
 walk the agents; Alt+Shift+Up and Alt+Shift+Down jump to the next machine's. Alt+Left and Alt+Right
 switch an agent's tab between Chat and Terminal.
@@ -46,6 +47,11 @@ the agent runs on (below).
 ![The Simulator panel](docs/simulator.png)
 
 The status bar shows the Claude Code and Codex quota left.
+
+**Settings of its own.** The harns logo in the sidebar's footer opens harns's Settings: this computer's name, the
+sidebar's style (Tree, agents hanging from their machine on lines, or Classic, each machine boxed with its agents and
+stats), whether agents open as a chat and the welcome's animation, what the status bar shows, and whether the tab bar
+offers the Simulator. Drag a machine's band to reorder the machines in the sidebar.
 
 ## Install
 
@@ -114,8 +120,8 @@ Optional:
   `~/.local/bin` that isn't harns's is left alone. If that machine's adb server restarts, or a
   connection drops, the panel connects it again within a minute. A share that can't be set up
   (no way to ssh in, someone else's `adb` there) shows why and is tried again later, less and less often.
-- **This computer's name:** it shows the computer's own name. For a nickname, put
-  `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
+- **This computer's name:** it shows the computer's own name. For a nickname, set Name in harns's Settings
+  (General), or put `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
 ## Platforms
 
