@@ -31,6 +31,8 @@ export async function windowsHost() {
 
     kill(pid) { return exec("taskkill", ["/PID", String(pid), "/F"]).catch(() => {}); },
 
+    closeTunnel(pid) { return exec("taskkill", ["/PID", String(pid), "/F"]).catch(() => {}); },
+
     closeTunnels() {
       // Tunnels a previous copy of the mod left (a reload, or a crash), found by the name SetEnv gave them.
       return ps(`Get-CimInstance Win32_Process -Filter "Name='ssh.exe'" | Where-Object { $_.CommandLine -like '*harns-simulator*' } | ` +

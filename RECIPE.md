@@ -201,7 +201,8 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 ## Simulator setup
 
 The panel needs the Android SDK's `emulator` and `platform-tools` and one virtual device on this computer, and says
-what's missing. Sessions on other machines need only `adb` there, and ssh to them with a key.
+what's missing. Sessions on other machines need only `adb` there; on Windows, ssh to them with a key too (Linux reuses herdr's
+connection).
 
 - **Windows:** Android Studio installs the SDK in `%LOCALAPPDATA%\Android\Sdk`; create a device in its Device Manager.
 - **Linux** (the SDK in `~/Android/Sdk`, or `ANDROID_HOME`):
@@ -231,8 +232,10 @@ what's missing. Sessions on other machines need only `adb` there, and ssh to the
   `dock-hyprland.py` while emulators are docked (it talks only to Hyprland's and herdr's sockets, to place the device
   window and notice herdr's popups, and adds and removes its one window rule);
 - for each session on another machine with a running emulator: an SSH reverse tunnel to that
-  machine (OpenSSH, Windows' own there, `ssh -N -R 127.0.0.1:<port>:127.0.0.1:<emulator adb port>`, bound
-  to its localhost), `adb connect` / `adb disconnect` there, and two files there:
+  machine, bound to its localhost: on Linux a forward added to herdr-core's own ssh connection (`ssh -S <its
+  socket> -O forward -R 127.0.0.1:<port>:127.0.0.1:<emulator adb port>`, found from herdr-core's ssh clients in
+  `ps`, cancelled with `-O cancel` and remembered in the mod's localStorage until then), else OpenSSH (Windows' own
+  there) `ssh -N -R …`, `adb connect` / `adb disconnect` there, and two files there:
   `~/.local/bin/adb` (harns's `adb.sh`, never over an `adb` that isn't its own) and
   `~/.config/harness/devices`; on this computer, copies of a virtual device in
   `~/.android/avd` when more sessions need one;

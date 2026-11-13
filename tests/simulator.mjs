@@ -54,7 +54,7 @@ check("no settings files: no flags beyond the device, no tooltip text", [s.launc
 
 // checkShares: Stop removes a share while its machine's adb devices answers; nothing throws, nothing else is touched.
 const calls = [];
-const sim = { shares: { a: { machine: "m", pid: 7, port: 15555, serial: "127.0.0.1:15555" }, b: { machine: "m", error: "no key", retryAt: 0 } } };
+const sim = { shares: { a: { machine: "m", tunnel: 7, port: 15555, serial: "127.0.0.1:15555" }, b: { machine: "m", error: "no key", retryAt: 0 } } };
 sim.ready = () => true;
 sim.unshare = async avd => { calls.push(`unshare ${avd}`); delete sim.shares[avd]; };
 globalThis.execStub = async (cmd, args) => {
@@ -70,7 +70,7 @@ check("a share that never got a tunnel is left for tend()'s retry, error kept", 
 
 // An offline device: disconnected first, then connected fresh.
 calls.length = 0;
-sim.shares = { a: { machine: "m", pid: 7, port: 15555, serial: "127.0.0.1:15555", error: "old" } };
+sim.shares = { a: { machine: "m", tunnel: 7, port: 15555, serial: "127.0.0.1:15555", error: "old" } };
 globalThis.execStub = async (cmd, args) => {
   calls.push(`${cmd} ${args.join(" ")}`);
   if (args[0] === "devices") return { code: 0, stdout: "List of devices attached\n127.0.0.1:15555\toffline\n" };
@@ -80,6 +80,17 @@ globalThis.execStub = async (cmd, args) => {
 await P.checkShares.call(sim);
 check("an offline device is disconnected, then connected again", calls, ["adb devices", "adb disconnect 127.0.0.1:15555", "adb connect 127.0.0.1:15555"]);
 check("and its error clears", sim.shares.a.error, undefined);
+
+// Linux: a tunnel rides herdr-core's ssh connection to that machine, found from its clients' command lines.
+{
+  const { herdrClient } = await import(pathToFileURL(join(work, "mod", "linux.js")).href);
+  const line = (target, extra = "") => `ssh -S /run/user/1000/herdr-core/ssh-9b45c67090ef -o ControlMaster=no -o BatchMode=yes ${extra}-T ${target} sh -c 'p=$(command -v herdr-core)'`;
+  check("herdr's client to the machine gives its socket", herdrClient(line("azael@compute"), "azael@compute"), "/run/user/1000/herdr-core/ssh-9b45c67090ef");
+  check("a client to another machine doesn't", herdrClient(line("azael@compute-2"), "azael@compute"), null);
+  check("options with values are skipped", herdrClient(line("box", "-p 2222 "), "box"), "/run/user/1000/herdr-core/ssh-9b45c67090ef");
+  check("the master itself isn't a client", herdrClient("ssh: /run/user/1000/herdr-core/ssh-9b45c67090ef [mux]", "box"), null);
+  check("an ssh that isn't herdr's isn't used", herdrClient("ssh -S /tmp/mine -T box", "box"), null);
+}
 
 // Linux: a copy of a virtual device is its config.ini without its data, named for itself, beside an .ini pointing at it.
 if (process.platform !== "win32") {

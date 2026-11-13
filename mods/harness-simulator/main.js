@@ -86,7 +86,7 @@ export default class Simulator extends View {
     try { this.mode = localStorage.getItem("mode") === "window" ? "window" : "dock"; } catch {}
     this.helper = false;         // the dock helper is running
     this.written = null;         // the state file's last contents
-    this.shares = {};            // avd -> { machine, pid, port, serial } | { machine, error } | { pending }
+    this.shares = {};            // avd -> { machine, tunnel, port, serial } | { machine, error } | { pending }
     this.declined = new Set();   // avds the user stopped sharing, until they stop
     this.maps = {};              // machine -> the devices file last written there
     this.scripts = {};           // machine -> true once its adb script is in place
@@ -115,7 +115,7 @@ export default class Simulator extends View {
     // The panel's slot went away (another layout, or quitting): the device windows hide, and the
     // tunnels close (the other machines see their emulators go offline until it's back).
     this.place(false);
-    for (const share of Object.values(this.shares)) if (share.pid) this.host?.kill(share.pid);
+    for (const share of Object.values(this.shares)) if (share.tunnel) this.host?.closeTunnel(share.tunnel);
     this.shares = {};
   }
 
@@ -270,7 +270,7 @@ export default class Simulator extends View {
       if (this.shares[avd] && this.shares[avd].machine !== m) await this.unshare(avd);
       // A share that couldn't be set up is tried again later, waiting longer each time (30 s up to 10 min):
       // a failed try can take 20 s, and most causes (no ssh key, someone else's adb there) don't clear alone.
-      const was = this.shares[avd], due = was && !was.pid && was.error && Date.now() >= (was.retryAt ?? 0);
+      const was = this.shares[avd], due = was && !was.tunnel && was.error && Date.now() >= (was.retryAt ?? 0);
       if (!m || !this.running[avd] || (was && !due) || this.declined.has(avd) || !this.ready(m)) continue;
       this.shares[avd] = { machine: m, pending: true, error: was?.error };
       const made = await this.share(m, avd).catch(err => {
@@ -278,7 +278,7 @@ export default class Simulator extends View {
         return { machine: m, error: errorText(err), retryAt: Date.now() + wait };
       });
       if (this.shares[avd]?.pending) this.shares[avd] = made;   // unless Stop or × ended it meanwhile
-      if (made.pid) delete this.retry[avd];
+      if (made.tunnel) delete this.retry[avd];
     }
     if (Date.now() - this.checked > CHECK) { this.checked = Date.now(); await this.checkShares(); }
     await this.writeMaps();
@@ -290,7 +290,7 @@ export default class Simulator extends View {
     // `adb devices`; one that's missing connects again, and one that can't is set up again.
     const byMachine = {};
     // Only shares with a tunnel: one that couldn't be set up is retried by tend(), on its own clock.
-    for (const [avd, share] of Object.entries(this.shares)) if (share.pid && !share.pending) (byMachine[share.machine] ??= []).push(avd);
+    for (const [avd, share] of Object.entries(this.shares)) if (share.tunnel && !share.pending) (byMachine[share.machine] ??= []).push(avd);
     for (const [m, avds] of Object.entries(byMachine)) {
       if (!this.ready(m)) continue;
       const list = await exec("adb", ["devices"], { on: m, timeout: 10000 }).catch(() => null);
@@ -299,7 +299,7 @@ export default class Simulator extends View {
       for (const avd of avds) {
         // Stop, Restart or × can end a share while that machine answers: only the same share is mended.
         const share = this.shares[avd];
-        if (!share?.pid || share.pending) continue;
+        if (!share?.tunnel || share.pending) continue;
         const st = state.get(share.serial);
         if (st === "device") { delete share.error; continue; }
         // Listed but not usable ("offline"): adb connect would only say it's "already connected".
@@ -312,10 +312,11 @@ export default class Simulator extends View {
     }
   }
 
-  // Sharing a session's emulator with its machine. An SSH reverse tunnel (OpenSSH, with
-  // the ssh config herdr's machines use) brings that machine's 127.0.0.1:<port> to the emulator's
-  // adb port here, and that machine's own adb server connects to it: the emulator is one more
-  // device in its list, beside any phones. Bound to localhost there; nothing listens on the network.
+  // Sharing a session's emulator with its machine. An SSH reverse tunnel (on herdr's own connection
+  // to it where there is one, else OpenSSH with the ssh config herdr's machines use) brings that
+  // machine's 127.0.0.1:<port> to the emulator's adb port here, and that machine's own adb server
+  // connects to it: the emulator is one more device in its list, beside any phones. Bound to
+  // localhost there; nothing listens on the network.
 
   async share(m, avd) {
     const list = await hc(["machine", "ls", "--json"]);
@@ -329,23 +330,23 @@ export default class Simulator extends View {
       if (taken.has(port)) continue;
       tries++;
       // SetEnv names the tunnel, so a later copy of the mod can find and close it.
-      const pid = await this.host.openTunnel(info.target, port, local);
-      if (!pid) continue;   // that port is taken there (or ssh can't log in): the next one
+      const tunnel = await this.host.openTunnel(info.target, port, local);
+      if (!tunnel) continue;   // that port is taken there (or ssh can't log in): the next one
       const serial = `127.0.0.1:${port}`;
       const c = await exec("adb", ["connect", serial], { on: m, timeout: 10000 })
         .catch(() => ({ code: 1, stdout: "", stderr: "adb isn't installed there" }));
-      if (/connected to/.test(c.stdout)) return { machine: m, pid, port, serial };
-      return { machine: m, pid, port, serial, error: (c.stderr || c.stdout).trim().split("\n")[0] || "adb couldn't connect" };
+      if (/connected to/.test(c.stdout)) return { machine: m, tunnel, port, serial };
+      return { machine: m, tunnel, port, serial, error: (c.stderr || c.stdout).trim().split("\n")[0] || "adb couldn't connect" };
     }
-    throw new Error("couldn't open a tunnel (ssh to it needs to work with a key)");
+    throw new Error("couldn't open a tunnel (herdr isn't connected to it, and ssh to it doesn't work with a key)");
   }
 
   async unshare(avd) {
     const share = this.shares[avd];
     delete this.shares[avd];
-    if (!share?.pid) return;
+    if (!share?.tunnel) return;
     await exec("adb", ["disconnect", share.serial], { on: share.machine, timeout: 5000 }).catch(() => {});
-    await this.host.kill(share.pid);
+    await this.host.closeTunnel(share.tunnel);
   }
 
   async installScript(m) {

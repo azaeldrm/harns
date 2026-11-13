@@ -104,15 +104,16 @@ Optional:
   and named while it starts.
 
   Sessions on other machines reach their emulator with that machine's own `adb`. The panel
-  shares each one there through an SSH reverse tunnel (OpenSSH, with the same ssh
-  config as herdr's machines, so ssh to the machine needs to work with a key), listening only
-  on that machine's localhost, and installs a small `~/.local/bin/adb` script there that points
+  shares each one there through an SSH reverse tunnel, listening only
+  on that machine's localhost (on Linux, a forward on herdr's own connection to the machine, so
+  no ssh key is needed; on Windows, or with no herdr connection, OpenSSH with herdr's ssh config,
+  so ssh to it needs to work with a key), and installs a small `~/.local/bin/adb` script there that points
   each session's terminals at their own emulator before running the machine's own adb. In
   that session, `adb devices` lists its emulator (and any phones, but not other sessions'
   emulators), and `adb`, `adb install` and `expo run:android` reach it. An `adb` already in
   `~/.local/bin` that isn't harns's is left alone. If that machine's adb server restarts, or a
   connection drops, the panel connects it again within a minute. A share that can't be set up
-  (no ssh key, someone else's `adb` there) shows why and is tried again later, less and less often.
+  (no way to ssh in, someone else's `adb` there) shows why and is tried again later, less and less often.
 - **This computer's name:** it shows the computer's own name. For a nickname, put
   `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
