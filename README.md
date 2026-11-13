@@ -47,6 +47,11 @@ the agent runs on (below).
 
 The status bar shows the Claude Code and Codex quota left.
 
+**Settings of its own.** The harns logo in the sidebar's footer opens harns's Settings: this computer's name, the
+sidebar's style (Tree, agents hanging from their machine on lines, or Classic, each machine boxed with its agents and
+stats), whether agents open as a chat and the welcome's animation, what the status bar shows, and whether the tab bar
+offers the Simulator. Drag a machine's band to reorder the machines in the sidebar.
+
 ## Install
 
 Needs the Herdr app and Python 3 on each machine. The chat in agent tabs is
@@ -114,8 +119,8 @@ Optional:
   `~/.local/bin` that isn't harns's is left alone. If that machine's adb server restarts, or a
   connection drops, the panel connects it again within a minute. A share that can't be set up
   (no way to ssh in, someone else's `adb` there) shows why and is tried again later, less and less often.
-- **This computer's name:** it shows the computer's own name. For a nickname, put
-  `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
+- **This computer's name:** it shows the computer's own name. For a nickname, set Name in harns's Settings
+  (General), or put `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
 
 ## Platforms
 

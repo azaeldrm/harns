@@ -16,7 +16,9 @@ export default class MachineStats extends View {
   init(_props, cx) {
     cx.spawn(async () => {
       const name = await localMachineName();
-      if (shared('machine.local-label') !== name) setShared('machine.local-label', name);
+      if (shared('harness.local-hostname') !== name) setShared('harness.local-hostname', name);
+      const label = String(shared('harness.local-name') ?? '').trim() || name;
+      if (shared('machine.local-label') !== label) setShared('machine.local-label', label);
     });
     this.samples = {};
     this.pending = {};

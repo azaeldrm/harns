@@ -1,6 +1,6 @@
 import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { theme, run, props, window, shared, setShared, updates, layout, agents } from "herdr";
+import { theme, run, props, window, shared, setShared, updates, layout, agents, openOverlay } from "herdr";
 
 const logoSrc = () => agents().some(a => a.status === "working")
   ? "mods/harness-chrome/harness-logo-fade.webp"
@@ -51,10 +51,11 @@ export default class WorkspaceChrome extends View {
       const ready = Boolean(updates().app.ready);
       const gear = icon("settings", "settings", ready ? "Settings · update ready" : "Settings", () => run("app.settings"), ready);
       const machine = icon("machine", "server", "Add machine", () => run("mod.open", { name: "machine-add" }));
-      // On the rail, the gear and the server centred side by side.
+      const harns = icon("harns-settings", "harness-logo-mono", "harns settings",
+        () => openOverlay({ mod: "harness-settings", kind: "dialog", width: 760 }));
       if (collapsed) return h_flex().size_full().bg(t.surface).items_center().justify_center().gap(2)
         .child(gear.w(22)).child(machine.w(22));
-      return h_flex().size_full().bg(t.surface).items_center().gap(2).px(12).child(gear).child(machine);
+      return h_flex().size_full().bg(t.surface).items_center().gap(2).px(12).child(gear).child(machine).child(harns);
     }
     // The logo on the sidebar's icon axis, 26 px in (12 + half of 28), as the agents' icons and the footer's gear.
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 12).pr(10).gap(4).items_center().text_size(13.5)

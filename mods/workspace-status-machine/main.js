@@ -9,6 +9,7 @@ export default class WorkspaceStatus extends MachineData {
   init(props, cx) {
     // Redraws the bar once a second, for the shown machine, folder and branch.
     super.init(props, cx);
+    if (shared("harness.status") === false) run("layout.hide", { id: "status" });
     cx.timer.every(1000, cx => cx.notify());
   }
 
@@ -55,7 +56,9 @@ export default class WorkspaceStatus extends MachineData {
       .when(Boolean(folder), el => el.child(label("folder", folder)))
       .when(needs > 0, el => el.child(div().text_color(t.blocked).child(`${needs} needs you`)))
       .child(div().flex_1())
-      .child(h_flex().flex_none().gap(18).items_center().child(usageGroup('Claude')).child(usageGroup('Codex')))
-      .child(div().id("palette").text_color(t.dim).on_click(() => run("app.palette")).child(`${window()?.platform === "macos" ? "⌘" : "Ctrl"} Shift P  commands`));
+      .child(h_flex().flex_none().gap(18).items_center()
+        .when(shared("harness.quota.claude") !== false, el => el.child(usageGroup('Claude')))
+        .when(shared("harness.quota.codex") !== false, el => el.child(usageGroup('Codex'))))
+      .when(shared("harness.commands-hint") !== false, el => el.child(div().id("palette").text_color(t.dim).on_click(() => run("app.palette")).child(`${window()?.platform === "macos" ? "⌘" : "Ctrl"} Shift P  commands`)));
   }
 }

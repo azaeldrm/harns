@@ -43,8 +43,14 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     A machine with no agents says "No agents", "Connecting…" or "Offline".
     The list scrolls without a scrollbar; where more is out of sight, its top (under the logo) and bottom (over the
     footer) fade, as 32 px of 12 bands of `surface`. The position is followed from the wheel (a mod can't read it).
-  - **Footer** (44 px): two icons side by side, Settings (a gear, with an amber dot when an update is ready) and Add
-    machine (a server).
+    Machines can be dragged into an order (kept in the mod's localStorage, `machines.order`). That's the Classic style
+    (shared `harness.sidebar` `classic`); the Tree style (the default) drops the band's box, rings and counts and hangs
+    each machine's agents and terminals from its icon (a laptop or a server) on 1 px lines, each agent's bot icon with its
+    program's icon small at its corner.
+  - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
+    harns's Settings (the logo, a 760 px dialog from `harness-settings`: General, Sidebar, Chat, Status bar, Simulator,
+    which write shared `harness.local-name`, `harness.sidebar`, `herdr-chat.chat`, `herdr-chat.animation`,
+    `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and `harness.simulator`).
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, Simulator (Windows and Linux), and the window buttons on Windows and Linux.
@@ -53,7 +59,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   Changes or Simulator open in a 368 px panel on the right.
 - **Status bar** (42 px, `surface`): the shown space's machine and branch, the focused
   pane's folder, "N needs you" when agents on that machine are blocked, then Claude Code and Codex quota bars (44 × 4 px)
-  and "Ctrl Shift P commands".
+  and "Ctrl Shift P commands" (each can be turned off in harns's Settings, and the bar hidden).
 
 The theme is `harness`: background `#080a0b`, canvas `#060708`, text `#dededb`, accent and
 working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are herdr's.
