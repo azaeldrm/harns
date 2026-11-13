@@ -891,7 +891,9 @@ export default class Agents extends View {
         .child(h_flex().w_full().gap(8).items_center().text_size(11.5).text_color(t.dim)
           .when(Boolean(pic), el => el.child(h_flex().w(16).flex_none().justify_center().when(Boolean(bar), c => c.child(bar))))
           .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
-            .children(where.map(([text, glyph]) => h_flex().min_w(0).gap(4).items_center()
+            // The folder whole; the branch (and space) take what's left, cut short at their end.
+            .children(where.map(([text, glyph]) => h_flex().gap(4).items_center()
+              .when(glyph === "folder", el => el.flex_none()).when(glyph !== "folder", el => el.min_w(0))
               .child(svg(`mods/harness-chrome/${glyph}.svg`).size(11).flex_none().text_color(t.dim))
               .child(div().min_w(0).truncate().child(text)))))
           .when(!pic && Boolean(bar), el => el.child(bar))));
