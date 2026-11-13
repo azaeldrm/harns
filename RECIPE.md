@@ -36,7 +36,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     program's name) and its status; under it, in 11.5 px dim, a 14 × 3 px bar of its context window under the icon, as on the
     rail, then its folder (the session's, from the log herdr-chat found for it,
     shared `herdr-chat.paths`; else the pane's) and git branch. Sub-agents hang under their parent as a
-    tree (26 px rows). Its terminals that aren't agents (a shell, a dev server, lazygit) follow its agents, a 28 px row
+    tree (26 px rows; in Tree their bot has no antenna, `harness-chrome/bot-small.svg`). Its terminals that aren't agents (a shell, a dev server, lazygit) follow its agents, a 28 px row
     each: the program's icon in the agents' icon column, the program running now and its folder; a click focuses it and
     shows the Terminal view; on the rail, just the icon, on the agents' axis, with the rest in its tooltip. The machine's
     name is followed by its counts, each with its icon: agents (a bot), and terminals (`>_`) when it has any.
@@ -299,7 +299,10 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
   in the panel, with ← back.
 - `harness-pane` is a pane header for layouts that want one; harns itself uses herdr-chat's.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
-  its rail.
+  its rail. `machine-agents` draws the rail from the same rows as the open list, each in its open box with
+  its icon alone and centred, so every row stays level as the sidebar folds, in either style: a machine's header icon as
+  open (Tree: server or laptop; Classic: its system's, with its CPU ring for the rings row), sub-agents and terminals
+  included, and a machine without agents a mark in its 26 px (a dash; a spinner while connecting; a cross offline).
 
 ## Done when
 
@@ -310,7 +313,7 @@ files they add or change), and downloads herdr-chat from GitHub when it isn't in
   emulator.
 - Each connected machine has a group with its agents under it (in Classic, with live CPU, RAM and GPU rings),
   and dragging a band reorders the machines; a working agent spins and the logo fades.
-- Folding the sidebar leaves icons, rings and statuses centered in the rail.
+- Folding the sidebar leaves icons, rings and statuses centered in the rail, each level with its row in the open list.
 - The status bar names the focused pane's machine and folder and fills the quota bars.
 - A new Claude Code tab opens on its chat and toggles to Terminal from its header.
 - Running the installer where herdr-chat isn't installed adds it; running it again leaves no layout

@@ -108,11 +108,12 @@ function icon(p, size, color) {
   return p.icon.endsWith('.svg') ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
-function agentPic(t, p, size, color, ring) {
-  // The agent icon, with its program's icon small at its bottom right on a ring of the row's color.
+function agentPic(t, p, size, color, ring, sub = false) {
+  // The agent icon (a sub-agent's: the same bot without its antenna), with its program's icon small at its bottom right
+  // on a ring of the row's color.
   const mark = icon(p, Math.round(size * 0.65), color);
   return div().relative().size(size).flex_none()
-    .child(svg("mods/harness-chrome/bot.svg").size(size).flex_none().text_color(color))
+    .child(svg(`mods/harness-chrome/${sub ? "bot-small" : "bot"}.svg`).size(size).flex_none().text_color(color))
     .when(Boolean(mark), el => el.child(div().absolute().right(-5).bottom(-4).p(1).rounded_full().bg(ring).child(mark)));
 }
 
@@ -196,6 +197,11 @@ export default class Agents extends View {
     // Its system's icon once known, else a drive (another machine) or a screen (this computer).
     const os = this.osIcons?.[machine?.name ?? ""];
     return os ? `mods/machine-agents/os/${os}.svg` : `mods/harness-chrome/${machine?.name ? "hard-drive" : "monitor"}.svg`;
+  }
+
+  headerIcon(machine) {
+    // The icon a machine's header shows, open or on the rail: in Classic its system's, in Tree a server or this laptop.
+    return classic() ? this.machineIcon(machine) : `mods/harness-chrome/${machine?.name ? "server" : "laptop"}.svg`;
   }
 
   noticeTurns(cx) {
@@ -617,29 +623,31 @@ export default class Agents extends View {
   subRow(t, s, shown, compact) {
     const k = s.t;
     const st = kidStatus(k, this.listed);
-    const pic = classic() ? icon(k.program, 14, t.foreground) : agentPic(t, k.program, 14, t.foreground, k.address === shown ? t.raised : t.surface);
     const on = k.address === shown;
-    return h_flex()
-      .id(`sub-${k.address}`)
-      .relative()
+    // As an agent's row: the name white while it's working, finished or needs you (or is being looked at), gray when idle;
+    // the icon gray, amber for the one being looked at. On the rail, where there's no name, the icon takes the name's
+    // white or gray instead, so the same rows stand out open and folded.
+    const bright = on || st !== "idle";
+    const color = on ? t.accent : compact && bright ? t.foreground : t.muted;
+    const pic = classic() ? icon(k.program, 14, color) : agentPic(t, k.program, 14, color, on ? t.raised : t.surface, true);
+    const name = k.name || k.template || k.program?.name || k.address;
+    // One box, open or on the rail: 26 px, its shade when looked at, hover, and a click to peek. Inside: open, the tree
+    // lines, the icon, the name and its status; on the rail the icon alone, centred, with the name in its tooltip.
+    const box = h_flex().id(`sub-${k.address}`).relative().h(26).flex_none().items_center().rounded(8)
+      .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
+      .on_click(() => this.peek(k.address));
+    if (compact) return box.justify_center().tooltip(name).child(pic ?? this.status(t, { status: st }, true));
+    return box
       .pl(classic() ? 17 * s.lines.length + 17 : 23 * s.lines.length + 11)
       .pr(8)
-      .rounded(8)
-      .h(26)
-      .flex_none()
-      .gap(0)
-      .items_center()
       .text_size(12.5)
-      .when(on, (el) => el.bg(t.raised))
-      .hover((s) => s.bg(t.hover))
-      .on_click(() => this.peek(k.address))
       .children(classic()
         ? s.lines.flatMap((l, j) => l ? [div().absolute().left(17 + 17 * j).top(0).w(1).bg(mix(t.dim, t.surface, 0.4))
           .when(l === "└", el => el.h(13)).when(l !== "└", el => el.bottom(0))] : [])
         : s.lines.flatMap((l, j) => treeLines(t, 17 + 23 * j, 13, l === "│" || l === "├", l === "├" || l === "└")))
       .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
-      .child(div().flex_1().truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
-      .child(this.status(t, { status: st }, compact));
+      .child(div().flex_1().truncate().text_color(bright ? t.foreground : t.muted).child(name))
+      .child(this.status(t, { status: st }));
   }
 
   plainTerminals(machine) {
@@ -663,16 +671,15 @@ export default class Agents extends View {
         run("pane.focus", { pane: p.pane });
         if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" });
       };
-      if (compact) return h_flex().id(`term-${p.pane}`).h(28).flex_none().items_center().justify_center().rounded(6)
-        .mx(8).border_l(2).pr(2).border_color(on ? t.accent : t.surface).when(on, (el) => el.bg(t.selected))
+      // One box, open or on the rail: its height, the agents' 2 px stripe column (amber on the rail for the one in front),
+      // hover, tooltip and click. Inside: open, the icon, the program and its folder; on the rail the icon alone, centred.
+      const box = h_flex().id(`term-${p.pane}`).h(28).flex_none().items_center().rounded(6).border_l(2)
+        .border_color(on && compact ? t.accent : t.surface).when(on, (el) => el.bg(compact ? t.selected : t.raised))
         .hover((s) => s.bg(t.hover)).cursor_pointer()
         .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
-        .on_click(open)
-        .child(h_flex().w(16).flex_none().justify_center().child(pic));
-      return h_flex().id(`term-${p.pane}`).pl(10).pr(8).h(28).flex_none().gap(10).items_center().rounded(6).text_size(12.5)
-        .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
-        .tooltip([name, p.title && p.title !== name ? p.title : "", p.cwd].filter(Boolean).join(" · "))
-        .on_click(open)
+        .on_click(open);
+      if (compact) return box.justify_center().pr(2).child(h_flex().w(16).flex_none().justify_center().child(pic));
+      return box.pl(8).pr(8).gap(10).text_size(12.5)
         .child(h_flex().size(16).flex_none().items_center().justify_center().child(pic))
         .child(div().flex_none().text_color(on ? t.foreground : t.muted).child(name))
         .when(Boolean(where), (el) => el.child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.dim).child(where)));
@@ -717,10 +724,10 @@ export default class Agents extends View {
     this.noticeMoves(list, cx);
 
     const withKids = (a, i) => {
-      const subs = collapsed ? [] : this.tree(all, a.address);
+      const subs = this.tree(all, a.address);
       const r = row(a, i, subs);
       if (this.folded.has(a.address)) return [r];
-      return [r, ...subs.map((s) => this.subRow(t, s, shown, false))];
+      return [r, ...subs.map((s) => this.subRow(t, s, shown, collapsed))];
     };
 
     const fold = (a, subs) => {
@@ -769,9 +776,8 @@ export default class Agents extends View {
           .gap(2)
           .flex_none()
           .rounded(6)
-          // 8 px in from each edge, as the open cards (so the selected one's shade matches), and the focus stripe's 2 px
-          // matched on the right, so the centre stays the rail's (the open icon axis).
-          .mx(8).border_l(2).pr(2).border_color(a.focused ? t.accent : t.surface)
+          // The focus stripe's 2 px matched on the right, so the centre stays the rail's.
+          .border_l(2).pr(2).border_color(a.focused ? t.accent : t.surface)
           .when(a.focused, (el) => el.bg(t.selected))
           .cursor_pointer()
           .hover((s) => s.bg(t.hover))
@@ -781,7 +787,9 @@ export default class Agents extends View {
           .child(this.hang(a.address, this.agentDetails(t, a, all, label(a) || a.space_name || "")))
           .child(h_flex().items_center().justify_center()
             .child(h_flex().w(16).flex_none().justify_center().when(Boolean(pic), el => el.child(pic)))
-            .child(div().w(0).overflow_hidden().child(" ")))
+            .child(div().w(0).overflow_hidden().child(" "))
+            // As tall as the open first line when that has its fold or "Needs you" (18 px).
+            .when(subs.length > 0 || a.status === "blocked", el => el.child(div().w(0).h(18).flex_none())))
           // The second line (its height from invisible text) holds the status mark, under the icon.
           .child(div().relative().w_full().text_size(11.5).child(div().w(0).overflow_hidden().child(" "))
             .child(h_flex().absolute().top(0).bottom(0).left(0).right(0).items_center().justify_center().child(this.status(t, a, true))));
@@ -905,11 +913,29 @@ export default class Agents extends View {
     // Each machine with agents listed under it and its top one, in the list's order, for jumpMachine (Alt+Shift+Down / Up).
     this.machineTops = groups.filter(g => g.machine && g.members.length).map(g => ({ machine: g.machine.name ?? "", top: g.members[0].address }));
 
+    const empty = (g) => {
+      // A machine without agents: what it is, or on the rail, in the same 26 px, a mark for it with the words in its
+      // tooltip: a dash for no agents, a spinner while connecting, a cross when offline or waiting for a login.
+      const ready = g.machine?.layout === "ready", loading = !ready && g.machine?.layout === "loading";
+      const text = ready ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : loading ? "Connecting…" : "Offline";
+      const mark = ready ? svg("mods/harness-chrome/minus.svg").size(12) : loading ? svg("mods/harness-chrome/spinner.svg").size(13).spin(900) : svg("mods/harness-chrome/x.svg").size(11);
+      return div().id(`empty-${g.id}`).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim)
+        .when(collapsed, el => el.justify_center().tooltip(text).child(mark.flex_none().text_color(t.dim)))
+        .when(!collapsed, el => el.pl(29).child(text));
+    };
     const header = (g) => {
       // A group's header: a machine's (inside its band, which folds it) or Pinned's (which folds itself).
       const open = !this.folded.has(g.id);
       const isMachine = Boolean(g.machine);
       const top = g.members.reduce((m, a) => ((RANK[a.status] ?? 0) > (RANK[m] ?? 0) ? a.status : m), null);
+      if (collapsed) {
+        // The rail's header: the open one's box (30 px, the same top padding), its icon alone and centred: the machine's
+        // logo as the open header shows it in this style, or Pinned's pin, which folds the group as open.
+        return h_flex().id(g.id).h(30).pt(isMachine ? 6 : 8).flex_none().items_center().justify_center().cursor_pointer()
+          .tooltip(g.label)
+          .when(!isMachine, el => el.on_click((_e, cx) => { open ? this.folded.add(g.id) : this.folded.delete(g.id); cx.notify(); }))
+          .child(svg(isMachine ? this.headerIcon(g.machine) : "mods/harness-chrome/pin.svg").size(isMachine ? 14 : 12).flex_none().text_color(isMachine ? t.muted : t.dim));
+      }
       return h_flex()
         .id(g.id)
         .px(8)
@@ -929,7 +955,7 @@ export default class Agents extends View {
         }))
         .when(isMachine, el => el.gap(8).text_size(13).font_semibold().pt(6).pl(9)
           .child(div().size(16).flex_none().flex().items_center().justify_center()
-            .child(svg(classic() ? this.machineIcon(g.machine) : `mods/harness-chrome/${g.machine.name ? "server" : "laptop"}.svg`).size(14).flex_none().text_color(t.muted))))
+            .child(svg(this.headerIcon(g.machine)).size(14).flex_none().text_color(t.muted))))
         .child(div().truncate().text_color(isMachine ? t.muted : t[g.status] ?? t.dim).child(g.label))
         .when(isMachine && classic(), (el) => {
           const n = this.plainTerminals(g.machine).length, count = (id, glyph, value, tip) => h_flex().id(id).gap(3).items_center()
@@ -991,23 +1017,9 @@ export default class Agents extends View {
             .child(svg(`mods/harness-chrome/${busy ? "spinner" : "rotate-cw"}.svg`).size(busy ? 15 : 12)));
         });
     };
-    const rows = collapsed
-      ? this.sortMachines(machines().filter(machine => !machine.temporary)).flatMap((machine, index) => [
-          // As open: the first machine right at the top, then 20 px between machines.
-          ...(index > 0 ? [div().h(20).flex_none()] : []),
-          // The open band's box, row for row: its header (30 px) and its rings row (22 px, the CPU alone), 8 px in from each edge
-          // and 8 px above the agents, so rows keep their height as the sidebar folds; the icon and the ring are centred.
-          // Resting on it shows the machine's details card, as open.
-          this.machineCard(t, machine, v_flex().mx(8).mb(8).pb(3).flex_none().rounded(8).bg(t.raised).border_1().border_color(t.border).overflow_hidden()
-            .child(h_flex().h(30).pt(6).flex_none().items_center().justify_center()
-              .child(svg(this.machineIcon(machine)).size(14).flex_none().text_color(t.muted)))
-            .child(this.railCpu(t, machine.name ?? null)), 0),
-          ...list.filter(a => (a.address.includes('/') ? a.address.split('/')[0] : null) === machine.name)
-            .flatMap(a => withKids(a, list.indexOf(a))),
-          // Its plain terminals under its agents, as open.
-          ...this.terminalRows(t, machine, true),
-        ])
-      : groups.flatMap((g, index) => this.boxed(t, g, index, [
+    // Open or on the rail, the same rows: the rail draws each in its box, its icon alone, so every row stays level as the
+    // sidebar folds.
+    const rows = groups.flatMap((g, index) => this.boxed(t, g, index, [
         ...(index > 0 && !(classic() && g.machine) ? [div().h(20).flex_none()] : []),
         // A machine's band, dragged to reorder the machines: in Classic its header and rings raised, so each machine's agents
         // read as a group; in Tree its header alone, the agents hanging from its icon.
@@ -1041,14 +1053,14 @@ export default class Agents extends View {
           })
           .when(Boolean(this.mdrag?.moved) && this.mdrop?.target === (g.machine.name ?? ""), el => el.child(div().absolute().left(6).right(6).h(2).rounded_full().bg(t.accent)
             .when(this.mdrop.after, d => d.bottom(-1)).when(!this.mdrop.after, d => d.top(-1))))
-          .child(header(g)).when(classic(), el => el.child(statsFor(g.machine.name ?? null, t))))] : [header(g)]),
+          .child(header(g)).when(classic(), el => el.child(collapsed ? this.railCpu(t, g.machine.name ?? null) : statsFor(g.machine.name ?? null, t))))] : [header(g)]),
         ...(this.folded.has(g.id) ? [] : !g.machine ? g.members.flatMap(withKids) : classic() ? [
-          ...(g.members.length ? g.members.flatMap(withKids) : [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")]),
-          ...this.terminalRows(t, g.machine),
+          ...(g.members.length ? g.members.flatMap(withKids) : [empty(g)]),
+          ...this.terminalRows(t, g.machine, collapsed),
         ] : [
-          ...(g.members.length ? [] : [div().id(`empty-${g.id}`).pl(29).h(26).flex_none().flex().items_center().text_size(11).text_color(t.dim).child(g.machine?.layout === "ready" ? "No agents" : this.hosts[g.machine?.name]?.state === "needs_login" ? "Needs login" : g.machine?.layout === "loading" ? "Connecting…" : "Offline")]),
+          ...(g.members.length ? [] : [empty(g)]),
           ...((terms) => [...g.members.map((a, i) => [withKids(a, i), 17]), ...terms.map(r => [[r], 14])]
-            .flatMap(([rows, at], n, all) => underMachine(t, rows, n === all.length - 1, at)))(this.terminalRows(t, g.machine)),
+            .flatMap(([rows, at], n, all) => collapsed ? rows : underMachine(t, rows, n === all.length - 1, at)))(this.terminalRows(t, g.machine, collapsed)),
         ]),
       ]));
 
@@ -1077,7 +1089,7 @@ export default class Agents extends View {
       .children(Array.from({ length: STEPS }, (_, i) => div().w_full().flex_1().bg(t.surface).opacity(top ? (STEPS - i) / STEPS : (i + 1) / STEPS)));
     const edges = () => [above, below];
     return v_flex().flex_1().min_h(0).relative()
-      .child(v_flex().id("ag-list").size_full().px(collapsed ? 0 : 8).overflow_y_scroll().track_scroll(this.scrollHandle)
+      .child(v_flex().id("ag-list").size_full().px(8).overflow_y_scroll().track_scroll(this.scrollHandle)
         .on_size_change((size, cx) => { const was = edges(); this.viewH = size.height; this.refade(was, cx); })
         .on_scroll_wheel((e, cx) => {
           const was = edges(), room = Math.max(0, this.rowsH - this.viewH);
