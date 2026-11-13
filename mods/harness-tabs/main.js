@@ -74,8 +74,8 @@ export default class Tabs extends View {
       ? Math.max(10, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
       : 10;
     const panel = find(root, "panel"), body = find(root, "panel-body");
-    // The Simulator panel docks Android's emulator, which is Windows-only for now.
-    const enabled = [...(shared("workspace.panels") ?? ["files", "changes"]), ...(w?.platform === "windows" ? ["simulator"] : [])];
+    // The Simulator panel runs Android's emulator on Windows and Linux.
+    const enabled = [...(shared("workspace.panels") ?? ["files", "changes"]), ...(["windows", "linux"].includes(w?.platform) ? ["simulator"] : [])];
     this.syncPanel(space, panel, body, enabled);
     const panelButton = (id, label, icon) => {
       const on = panel && !panel.hidden && body?.active === id;
