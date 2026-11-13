@@ -33,9 +33,9 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     name, or a nickname; 13 px and gray like the icons, starting where its agents' titles do), a + to start an agent
     there, a row of CPU, RAM and GPU rings (one per GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (without the harness's prefix, and the folder Pi and Codex add after it; else the
-    program's name) and its status; under it, in 11.5 px dim, its folder (the session's, from the log
-    herdr-chat found for it, shared `herdr-chat.paths`; else the pane's) and git branch and a 36 × 3 px bar of the context window used
-    (amber above 75%, red `#d88179` above 90%). Sub-agents hang under their parent as a
+    program's name) and its status; under it, in 11.5 px dim, a 14 × 3 px bar of its context window under the icon, as on the
+    rail, then its folder (the session's, from the log herdr-chat found for it,
+    shared `herdr-chat.paths`; else the pane's) and git branch. Sub-agents hang under their parent as a
     tree (26 px rows). Its terminals that aren't agents (a shell, a dev server, lazygit) follow its agents, a 28 px row
     each: the program's icon in the agents' icon column, the program running now and its folder; a click focuses it and
     shows the Terminal view; on the rail, just the icon, on the agents' axis, with the rest in its tooltip. The machine's
@@ -49,7 +49,7 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     an order by their bands (kept in the mod's localStorage, `machines.order`).
   - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
     harns's Settings (the logo, a 760 px dialog from `harness-settings`: General, Sidebar, Chat, Status bar, Simulator,
-    which write shared `harness.local-name`, `harness.sidebar`, `herdr-chat.chat`, `herdr-chat.animation`,
+    which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `herdr-chat.chat`, `herdr-chat.animation`,
     `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and `harness.simulator`).
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
@@ -68,8 +68,10 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 
 - **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
   blocked is a "Needs you" badge (a "!" in the rail); done is a green check (the theme's
-  `ansi2`); idle shows nothing open (the card's bar shows its context) and, on the rail, a 14 × 3 px
-  context bar, the card's in small (amber above 75%, red `#d88179` above 90%, the percentage on hover). On the
+  `ansi2`); idle shows nothing open (the card's bar under the icon shows its context) and, on the rail, the same
+  14 × 3 px context bar. It fills with the share used (gray, amber above 75%, red `#d88179` above 90%), or, with
+  shared `harness.context-bar` `health` (Settings → Sidebar → Context bar), drains like a health bar to the share left
+  (green, amber below 25% left, red below 10%); hovering it gives the percentage either way. On the
   rail the mark sits on the row's second line, under the icon.
   Tabs show the same spinner, or a dot for blocked and done.
 - **Context readings:** Claude Code and Pi report through the relays (Watch out). Codex's
