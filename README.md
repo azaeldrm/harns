@@ -10,8 +10,9 @@ status bar. Everything goes through herdr's own machine connections.
 
 ## Features
 
-**Organized by machine.** Each machine in the sidebar shows its system (Windows, macOS or the Linux distribution),
-its CPU, RAM and GPU load, its agents with their folders, branches and context, and its plain terminals. Its **+**
+**Organized by machine.** Each machine in the sidebar lists its agents with their folders, branches and context, and
+its plain terminals, hanging from it on lines; the Classic style boxes each machine with its system (Windows, macOS or
+the Linux distribution) and its CPU, RAM and GPU load, which the machine's card shows in either. Its **+**
 starts an agent there from the ones installed on it, or a terminal, a new space or a worktree. Alt+Up and Alt+Down
 walk the agents; Alt+Shift+Up and Alt+Shift+Down jump to the next machine's. Alt+Left and Alt+Right
 switch an agent's tab between Chat and Terminal.

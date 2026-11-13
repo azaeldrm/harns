@@ -286,7 +286,8 @@ export default class Agents extends View {
   }
 
   machineCard(t, machine, trigger, edge = 8) {
-    // A machine's band (header and rings); resting on it shows its details beside the sidebar, level with it.
+    // A machine's band (its header, and in Classic its rings); resting on it shows its details beside the sidebar, level
+    // with it.
     const key = `m:${machine.name ?? "@local"}`;
     return div().id(`mtrig-${key}`).relative().w_full()
       .on_hover((on, cx) => {
@@ -466,7 +467,7 @@ export default class Agents extends View {
   }
 
   boxed(t, g, index, items) {
-    // A machine's rows as drawn, or in the contained look one box: its band on top, a rule, then its agents and terminals.
+    // A machine's rows as drawn, or in the Classic style one box: its band on top, a rule, then its agents and terminals.
     if (!classic() || !g.machine) return items;
     const [band, ...rest] = items;
     return [
@@ -641,8 +642,8 @@ export default class Agents extends View {
   terminalRows(t, machine, compact = false) {
     // The machine's plain terminals at the bottom of its group, under its agents, a row each: the program's icon in the
     // agent cards' icon column (their 2 px stripe and 8 px padding), the program running now, its folder. A click focuses
-    // the pane and shows the Terminal view, as a shell has no chat. Their count is in the machine's header. On the rail
-    // (compact) just the icon, centred as the agents' are, with the rest in its tooltip.
+    // the pane and shows the Terminal view, as a shell has no chat. In Classic their count is in the machine's header. On
+    // the rail (compact) just the icon, centred as the agents' are, with the rest in its tooltip.
     const shown = focused()?.pane;
     return this.plainTerminals(machine).map((p) => {
       const on = p.pane === shown, name = p.program?.name || p.title || "shell", where = folderName(p.cwd);
@@ -998,7 +999,8 @@ export default class Agents extends View {
         ])
       : groups.flatMap((g, index) => this.boxed(t, g, index, [
         ...(index > 0 && !(classic() && g.machine) ? [div().h(20).flex_none()] : []),
-        // A machine's header and rings as one raised band, so each machine's agents read as a group.
+        // A machine's band, dragged to reorder the machines: in Classic its header and rings raised, so each machine's agents
+        // read as a group; in Tree its header alone, the agents hanging from its icon.
         ...(g.machine ? [this.machineCard(t, g.machine, v_flex().id(`band-${g.id}`).w_full().pb(3).rounded(8).border_1()
           .when(classic(), el => el.rounded(0).bg(t.raised).border_color(t.raised).hover(s => s.bg(t.hover)))
           .when(!classic(), el => el.mb(2).border_color(t.surface).hover(s => s.bg(t.hover)))
