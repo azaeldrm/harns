@@ -38,7 +38,8 @@ async function cancelForward(f) {
 
 export async function linuxHost() {
   // The Simulator's Linux side: the Android SDK in ~/Android/Sdk (or ANDROID_HOME), programs started detached, tunnels
-  // through OpenSSH, and on Hyprland dock-hyprland.py placing the device windows (other desktops show them in their own).
+  // on herdr's own ssh connections (else OpenSSH), and on Hyprland dock-hyprland.py placing the device windows (other
+  // desktops show them in their own).
   const r = await sh('printf "%s|%s|%s|%s|%s" "$ANDROID_HOME" "$ANDROID_SDK_ROOT" "$ANDROID_AVD_HOME" "$HOME" "$HYPRLAND_INSTANCE_SIGNATURE"');
   const [home, root, avds, user, hyprland] = r.stdout.split("|");
   const sdk = home || root || `${user}/Android/Sdk`;
@@ -52,11 +53,9 @@ export async function linuxHost() {
     cache,
     stateFile: `${cache}/dock-state.txt`,
     docks: Boolean(hyprland),
-    noSdk: "No Android emulator found in ~/Android/Sdk. Install the SDK's emulator, or set ANDROID_HOME (README: Simulator setup).",
+    noSdk: "No Android emulator found in ~/Android/Sdk. Install the SDK's emulator, or set ANDROID_HOME (RECIPE.md: Simulator setup).",
 
     start(program, args) { return sh(DETACH, program, ...args); },
-
-    kill(pid) { return exec("kill", [String(pid)]).catch(() => {}); },
 
     async closeTunnels() {
       // Tunnels a previous copy of the mod left (a reload, or a crash): its own ssh processes, found by the name SetEnv
@@ -86,7 +85,7 @@ export async function linuxHost() {
       }
       const t = await sh('setsid ssh -N -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ' +
         '-o SetEnv=HARNS=harns-simulator -R "$1" "$2" > /dev/null 2>&1 < /dev/null & p=$!; sleep 2.5; ' +
-        'if kill -0 "$p" 2> /dev/null; then echo "$p"; else echo exited; fi', `127.0.0.1:${port}:127.0.0.1:${local}`, target);
+        'if kill -0 "$p" 2> /dev/null; then echo "$p"; else echo exited; fi', spec, target);
       return Number(t.stdout.trim()) || null;
     },
 

@@ -22,14 +22,12 @@ export async function windowsHost() {
     cache,
     stateFile: `${cache}\\dock-state.txt`,
     docks: true,
-    noSdk: "No Android emulator found. Install the Android SDK's emulator, or set ANDROID_HOME (README: Simulator setup).",
+    noSdk: "No Android emulator found. Install the Android SDK's emulator, or set ANDROID_HOME (RECIPE.md: Simulator setup).",
 
     start(program, args) {
       // Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it.
       return ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(program)} -ArgumentList ${args.map(quote).join(",")}`);
     },
-
-    kill(pid) { return exec("taskkill", ["/PID", String(pid), "/F"]).catch(() => {}); },
 
     closeTunnel(pid) { return exec("taskkill", ["/PID", String(pid), "/F"]).catch(() => {}); },
 

@@ -1,5 +1,6 @@
 // Exercises the Simulator with herdr's APIs stubbed: specs merge and validation, checkShares surviving a share that
-// Stop removes mid-check and repairing an offline device, and (on Linux) copying a virtual device.
+// Stop removes mid-check and repairing an offline device, and (on Linux) finding herdr's ssh connection to a machine
+// and copying a virtual device.
 import { mkdirSync, writeFileSync, cpSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";

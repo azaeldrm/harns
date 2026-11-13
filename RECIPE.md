@@ -171,7 +171,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
     terminal of the tab, its panes' and the sub-agents under them from `terminals()` `parent`,
     and the emulator's serial there) and installs `adb.sh` as `~/.local/bin/adb`, which sets
     `ANDROID_SERIAL` from `HC_TERMINAL_ID` and filters `adb devices`. What differs by system is in `windows.js`
-    (PowerShell, Windows' OpenSSH, `harns-dock`) and `linux.js` (`sh`, OpenSSH, `setsid`). On Hyprland,
+    (PowerShell, Windows' OpenSSH, `harns-dock`) and `linux.js` (`sh`, forwards on herdr-core's ssh connection or OpenSSH, `setsid`). On Hyprland,
     `dock-hyprland.py` (Python 3) reads the same state file: while it runs, a window rule (`harns-simulator`) opens
     every `Emulator`-class window floating and borderless on the hidden workspace `special:harns-simulator`, so one
     never tiles beside herdr or takes its maximized place; the shown one is brought onto herdr's workspace over the

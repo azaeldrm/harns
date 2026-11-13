@@ -269,7 +269,7 @@ export default class Simulator extends View {
       const m = this.tabMachine(tab);
       if (this.shares[avd] && this.shares[avd].machine !== m) await this.unshare(avd);
       // A share that couldn't be set up is tried again later, waiting longer each time (30 s up to 10 min):
-      // a failed try can take 20 s, and most causes (no ssh key, someone else's adb there) don't clear alone.
+      // a failed try can take 20 s, and most causes (no way to ssh in, someone else's adb there) don't clear alone.
       const was = this.shares[avd], due = was && !was.tunnel && was.error && Date.now() >= (was.retryAt ?? 0);
       if (!m || !this.running[avd] || (was && !due) || this.declined.has(avd) || !this.ready(m)) continue;
       this.shares[avd] = { machine: m, pending: true, error: was?.error };
@@ -329,7 +329,8 @@ export default class Simulator extends View {
     for (let port = SHARE_PORT, tries = 0; tries < 5; port++) {
       if (taken.has(port)) continue;
       tries++;
-      // SetEnv names the tunnel, so a later copy of the mod can find and close it.
+      // A later copy of the mod closes what this one leaves: an ssh of its own by the name SetEnv gives it, a forward
+      // on herdr's connection from the list the host keeps.
       const tunnel = await this.host.openTunnel(info.target, port, local);
       if (!tunnel) continue;   // that port is taken there (or ssh can't log in): the next one
       const serial = `127.0.0.1:${port}`;
