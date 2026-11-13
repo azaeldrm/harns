@@ -15,6 +15,11 @@ const STYLES = [
   { id: "tree", name: "Tree", about: "Agents hang from their machine on lines." },
 ];
 
+const CONTEXT_BARS = [
+  { id: "fill", name: "Fill", about: "Fills up as a session uses its context window: gray, amber past 75%, red past 90%." },
+  { id: "health", name: "Health bar", about: "Drains as a session uses its context window: green, amber below 25% left, red below 10%." },
+];
+
 function find(node, id) {
   // The layout node with this id, if the layout has one.
   if (node?.id === id) return node;
@@ -78,15 +83,24 @@ export default class HarnessSettings extends View {
           .child(Input.new(this.name).h_full().text_size(13).text_color(t.foreground))));
   }
 
+  choice(t, id, chosen, onClick) {
+    // A radio dot, filled when its option is the one in use.
+    return div().id(id).size(20).rounded(10).border_1().border_color(chosen ? t.accent : t.border).cursor_pointer()
+      .flex().items_center().justify_center().on_click(onClick)
+      .when(chosen, el => el.child(div().size(10).rounded(5).bg(t.accent)));
+  }
+
   sidebar(t) {
-    // The sidebar's look: one of the styles, its dot filled when in use.
+    // The sidebar's look (one of the styles) and how its agents' context bars read.
     const style = ["classic", "contained"].includes(shared("harness.sidebar")) ? "classic" : "tree";
+    const bar = shared("harness.context-bar") === "health" ? "health" : "fill";
     return v_flex().w_full()
       .child(this.heading(t, "Style"))
       .children(STYLES.map(s => this.row(t, s.name, s.about,
-        div().id(`style-${s.id}`).size(20).rounded(10).border_1().border_color(s.id === style ? t.accent : t.border).cursor_pointer()
-          .flex().items_center().justify_center().on_click(() => setShared("harness.sidebar", s.id))
-          .when(s.id === style, el => el.child(div().size(10).rounded(5).bg(t.accent))))));
+        this.choice(t, `style-${s.id}`, s.id === style, () => setShared("harness.sidebar", s.id)))))
+      .child(this.heading(t, "Context bar"))
+      .children(CONTEXT_BARS.map(b => this.row(t, b.name, b.about,
+        this.choice(t, `context-bar-${b.id}`, b.id === bar, () => setShared("harness.context-bar", b.id)))));
   }
 
   chat(t) {

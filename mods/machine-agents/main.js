@@ -43,12 +43,16 @@ function find(node, id) {
   return null;
 }
 
-function healthBar(t, used, width, height = 3) {
-  // The context window as a health bar: the share of it left, green while healthy, amber below 25% left, red below 10%.
-  const left = 100 - used;
+const healthBars = () => shared("harness.context-bar") === "health";
+const contextText = used => healthBars() ? `${Math.round(100 - used)}% left` : `${Math.round(used)}% used`;
+
+function contextBar(t, used, width, height = 3) {
+  // The context window as harns's Settings chose: filling with what's used (gray, amber past 75%, red past 90%), or
+  // as a health bar draining to what's left (green, amber below 25% left, red below 10%).
+  const health = healthBars(), share = health ? 100 - used : used;
+  const color = health ? (share < 10 ? "#d88179" : share < 25 ? t.working : t.ansi2 ?? t.done) : (share > 90 ? "#d88179" : share > 75 ? t.working : t.muted);
   return div().w(width).h(height).flex_none().rounded_full().bg(t.border)
-    .when(left > 0, el => el.child(div().h_full().rounded_full().w(Math.max(2, Math.round(width * left / 100)))
-      .bg(left < 10 ? "#d88179" : left < 25 ? t.working : t.ansi2 ?? t.done)));
+    .when(share > 0, el => el.child(div().h_full().rounded_full().w(Math.max(2, Math.round(width * share / 100))).bg(color)));
 }
 
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
@@ -394,8 +398,8 @@ export default class Agents extends View {
       .when(Boolean(folder), el => el.child(row("Folder", folder)))
       .when(Boolean(branch), el => el.child(row("Branch", branch)))
       .child(row("Context", used == null ? "No reading yet" : h_flex().gap(8).items_center()
-        .child(healthBar(t, used, 148, 4))
-        .child(div().text_size(11).child(`${Math.round(100 - used)}% left`))))
+        .child(contextBar(t, used, 148, 4))
+        .child(div().text_size(11).child(contextText(used)))))
       .when(kids.length > 0, el => el.child(v_flex().w_full().gap(4).pt(2)
         .child(div().text_size(11).text_color(t.dim).child(`Sub-agents \u00b7 ${kids.length}`))
         .children(kids.map(({ t: k, lines }) => {
@@ -681,7 +685,7 @@ export default class Agents extends View {
     const known = Number.isFinite(context?.percent);
     const percent = known ? Math.max(0, Math.min(100, context.percent)) : 0;
     const state = { working: "Working", done: "Finished · not yet viewed", blocked: "Needs you" }[a.status];
-    const tip = a.address ? `Context: ${known ? `${Math.round(100 - percent)}% left` : "unavailable"}${state ? ` · ${state}` : ""}` : state;
+    const tip = a.address ? `Context: ${known ? contextText(percent) : "unavailable"}${state ? ` · ${state}` : ""}` : state;
     const mark = el => div().size(14).flex_none().flex().items_center().justify_center().when(Boolean(tip), d => d.tooltip(tip)).child(el);
     // The spinner's picture has a clear margin (build-mods.py), so it draws at 15 px to show the same 12 px ring.
     if (a.status === "working") return mark(svg("mods/machine-agents/context-rings/spinner.svg").size(15).flex_none().text_color(t.working).spin(900));
@@ -689,8 +693,8 @@ export default class Agents extends View {
     if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
       .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
-    // Idle: on the rail (compact) the 14 px context health bar, as the open card shows under its icon; open, no mark.
-    if (compact) return (known ? healthBar(t, percent, 14) : div().w(14).h(3).flex_none().rounded_full().bg(t.border)).when(Boolean(tip), d => d.tooltip(tip));
+    // Idle: on the rail (compact) the 14 px context bar, as the open card shows under its icon; open, no mark.
+    if (compact) return (known ? contextBar(t, percent, 14) : div().w(14).h(3).flex_none().rounded_full().bg(t.border)).when(Boolean(tip), d => d.tooltip(tip));
     return div().size(14).flex_none();
   }
 
@@ -811,7 +815,7 @@ export default class Agents extends View {
       const context = (shared("agents.context") ?? {})[a.address];
       const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
       const barWidth = pic ? 14 : 36;
-      const bar = used == null ? null : healthBar(t, used, barWidth).tooltip(`Context: ${Math.round(100 - used)}% left`);
+      const bar = used == null ? null : contextBar(t, used, barWidth).tooltip(`Context: ${contextText(used)}`);
       // Dragging (by machine, not pinned): press, move over another agent of the same machine, release.
       const machineOf = x => x.includes("/") ? x.split("/")[0] : "";
       const draggable = !isPinned;
