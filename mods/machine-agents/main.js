@@ -805,8 +805,9 @@ export default class Agents extends View {
       const where = [[folder !== name ? folder : "", "folder"], [branch, "branch"], [full && a.space_name !== name ? a.space_name : "", "layers"]].filter(([text]) => text);
       const context = (shared("agents.context") ?? {})[a.address];
       const used = Number.isFinite(context?.percent) ? Math.max(0, Math.min(100, context.percent)) : null;
-      const bar = used == null ? null : div().w(36).h(3).flex_none().rounded_full().bg(t.border).tooltip(`Context: ${Math.round(used)}% used`)
-        .child(div().h_full().rounded_full().w(Math.max(2, Math.round(36 * used / 100))).bg(used > 90 ? "#d88179" : used > 75 ? t.working : t.muted));
+      const barWidth = pic ? 14 : 36;
+      const bar = used == null ? null : div().w(barWidth).h(3).flex_none().rounded_full().bg(t.border).tooltip(`Context: ${Math.round(used)}% used`)
+        .child(div().h_full().rounded_full().w(Math.max(2, Math.round(barWidth * used / 100))).bg(used > 90 ? "#d88179" : used > 75 ? t.working : t.muted));
       // Dragging (by machine, not pinned): press, move over another agent of the same machine, release.
       const machineOf = x => x.includes("/") ? x.split("/")[0] : "";
       const draggable = !isPinned;
@@ -871,12 +872,13 @@ export default class Agents extends View {
           .when(this.hovered === a.address, el => el.child(pin))
           .child(this.status(t, a)))
         // Always two lines (the rail's rows match their height).
-        .child(h_flex().w_full().pl(pic ? 24 : 0).gap(8).items_center().text_size(11.5).text_color(t.dim)
+        .child(h_flex().w_full().gap(8).items_center().text_size(11.5).text_color(t.dim)
+          .when(Boolean(pic), el => el.child(h_flex().w(16).flex_none().justify_center().when(Boolean(bar), c => c.child(bar))))
           .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
             .children(where.map(([text, glyph]) => h_flex().min_w(0).gap(4).items_center()
               .child(svg(`mods/harness-chrome/${glyph}.svg`).size(11).flex_none().text_color(t.dim))
               .child(div().min_w(0).truncate().child(text)))))
-          .when(Boolean(bar), el => el.child(bar))));
+          .when(!pic && Boolean(bar), el => el.child(bar))));
     };
 
     const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
