@@ -16,11 +16,14 @@ REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / 'src'
 SHARED = SRC / 'shared'
 
-# Each share folder and the mods it ships.
+# Each share folder (a layout or a mod listing) and the mods it ships.
 LISTINGS = {
     'layouts/harns': ['harns-chrome', 'harns-tabs', 'harns-settings', 'markdown-files', 'emulator',
                       'machine-sidebar', 'harns-status', 'agent-chat'],
     'layouts/herdr-chat': ['agent-chat'],
+    # Mods listed on their own (herdr.dev/mods), for people's own layouts.
+    'mods/agent-chat': ['agent-chat'],
+    'mods/markdown-files': ['markdown-files'],
 }
 
 # Editor files and caches never ship.

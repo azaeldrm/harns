@@ -6,6 +6,8 @@ Layouts and mods for the [Herdr](https://herdr.dev) app, in one repository:
 |---|---|---|
 | **harns** (layout) | A window organized by machine: each machine's agents in the sidebar, agent tabs as a chat or a terminal, Claude Code and Codex quota in the status bar | [`layouts/harns`](layouts/harns/RECIPE.md) |
 | **herdr-chat** (layout) | An agent's terminal shown as a chat, with a Chat / Terminal toggle | [`layouts/herdr-chat`](layouts/herdr-chat/RECIPE.md) |
+| **agent-chat** (mod) | The chat and its Chat / Terminal toggle, for your own layout | [`mods/agent-chat`](mods/agent-chat/RECIPE.md) |
+| **markdown-files** (mod) | herdr's Files panel, with Markdown opening rendered in a floating window | [`mods/markdown-files`](mods/markdown-files/RECIPE.md) |
 
 Each folder is one listing on herdr.dev: its `RECIPE.md` (the brief to build it from), its `preview.png`, and the files
 an agent copies to add it. The rest of this page is about harns.

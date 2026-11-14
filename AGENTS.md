@@ -11,7 +11,9 @@ what it is.
 |---|---|---|
 | harns (layout) | `layouts/harns/` | `harns-chrome`, `harns-tabs`, `harns-settings`, `harns-status`, `machine-sidebar`, `markdown-files`, `emulator`, `agent-chat` |
 | herdr-chat (layout) | `layouts/herdr-chat/` | `agent-chat` |
-| mod listings (planned) | `mods/<name>/` | `agent-chat`, `markdown-files`, `machine-sidebar`, `emulator` |
+| agent-chat (mod) | `mods/agent-chat/` | `agent-chat` |
+| markdown-files (mod) | `mods/markdown-files/` | `markdown-files` |
+| mod listings (planned) | `mods/<name>/` | `machine-sidebar`, `emulator` |
 
 ## Structure
 
