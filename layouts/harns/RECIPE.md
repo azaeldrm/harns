@@ -201,9 +201,11 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   - `harns-status`: the status bar. It also collects the stats: a built copy of the shared machine code
     (`machine-data.js`) publishes shared `machine.stats`, `machine.usage` and `machine.local-label`.
   - `agent-chat` ([the herdr-chat layout](../herdr-chat/RECIPE.md) too): the chat panel and the pane header with the toggle. The chat
-    block passes it `backdrop: true`: an empty chat (a new session's welcome, or no agent in
-    view) plays an animated scene behind it, dimmed (sharks, jellyfish, a night sky, rain),
-    switched with a button at its bottom right; the reply box goes see-through while it plays.
+    block passes it `backdrop: true`: an animated scene plays behind the chat, dimmed (sharks, jellyfish, a night sky,
+    rain), one for every conversation. Over an empty chat (a new session's welcome, or no agent in view) it plays at
+    30 fps with a button at its bottom right that switches the scene; behind a conversation, at 8 fps and dimmer, and the
+    list's fade into the reply box is left out. The reply box is see-through over it. After 45 s with no activity (the
+    pointer over the chat, typing, a message, the agent's status changing) it rests on its last frame.
   - Shipped: the `changes` block; `picker`, `machine-add`, `new-menu`, `menu` and
     `worktree` as overlays; icons from `pane`, `files` and `changes`.
 - **Programs it runs** through `exec(..., {on: machine})`: per platform

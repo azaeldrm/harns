@@ -49,8 +49,8 @@ status bar) with the chat and the terminal sharing the work area.
   - a jump-to-bottom button when the newest message is off screen.
 - **Empty chat:** herdr's logo with "Opening this … conversation…", "Waiting for this …
   conversation to start." or "No messages in this session yet." With the block's `backdrop` prop, a dimmed
-  animation (sharks, jellyfish, a night sky or rain) plays behind it, unless shared `herdr-chat.animation` is false
-  (harns's Settings sets it).
+  animation (sharks, jellyfish, a night sky or rain) plays behind the chat, here and slower and dimmer behind a
+  conversation, unless shared `herdr-chat.animation` is false (harns's Settings sets it).
 
 Colours come from the active theme; icons are the mod's own SVGs in the theme's text colour.
 

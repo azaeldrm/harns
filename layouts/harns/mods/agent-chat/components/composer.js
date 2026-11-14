@@ -368,7 +368,7 @@ export class Composer {
     const menu = this.menu.render(t, active);
     return v_flex().w_full().max_w(COLUMN).gap(6).relative()
       .when(Boolean(menu), el => el.child(menu))
-      // Over the backdrop (an empty chat, in layouts that show one) the box is see-through, the animation dim behind it.
+      // Over the backdrop (in layouts that show one) the box is see-through, the animation dim behind it.
       .child(h_flex().id("composer-box").w_full().pl(16).pr(8).py(8).gap(8).items_end().rounded(18).border_1().border_color(t.input)
         .bg(this.host.backdropShown ? `${t.surface.slice(0, 7)}a6` : t.surface)
         .child(v_flex().flex_1().min_w(0)

@@ -41,8 +41,8 @@ live terminal, one click apart. Mermaid diagrams in replies are drawn by [Pele](
 
 ![A mermaid diagram in the chat](docs/diagram.png)
 
-**Something to look at while it starts.** A new conversation opens on a dimmed animation behind its welcome: sharks,
-jellyfish, a night sky or rain.
+**Something to look at.** A dimmed animation plays behind the chat: sharks, jellyfish, a night sky or rain. It's lively
+behind a new conversation's welcome, and slow and faint behind a conversation, out of the way of the text.
 
 ![The welcome's animation](docs/welcome.webp)
 
@@ -61,7 +61,7 @@ Claude Code and Codex quota left.
 
 **Settings of its own.** The harns logo in the sidebar's footer opens harns's Settings: this computer's name, the
 sidebar's style (Tree, agents hanging from their machine on lines, or Classic, each machine boxed with its agents and
-stats), whether agents open as a chat and the welcome's animation, what the status bar shows, and whether the tab bar
+stats), whether agents open as a chat and the chat's animation, what the status bar shows, and whether the tab bar
 offers the Simulator. Drag a machine's band to reorder the machines in the sidebar.
 
 ## Install
