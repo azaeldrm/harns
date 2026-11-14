@@ -209,27 +209,30 @@ export default class HerdrChat extends View {
   }
 
   status(t, active) {
+    // The line over the reply box, set like the line under it (the footer's 11.5 px in a 24 px row: the spark or dot centred where the model's 12 px icon is, 10 px in, and the text
+    // 5 px after it, where the model's name starts): what
+    // the agent is doing, a machine that isn't answering, or reading new messages.
     const card = this.card.render(t, active);
     if (card) return card;
     const cue = this.reader.readCue();
     if (cue === "silent") {
       const who = active?.machine ? `${active.machine} isn't answering` : "Couldn't read new messages";
-      return h_flex().w_full().max_w(COLUMN).h(26).gap(8).items_center()
-        .child(div().size(8).mx(3).rounded(4).flex_none().bg(t.blocked ?? t.muted))
-        .child(div().flex_1().min_w(0).truncate().text_size(13.5).text_color(t.muted)
+      return h_flex().w_full().max_w(COLUMN).h(24).pl(10).gap(5).items_center()
+        .child(div().size(6).mx(3).rounded(3).flex_none().bg(t.blocked ?? t.muted))
+        .child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.muted)
           .child(this.reader.session.readAt ? `${who} · messages as of ${clock(this.reader.session.readAt)}` : who))
         .child(div().id("read-retry").px(10).h(24).flex().items_center().rounded(12).cursor_pointer()
           .border_1().border_color(t.border).text_size(12.5).text_color(t.foreground).hover(s => s.bg(t.hover))
           .on_click((_e, cx) => this.reader.retry(cx)).child("Retry"));
     }
-    if (active?.status === "working") return h_flex().w_full().max_w(COLUMN).h(26).gap(8).items_center()
-      .child(div().w(14).text_size(15).text_color(t.accent).frames(SPARK, 120).child(SPARK[0]))
-      .child(div().flex_1().min_w(0).truncate().text_size(13.5).text_color(t.muted)
+    if (active?.status === "working") return h_flex().w_full().max_w(COLUMN).h(24).pl(10).gap(5).items_center()
+      .child(div().w(12).flex_none().flex().justify_center().text_size(13).text_color(t.accent).frames(SPARK, 120).child(SPARK[0]))
+      .child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.muted)
         .loop("opacity", { from: 0.55, to: 1, period: 1600 })
         .child((active.activity ? `${active.activity}…`.replace(/……$/, "…") : "Working…") + (cue === "checking" ? " · checking for new messages" : "")));
-    if (cue === "checking") return h_flex().w_full().max_w(COLUMN).h(26).gap(8).items_center()
-      .child(div().size(8).mx(3).rounded(4).flex_none().bg(t.accent).loop("opacity", { from: 0.25, to: 1, period: 900 }))
-      .child(div().flex_1().min_w(0).truncate().text_size(13.5).text_color(t.muted)
+    if (cue === "checking") return h_flex().w_full().max_w(COLUMN).h(24).pl(10).gap(5).items_center()
+      .child(div().size(6).mx(3).rounded(3).flex_none().bg(t.accent).loop("opacity", { from: 0.25, to: 1, period: 900 }))
+      .child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.muted)
         .loop("opacity", { from: 0.55, to: 1, period: 1600 }).child("Checking for new messages…"));
     return null;
   }
@@ -491,11 +494,13 @@ export default class HerdrChat extends View {
         .child(div().max_w(420).text_center().text_size(14).text_color(t.muted).child(this.note))))
       .when(!empty, el => el.child(body))
       .when(Boolean(measure), el => el.child(measure))
-      .child(v_flex().w_full().flex_none().items_center().px(24).pt(12).pb(14).gap(12)
+      // The line over the reply box (the working line, a question, a read problem) sits as close to it as the line under it
+      // (the composer's 6 px).
+      .child(v_flex().w_full().flex_none().items_center().px(24).pt(12).pb(14).gap(6)
         // The status line's room is always kept, so "Working…" coming and going (just after a send, at a turn's end)
         // doesn't resize the list above and shift every message, and the welcome's box sits where the conversation's will.
         .when(Boolean(status), el => el.child(status))
-        .when(!status, el => el.child(div().w_full().h(26).flex_none()))
+        .when(!status, el => el.child(div().w_full().h(24).flex_none()))
         .child(this.composer.render(t, active, this.sessionLine(t, active, this.modelChip(t, active)))));
   }
 }
