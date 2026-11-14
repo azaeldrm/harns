@@ -3,20 +3,20 @@ const FILES = "item/fileChange/requestApproval";
 const INPUT = "item/tool/requestUserInput";
 const FILE_DECISIONS = ["accept", "acceptForSession", "decline", "cancel"];
 
+/** The conversation id in a Codex log's name (rollout-<time>-<id>.jsonl), or "". */
 export function codexThread(path) {
-  // The conversation id in a Codex log's name (rollout-<time>-<id>.jsonl), or "".
   const m = /rollout-.*?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i.exec(path ?? "");
   return m ? m[1].toLowerCase() : "";
 }
 
+/** The command as typed, unwrapped from the `bash -lc '…'` Codex runs it in. */
 function shellOf(command) {
-  // The command as typed, unwrapped from the `bash -lc '…'` Codex runs it in.
   const m = /^\S*(?:ba|z)?sh\s+-l?c\s+'([\s\S]*)'$/.exec(command ?? "");
   return m ? m[1].replace(/'\\''/g, "'") : command ?? "";
 }
 
+/** What a decision's row says, worded as Codex's own dialog words it. */
 function decisionLabel(d, files) {
-  // What a decision's row says, worded as Codex's own dialog words it.
   const name = typeof d === "string" ? d : Object.keys(d)[0];
   if (name === "accept") return "Yes, proceed";
   if (name === "acceptForSession") return files ? "Yes, and don't ask again for these files" : "Yes, and don't ask again this session";
@@ -30,8 +30,8 @@ function decisionLabel(d, files) {
   return null;
 }
 
+/** A prompt as the question card shows one, answered through Codex's daemon rather than keys. */
 function card(request, question, options, extra = {}) {
-  // A prompt as the question card shows one, answered through Codex's daemon rather than keys.
   const p = request.params;
   return {
     question, tabs: null, steps: [], review: null, options, multi: false, more: false, preview: null,
@@ -60,16 +60,19 @@ function inputCard(request, step, answers) {
   return { ...card(request, [q.question], options, { step, answers, questions: p.questions.map(x => x.id) }), steps };
 }
 
+/** The question card for a request Codex's daemon has open (null: the terminal handles that kind). */
 export function daemonChoices(request, step = 0, answers = {}) {
-  // The question card for a request Codex's daemon has open (null: the terminal handles that kind).
   if (request.method === COMMAND) return approvalCard(request, false);
   if (request.method === FILES) return approvalCard(request, true);
   if (request.method === INPUT) return inputCard(request, step, answers);
   return null;
 }
 
+/**
+ * What picking a row (or typing in its text row) sends: { result } to answer now, or { step, answers } for the next
+ * question.
+ */
 export function daemonReply(choices, index, typed = "") {
-  // What picking a row (or typing in its text row) sends: { result } to answer now, or { step, answers } for the next question.
   const d = choices.daemon, o = choices.options[index];
   if (d.method !== INPUT) return o?.decision !== undefined ? { result: { decision: o.decision } } : null;
   const answer = o?.input === "text" ? typed.trim() : o?.answer;

@@ -13,8 +13,8 @@ export const KINDS = {
 };
 export const STEP = { think: "Thought", shell: "Bash", read: "Read", edit: "Edit", search: "Search", web: "Web", image: "View", agent: "Agent", todo: "Todos", other: "Tool" };
 
+/** A group of steps in a few words: "Ran 2 commands, edited main.js". */
 export function summary(steps) {
-  // A group of steps in a few words: "Ran 2 commands, edited main.js".
   const calls = steps.filter(c => c.k !== "think");
   if (!calls.length) return "Thought process";
   const order = [], counts = {}, files = {};
@@ -33,8 +33,8 @@ export function summary(steps) {
   return parts.length ? text[0].toUpperCase() + text.slice(1).replace(/, (\w)/g, (_m, c) => `, ${c.toLowerCase()}`) : "";
 }
 
+/** The rows without the message the agent handed back (Claude Code, stopped before answering). */
 export function withoutRetracted(messages, retracted) {
-  // The rows without the message the agent handed back (Claude Code, stopped before answering).
   if (!retracted) return { rows: messages, retracted: null };
   let last = messages.length - 1;
   while (last >= 0 && messages[last].kind !== "message") last--;
@@ -43,8 +43,8 @@ export function withoutRetracted(messages, retracted) {
   return { rows: messages.slice(0, last), retracted };
 }
 
+/** Folds each run of tool calls and thoughts into one group of steps, in order. */
 export function foldActivity(messages) {
-  // Folds each run of tool calls and thoughts into one group of steps, in order.
   const out = [];
   for (const m of messages) {
     if (m.kind !== "tools" && m.kind !== "reasoning") { out.push(m); continue; }
@@ -59,8 +59,8 @@ export function foldActivity(messages) {
 
 export const OUTPUT_LINES = 6, OUTPUT_CHARS = 700, THOUGHT_CHARS = 360, THOUGHT_LINES = 4;
 
+/** A step's text: all of it when `open`, else a preview of a few lines, and whether anything was left out. */
 export function stepText(c, open) {
-  // A step's text: all of it when `open`, else a preview of a few lines, and whether anything was left out.
   const text = (c.o || "").replace(/\s+$/, "").replace(/^\n+/, "");
   if (open || !text) return { text, more: false };
   if (c.k === "think") {
@@ -77,8 +77,8 @@ export function stepText(c, open) {
   return { text: shown.slice(0, OUTPUT_CHARS).replace(/\s+$/, "") + "\n\u2026", more: true, hidden: lines.length - Math.min(lines.length, OUTPUT_LINES) };
 }
 
+/** An opened group's steps, as rows of their own below its title. */
 export function stepRows(group) {
-  // An opened group's steps, as rows of their own below its title.
   return group.calls.map((c, j) => ({ kind: "step", call: c, last: j === group.calls.length - 1, key: `${group.key}/${j}.${callDigest(c)}` }));
 }
 
@@ -87,8 +87,8 @@ const CALL_DIGESTS = new WeakMap();
 export const CALL_SOURCE = new WeakMap();
 const sample = s => s.length > 512 ? `${s.length}:${s.slice(0, 256)}:${s.slice(-256)}` : s;
 
+/** A tool call's digest: its input once per call, plus its output's size and end, which arrive later. */
 function callDigest(c) {
-  // A tool call's digest: its input once per call, plus its output's size and end, which arrive later.
   const source = CALL_SOURCE.get(c) ?? c;
   let base = CALL_DIGESTS.get(source);
   if (base === undefined) {
@@ -99,8 +99,8 @@ function callDigest(c) {
   return `${base}.${o.length}.${hash(o.slice(-64))}`;
 }
 
+/** A row's content digest, computed once per row object. */
 function digest(m) {
-  // A row's content digest, computed once per row object.
   let d = DIGESTS.get(m);
   if (d === undefined) {
     d = m.text != null ? hash(sample(m.text) + (m.images ?? []).join("|") + (m.stats ? JSON.stringify(m.stats) : "")) : hash((m.calls ?? []).map(callDigest).join("|"));
@@ -117,7 +117,6 @@ export function keyRows(rows) {
     m.key = `${base}-${seen[base]}`;
   }
   rows.forEach((m, i) => {
-    // A copy row under the person's message (`prompt`) belongs to their side, so the gap comes after it, not before it.
     const mine = r => (r?.kind === "message" && r.role === "user") || Boolean(r?.prompt);
     const prev = rows[i - 1], user = mine(m);
     const prevUser = mine(prev);
@@ -127,8 +126,8 @@ export function keyRows(rows) {
   return rows;
 }
 
+/** An assistant message split around its fenced code blocks: text, a code row, text, … (null when it has none). */
 export function splitCode(text) {
-  // An assistant message split around its fenced code blocks: text, a code row, text, … (null when it has none).
   const parts = text.split(/```([^\n`]*)\n([\s\S]*?)```/g);
   if (parts.length === 1) return null;
   const out = [];
@@ -139,11 +138,13 @@ export function splitCode(text) {
   return out;
 }
 
+/**
+ * The rows with a copy row after each agent response (the run of rows up to the next message from the person; the one
+ * still being written gets none, so no empty band sits between the conversation and the working line over the reply
+ * box), and one after each of the person's messages (`prompt`, drawn at the right, under its bubble). A turn's "stats"
+ * row (see TurnClock) goes onto its response's copy row, which shows it.
+ */
 export function withCopyRows(rows, working) {
-  // The rows with a copy row after each agent response (the run of rows up to the next message from the person; the one still
-  // being written gets none, so no empty band sits between the conversation and the working line over the reply box), and
-  // one after each of the person's messages (`prompt`, drawn at the right, under its bubble).
-  // A turn's "stats" row (see TurnClock) goes onto its response's copy row, which shows it.
   const out = [];
   let texts = [], stats = null;
   const close = last => {

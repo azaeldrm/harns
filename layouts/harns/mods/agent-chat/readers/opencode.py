@@ -37,8 +37,6 @@ def find_opencode():
     if A.known.startswith(db + "#"):
         sid = A.known.split("#", 1)[1]
         if con.execute("select 1 from session_v2 where id = ?", (sid,)).fetchone(): return A.known
-    # Sessions updated since the agent started (a resumed one is updated, not created, then): in the terminal's folders,
-    # else (a session resumed from another folder) in any folder, which the screen must confirm.
     since = A.created - 10000 if A.created else 0
     query = "select time_updated, id from session_v2 where parent_id is null and time_updated >= ?"
     rows = []
@@ -93,7 +91,6 @@ def parse_opencode(path):
             add_message("user", "", *placed_images(d.get("text", "")))
             add_tick(secs(made), prompt=True)
         elif kind == "assistant":
-            # The reply ran from its row's creation to its last update; its output tokens if the row records them.
             add_tick(secs(made))
             add_tick(secs(changed), mid=str(rid), out=(d.get("tokens") or {}).get("output") if isinstance(d.get("tokens"), dict) else None)
             for c in d.get("content") or []:

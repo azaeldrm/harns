@@ -2,8 +2,6 @@ import json, os, sqlite3, subprocess, sys, tempfile, time, urllib.parse
 from pathlib import Path
 from reader_bundle import bundle
 
-# Which session is the terminal's, as Pi and OpenCode find it (common.py pick_session): written since the agent started,
-# in the terminal's folders first; then any folder, which the screen must confirm; the screen also tells several apart.
 reader = bundle()
 failed = 0
 
@@ -25,7 +23,6 @@ def read(app, env, cwd, created, known="", screen=None, peers=0):
 
 now = time.time()
 
-# Pi: a folder of sessions per working folder.
 home = tempfile.mkdtemp()
 env = {"HOME": home, "USERPROFILE": home}
 def pi_session(cwd, name, said, mtime):
@@ -50,7 +47,6 @@ check("Pi: nothing in its folder, one elsewhere: the screen must confirm", read(
 check("Pi: resumed from another folder, shown on the screen", read("pi", env, "/empty", started, screen="a conversation resumed from another folder")[0], moved)
 check("Pi: elsewhere but not on the screen: not this terminal's", read("pi", env, "/empty", started, screen="nothing like it here at all")[0], "")
 
-# OpenCode: one SQLite file; a resumed session is updated, not created, after the terminal opened.
 data = tempfile.mkdtemp()
 os.makedirs(os.path.join(data, "opencode"))
 db = os.path.join(data, "opencode", "opencode.db")

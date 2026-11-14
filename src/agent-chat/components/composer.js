@@ -18,8 +18,12 @@ const DRAFT_PAUSE = 400;
 const SENT_PRUNE_EVERY = 3600000;
 
 export class Composer {
+  /**
+   * The reply box: one draft per session (text and images), mirrored into the agent's own box, and sending it. `host`
+   * is the view: its `sending` lock, `note`, `key`, `list`, `card`, `stop()`, `stopping`, `showPending()` /
+   * `dropPending()` for the message just sent, and `backdropShown` (whether the backdrop is behind the box now).
+   */
   constructor(host, cx) {
-    // The reply box: one draft per session (text and images), mirrored into the agent's own box, and sending it. `host` is the view: its `sending` lock, `note`, `key`, `list`, `card`, `stop()`, `stopping`, `showPending()` / `dropPending()` for the message just sent, and `backdropShown` (whether the backdrop is behind the box now).
     this.host = host;
     this.input = TextareaState.new({ placeholder: "Reply…", rows: 1 });
     this.input.set_soft_wrap(true);
@@ -45,27 +49,25 @@ export class Composer {
     cx.timer.every(SENT_PRUNE_EVERY, () => { this.pruneSent(); });
   }
 
+  /** Whether the box holds nothing to send. */
   blank() {
-    // Whether the box holds nothing to send.
     return !this.input.value().trim() && !this.attachments.length;
   }
 
+  /** The chat box and the agent's own input box hold the same draft. */
   mirrorOnSwitch(cx) {
-    // The chat box and the agent's own input box hold the same draft.
     const mode = shared("herdr-chat.mode"), t = target();
     const session = t ? sessionOf(t) : "";
     const was = this.lastMode, wasSession = this.lastModeSession;
     this.lastMode = mode; this.lastModeSession = session;
-    // The box takes the keyboard whenever Chat starts showing: switched to from Terminal, or showing another agent (another
-    // tab or space, an agent picked in the sidebar), where the view stays Chat.
     if (mode === "chat" && (was !== "chat" || session !== wasSession)) this.input.focus();
     if (mode === was || !t || session !== wasSession || !canMirror(t.harness) || this.host.sending || this.host.card.choices) return;
     if (was === "chat" && mode === "terminal") this.pushDraft(t, session, cx);
     else if (was === "terminal" && mode === "chat") this.pullDraft(t, session, cx);
   }
 
+  /** Runs a mirror step after the ones before it, one at a time: a quick switch back waits for the push to finish. */
   queueMirror(cx, step) {
-    // One mirror step at a time: a quick switch back waits for the push before reading the box.
     this.mirrorChain = this.mirrorChain.then(() => new Promise(done => cx.spawn(async cx => {
       try { await step(cx); } catch {} finally { done(); }
     })));
@@ -86,8 +88,8 @@ export class Composer {
     });
   }
 
+  /** The agent's box back into the chat. */
   pullDraft(t, session, cx) {
-    // The agent's box back into the chat.
     this.queueMirror(cx, async cx => {
       const r = await inputBox("read", t);
       if (!r.ok) return;
@@ -113,8 +115,8 @@ export class Composer {
     });
   }
 
+  /** Saves the reply box's draft (text and images) once typing pauses, so a reload of the chat keeps it. */
   keepDraft(cx) {
-    // Saves the reply box's draft (text and images) once typing pauses, so a reload of the chat keeps it.
     const key = this.host.key, token = this.draftToken = (this.draftToken ?? 0) + 1;
     if (!key) return;
     cx.spawn(async cx => {
@@ -124,8 +126,8 @@ export class Composer {
     });
   }
 
+  /** The reply box's draft kept for session `from` (default: the one shown), and `key`'s put in it. */
   swapDraft(key, from = this.host.key) {
-    // The reply box's draft kept for session `from` (default: the one shown), and `key`'s put in it.
     if (from) {
       const text = this.input.value(), attachments = this.attachments;
       if (text || attachments.length) this.drafts.set(from, { text, attachments });
@@ -137,8 +139,8 @@ export class Composer {
     this.mirror = null;
   }
 
+  /** `hc put` each image beside the agent's terminal (this computer or another) and return where they landed. */
   async placeImages(t, attached) {
-    // `hc put` each image beside the agent's terminal (this computer or another) and return where they landed.
     const placed = [];
     const where = sessionOf(t);
     for (const a of attached) {
@@ -153,8 +155,8 @@ export class Composer {
     return placed;
   }
 
+  /** Runs a prepare script; resolves with the preview copy's path, or null with the reason in the note. */
   async prepare(args, label) {
-    // Runs a prepare script; resolves with the preview copy's path, or null with the reason in the note.
     const r = onWindows()
       ? await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File", modFile("prepare-image.ps1"), ...args.windows]).catch(e => ({ code: 1, stderr: String(e) }))
       : await exec("sh", args.unix).catch(e => ({ code: 1, stderr: String(e) }));
@@ -170,8 +172,8 @@ export class Composer {
     return null;
   }
 
+  /** Adds an image to the draft of `owner`, the session it was added in, even if another one shows now. */
   attach(file, name, cx, owner = this.host.key) {
-    // Adds an image to the draft of `owner`, the session it was added in, even if another one shows now.
     const a = { name, file, rel: `${ATTACH_DIR}/${file.split(/[\\/]/).pop()}` };
     if (owner === this.host.key) { this.attachments.push(a); this.keepDraft(cx); }
     else {
@@ -183,18 +185,18 @@ export class Composer {
     cx.notify();
   }
 
+  /** Deletes preview copies: after a send, or when one is removed from the box. */
   forget(files) {
-    // Deletes preview copies: after a send, or when one is removed from the box.
     removeFiles(files);
   }
 
+  /** Sent images keep their previews in sent/, so the message's bubble can show them. */
   keepSent(attached, placed, t, cx) {
-    // Sent images keep their previews in sent/, so the message's bubble can show them.
     cx.spawn(async cx => { for (const n of await keepSent(attached.map(a => a.file), placed, t.machine)) this.sent.add(n); cx.notify(); });
   }
 
+  /** Fetches, once each, the images in `messages` that have no preview in sent/ yet, from the agent's machine. */
   previewsFor(t, messages, cx) {
-    // Fetches, once each, the images in `messages` that have no preview in sent/ yet, from the agent's machine.
     if (!t || !this.sentReady || messages === this.scanned) return;
     this.scanned = messages;
     for (const m of messages) for (const path of m.images ?? []) {
@@ -205,8 +207,8 @@ export class Composer {
     }
   }
 
+  /** Drops the previews of terminals that are gone. */
   async pruneSent() {
-    // Drops the previews of terminals that are gone.
     const r = await hc(["ls", "--all", "--json"]).catch(() => null);
     let listing = null;
     try { listing = r?.code === 0 ? JSON.parse(r.stdout) : null; } catch {}
@@ -215,13 +217,13 @@ export class Composer {
     for (const n of stale) this.sent.delete(n);
   }
 
+  /** Preview copies left by a copy that closed before sending them: anything older than a day. */
   pruneCache() {
-    // Preview copies left by a copy that closed before sending them: anything older than a day.
     pruneOld(attachDir(), keptImages().map(f => f.split(/[\\/]/).pop()), ["sent"]);
   }
 
+  /** Dropped files: images get a preview copy (shrunk when big) and are attached; anything else is ignored. */
   dropFiles(paths, cx) {
-    // Dropped files: images get a preview copy (shrunk when big) and are attached; anything else is ignored.
     const images = paths.filter(p => IMAGE_FILE.test(p));
     if (!images.length) { this.host.note = "Only images can be attached (png, jpg, gif, webp)."; cx.notify(); return; }
     const owner = this.host.key;
@@ -238,8 +240,8 @@ export class Composer {
     });
   }
 
+  /** Ctrl+V with an image (and no text) on the clipboard: attached like a dropped file. */
   pasteImage(cx) {
-    // Ctrl+V with an image (and no text) on the clipboard: attached like a dropped file.
     const owner = this.host.key;
     cx.spawn(async cx => {
       const name = attachName("pasted");
@@ -265,8 +267,8 @@ export class Composer {
           .child(icon("close", 10, t.muted)))));
   }
 
+  /** ↑ (dir -1) or ↓ (+1) in the reply box: the skill menu's selection while it's open. */
   lineKey(dir, cx) {
-    // ↑ (dir -1) or ↓ (+1) in the reply box: the skill menu's selection while it's open.
     if (this.menu.move(target(), dir, cx)) return;
     const { start, end } = caretOf(this.input);
     const from = dir < 0 ? start : end;
@@ -276,8 +278,8 @@ export class Composer {
     this.lineGoal = { at, column };
   }
 
+  /** Enter (without Shift): sends, and never leaves a new line in the box. */
   enter(cx) {
-    // Enter (without Shift): sends, and never leaves a new line in the box.
     this.enterAt = Date.now();
     const v = this.input.value(), s = v.replace(/\r?\n$/, "");
     if (s !== v) this.input.set_value(s);
@@ -294,9 +296,6 @@ export class Composer {
     this.keepDraft(cx);
     cx.notify();
     const owner = this.host.key;
-    // Shown in the conversation at once, as chat apps do, until the agent's log has it (main.js withPending): the log
-    // gets it a moment after the agent starts working, which drew the list in several jumps. Not for an answer to a
-    // prompt or a slash command, which the log doesn't record as a message of the person's.
     if (typed && t.status !== "blocked" && !typed.startsWith("/")) this.host.showPending(owner, typed);
     const restore = () => {
       this.host.dropPending(owner, typed);
@@ -348,27 +347,31 @@ export class Composer {
     });
   }
 
+  /**
+   * After a message reaches the agent: its box starts empty, its images are kept for the conversation, and the list
+   * follows it.
+   */
   delivered(t, attached, placed, cx) {
-    // After a message reaches the agent: its box starts empty, its images are kept for the conversation, and the list follows it.
     this.mirror = { session: sessionOf(t), sig: "\u0000", images: [], paths: [], pasted: "", textBox: "", box: "", foreign: false };
     this.keepSent(attached, placed, t, cx);
     this.host.list.follow();
   }
 
+  /** The conversation to send `typed` to through the agent's daemon, or "" to type it into the terminal. */
   daemonThread(t, typed) {
-    // The conversation to send `typed` to through the agent's daemon, or "" to type it into the terminal.
     return viaDaemon(t.harness, t.status, typed) && chatKey(t) === this.host.key ? t.harness.daemon.thread(this.host.sessionPath) : "";
   }
 
+  /**
+   * The reply box (attachments, the text, and the send or stop button at its bottom right) and the line under it
+   * (`footer`: the model, effort, mode and context), so the box grows only with what's typed.
+   */
   render(t, active, footer = null) {
-    // The reply box (attachments, the text, and the send or stop button at its bottom right) and the line under it
-    // (`footer`: the model, effort, mode and context), so the box grows only with what's typed.
     const ready = (Boolean(this.input.value().trim()) || this.attachments.length > 0) && !this.host.sending && Boolean(active);
     const stopping = active?.status === "working" && !this.input.value().trim() && !this.attachments.length;
     const menu = this.menu.render(t, active);
     return v_flex().w_full().max_w(COLUMN).gap(6).relative()
       .when(Boolean(menu), el => el.child(menu))
-      // Over the backdrop (in layouts that show one) the box is see-through, the animation dim behind it.
       .child(h_flex().id("composer-box").w_full().pl(16).pr(8).py(8).gap(8).items_end().rounded(18).border_1().border_color(t.input)
         .bg(this.host.backdropShown ? `${t.surface.slice(0, 7)}a6` : t.surface)
         .child(v_flex().flex_1().min_w(0)
@@ -397,8 +400,6 @@ export class Composer {
             .bg(ready ? t.accent : t.raised).text_color(ready ? t.accent_foreground : t.dim)
             .when(ready, el => el.cursor_pointer().hover(s => s.opacity(0.88)).on_click((_e, cx) => this.send(cx)))
             .child(svg(`${ICONS}/arrow-up.svg`).size(16))))
-      // Under the box: what the session runs with (main.js), else how sending works, on a line as tall as that one,
-      // so the box stays put when the session's line replaces the hint.
       .child(footer ?? h_flex().w_full().h(24).px(4).items_center().justify_center().text_size(11.5).text_color(t.dim)
         .child(active ? `Sends to the live ${active.label} terminal · drop or paste an image to attach it` : ""));
   }

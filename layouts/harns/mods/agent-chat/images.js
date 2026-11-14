@@ -10,14 +10,17 @@ function sentDir() { return onWindows() ? `${attachDir()}\\sent` : `${appHome()}
 
 function cleanPart(s) { return String(s ?? "").replace(/[^A-Za-z0-9_-]/g, "-"); }
 
+/**
+ * A placed image's name in sent/: its machine, its terminal's folder under files/, and its file name, so images named
+ * alike elsewhere stay apart.
+ */
 export function previewName(path, machine) {
-  // A placed image's name in sent/: its machine, its terminal's folder under files/, and its file name, so images named alike elsewhere stay apart.
   const parts = path.split(/[\\/]/);
   return `${cleanPart(machine) || "local"}~${cleanPart(parts.at(-2))}~${parts.at(-1)}`;
 }
 
+/** Moves sent images' previews into sent/, under the names their placed paths give; returns the names kept. */
 export async function keepSent(previews, placed, machine) {
-  // Moves sent images' previews into sent/, under the names their placed paths give; returns the names kept.
   if (!previews.length) return [];
   await mkdir(sentDir(), { recursive: true }).catch(() => null);
   const kept = [];
@@ -25,7 +28,6 @@ export async function keepSent(previews, placed, machine) {
     const name = previewName(placed[i], machine);
     const bytes = await readFile(f).catch(() => null);
     if (!bytes) continue;
-    // Herdr's writeFile can report success having written no bytes, so a preview only counts once it reads back whole; fetchSent makes one otherwise.
     const dest = `${sentDir()}/${name}`;
     await writeFile(dest, bytes).catch(() => null);
     const whole = await readFile(dest).then(back => back.length === bytes.length, () => false);
@@ -52,8 +54,11 @@ else:
 `;
 const SHRINK_OVER = 250000;
 
+/**
+ * A big preview in sent/ through the reply box's prepare script, as <name>.jpg in place of it; the name kept, or null
+ * when it can't be shrunk here.
+ */
 async function shrink(name) {
-  // A big preview in sent/ through the reply box's prepare script, as <name>.jpg in place of it; the name kept, or null when it can't be shrunk here.
   const source = `${sentDir()}/${name}`;
   const r = await (onWindows()
     ? exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File", modFile("prepare-image.ps1"), "-Source", source, "-Folder", sentDir(), "-Name", name])
@@ -64,8 +69,11 @@ async function shrink(name) {
   return null;
 }
 
+/**
+ * Copies an image herdr placed beside a terminal, on its machine (null: this one), into sent/, shrunk when big; the
+ * file's name there, or null.
+ */
 export async function fetchSent(path, machine) {
-  // Copies an image herdr placed beside a terminal, on its machine (null: this one), into sent/, shrunk when big; the file's name there, or null.
   await mkdir(sentDir(), { recursive: true }).catch(() => null);
   const name = previewName(path, machine);
   const r = await python(["-c", FETCH, machine ?? "", path, `${sentDir()}/${name}`]).catch(() => null);
@@ -73,19 +81,25 @@ export async function fetchSent(path, machine) {
   return Number(r.stdout) > SHRINK_OVER ? (await shrink(name).catch(() => null)) ?? name : name;
 }
 
+/**
+ * The file in sent/ that shows a placed image, as `sent` lists them: under its preview name, or that with .jpg when it
+ * was shrunk; null when there's none.
+ */
 export function previewFile(sent, path, machine) {
-  // The file in sent/ that shows a placed image, as `sent` lists them: under its preview name, or that with .jpg when it was shrunk; null when there's none.
   const name = previewName(path, machine);
   return sent?.has(name) ? name : sent?.has(`${name}.jpg`) ? `${name}.jpg` : null;
 }
 
+/** The previews in sent/. */
 export async function sentNames() {
-  // The previews in sent/.
   return readdir(sentDir()).catch(() => []);
 }
 
+/**
+ * The previews whose terminal is gone, from `hc ls --all --json`; a machine that isn't connected keeps its own, since
+ * its terminals only look gone.
+ */
 export function staleSent(names, listing) {
-  // The previews whose terminal is gone, from `hc ls --all --json`; a machine that isn't connected keeps its own, since its terminals only look gone.
   if (!Array.isArray(listing?.machines) || !Array.isArray(listing?.terminals)) return [];
   const down = new Set(listing.machines.filter(m => m.state !== "connected").map(m => cleanPart(m.name)));
   const live = new Set(listing.terminals.map(t => {
@@ -98,13 +112,13 @@ export function staleSent(names, listing) {
   });
 }
 
+/** Deletes these previews from sent/. */
 export async function dropSent(names) {
-  // Deletes these previews from sent/.
   await Promise.all(names.map(n => unlink(`${sentDir()}/${n}`).catch(() => null)));
 }
 
+/** A unique name for the preview copy, without its extension (the prepare script picks it). */
 export function attachName(source) {
-  // A unique name for the preview copy, without its extension (the prepare script picks it).
   const base = source.split(/[\\/]/).pop().replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9_-]/g, "-").slice(-40) || "image";
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}-${base}`;
 }

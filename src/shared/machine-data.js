@@ -84,8 +84,8 @@ export default class MachineStats extends View {
     }
   }
 
+  /** Once a second: queues an account read for the services each finished turn spent, and runs the reads due. */
   noticeTurns(cx) {
-    // Once a second: queues an account read for the services each finished turn spent, and runs the reads due.
     const now = look(agents(), machines());
     for (const app of endedApps(this.seen, now))
       for (const service of servicesOf(app)) if (!this.usageDue.has(service)) this.usageDue.set(service, Date.now() + READ_AFTER);
@@ -95,8 +95,8 @@ export default class MachineStats extends View {
     if (ready.length) this.readUsage(cx, ready);
   }
 
+  /** Reads the account's limits for `services` and publishes them. */
   readUsage(cx, services) {
-    // Reads the account's limits for `services` and publishes them.
     if (this.usageReading) { for (const s of services) this.usageAgain.add(s); return; }
     this.usageReading = true;
     cx.spawn(async cx => {
@@ -127,8 +127,8 @@ export default class MachineStats extends View {
     });
   }
 
+  /** Publishes the account's usage in shared `machine.usage`: each service read replaces its last reading. */
   publishUsage(results) {
-    // Publishes the account's usage in shared `machine.usage`: each service read replaces its last reading.
     const before = shared('machine.usage') ?? {};
     const usage = { ...before };
     for (const [service, reading] of Object.entries(results)) {

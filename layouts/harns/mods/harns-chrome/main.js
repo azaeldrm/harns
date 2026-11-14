@@ -7,14 +7,10 @@ const logoSrc = () => agents().some(a => a.status === "working")
   ? "mods/harns-chrome/harness-logo-fade.webp"
   : "mods/harns-chrome/harness-logo-bob.webp";
 
-
-
-// The rail is twice the sidebar's icon axis (26 px in), so what it centres lines up with the open sidebar's icons; macOS
-// needs it wider for the traffic lights.
 const RAIL = 52;
 
+/** To the rail (on macOS wide enough for the traffic lights), or back to the width it had. */
 function toggleSidebar() {
-  // To the rail (on macOS wide enough for the traffic lights), or back to the width it had.
   const width = find(layout(), "sidebar")?.size?.px;
   if (!narrow()) setShared("sidebar.width", width);
   setShared("sidebar.collapsed", !narrow());
@@ -32,9 +28,6 @@ export default class WorkspaceChrome extends View {
     const t = theme();
     const collapsed = narrow();
     if (props()?.footer) {
-      // Settings and Add machine as icons side by side (smaller on the rail, so both still fit); an update ready dots the gear.
-      // Open: the gear on the sidebar's icon axis, 26 px in (12 + half of 28). On the rail: the gear in the icon column and the
-      // server in the status column, the same 16 and 14 px slots 6 px apart as the rows above.
       const size = collapsed ? 24 : 28;
       const icon = (id, name, tip, action, dot = false) => div().id(id).relative().size(size).flex_none().flex().items_center().justify_center()
         .rounded(7).text_color(t.muted).hover(s => s.bg(t.hover).text_color(t.foreground)).cursor_pointer().tooltip(tip)
@@ -49,13 +42,10 @@ export default class WorkspaceChrome extends View {
         .child(gear.w(22)).child(machine.w(22));
       return h_flex().size_full().bg(t.surface).items_center().gap(2).px(12).child(gear).child(machine).child(harns);
     }
-    // The logo on the sidebar's icon axis, 26 px in (12 + half of 28), as the agents' icons and the footer's gear.
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 12).pr(10).gap(4).items_center().text_size(13.5)
-      // On the rail, the logo centred.
       .when(collapsed, el => el.pl(0).pr(0).justify_center().child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Expand sidebar").cursor_pointer()))
       .when(window()?.platform === "macos" && !collapsed, el => el.pl(76))
       .when(!collapsed, el => el.child(h_flex().flex_1().gap(8).items_center()
-        // The same 28 px button and logo as the rail's.
         .child(this.button("sidebar-collapse-logo", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Collapse sidebar"))
         .child(div().text_size(16).font_semibold().text_color(t.foreground).child("harns"))))
       .when(!collapsed, el => el.child(this.button("search", svg("mods/harns-chrome/icons/search.svg").size(15), () => run("mod.open", { name: "picker" }))))

@@ -9,8 +9,9 @@ def pi_call(name, inp):
     return {"k": "other", "d": name}
 
 def find_pi():
-    # Pi keeps a folder of sessions per working folder: the terminal's folders first, then (a session resumed from another
-    # folder's) any folder, which the screen must confirm.
+    """Pi keeps a folder of sessions per working folder: the terminal's folders first, then (a session resumed from
+    another folder's) any folder, which the screen must confirm.
+    """
     sessions = os.path.join(HOME, ".pi", "agent", "sessions")
     own = []
     for cwd in candidate_cwds():
@@ -89,7 +90,6 @@ def parse_pi(path):
             add_message("user", "", *placed_images(said))
             add_tick(iso_time(o.get("timestamp")), prompt=True)
         elif role == "assistant":
-            # The reply's request started at its message's timestamp (ms) and ended at its entry's.
             if isinstance(m.get("timestamp"), (int, float)): add_tick(m["timestamp"] / 1000)
             add_tick(iso_time(o.get("timestamp")), mid=str(o.get("id") or m.get("responseId") or stamp), out=(m.get("usage") or {}).get("output"))
             for c in content if isinstance(content, list) else []:

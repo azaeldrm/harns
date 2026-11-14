@@ -1,14 +1,3 @@
-// The backdrop: a nested view playing a scene (sharks hunting fish, jellyfish, a night sky, rain) drawn as text
-// behind a page. props: {dim, slow, sceneKey, stir}. `slow` plays it at SLOW_FPS (behind a conversation) instead of
-// FPS; a parent changes it and `dim` with set_props. A new `stir` (any changed value) counts as activity, like the
-// pointer moving over it: the parent's way to keep it from resting while the page over it is in use. `sceneKey` is the
-// shared value naming the scene (an id from scenes/index.js). The view reads it every tick and switches when it changes,
-// so whatever sets it (the chat's button) needs no other channel.
-// It animates only while it's drawn and the window is in front. Anything else (the Terminal view shown, the animation
-// turned off, another app in front) drops it to one look a second, and a look that finds it drawn again picks the
-// motion back up. Shown for REST_MS with no pointer over it and no stir, it rests on its last frame until either comes:
-// every frame costs the whole window a redraw, and a chat can sit open for hours. Drawn again while it looks only once
-// a second, it moves at once rather than at the next look, so a welcome doesn't open on a frozen frame.
 import { View, div } from "gpui-kit";
 import { theme, shared, window as appWindow } from "herdr";
 import { Palette } from "./palette.js";
@@ -65,14 +54,15 @@ export class BackdropView extends View {
     this.task = cx.timer.every(every, cx => this.tick(cx));
   }
 
+  /**
+   * One step of the animation: a frame while it's drawn and the window is in front, else a slow look (idle) or none
+   * (resting). render() sets `drawn`, so a tick that finds it unset since the last one knows nothing drew the view.
+   */
   tick(cx) {
-    // render() sets drawn; a tick that finds it unset since the last one means nothing drew this view.
     const drawn = this.drawn;
     this.drawn = false;
-    // Another scene picked: start it, and move at once even if resting.
     if (this.wanted() !== this.sceneId) { this.show(this.wanted()); this.speed("fast", cx); }
     if (!drawn || !appWindow()?.active || !this.size) { this.speed("idle", cx); cx.notify(); return; }
-    // Coming back into view counts as a stir; resting, it keeps its frame and looks again only to see it's shown.
     if (this.mode === "idle") this.stirred = Date.now();
     if (Date.now() - this.stirred > REST_MS) { this.speed("rest", cx); cx.notify(); return; }
     this.speed("fast", cx);
@@ -100,7 +90,9 @@ export class BackdropView extends View {
     this.scene.setDim(this.dim);
   }
 
-  /** Where the pointer is, for the scene to react to (e.local_position: in the view, zoomed px). Whether it was there. */
+  /**
+   * Where the pointer is, for the scene to react to (e.local_position: in the view, zoomed px). Whether it was there.
+   */
   pointer(e, active, cx) {
     const at = e.local_position;
     if (!this.size || !at) return false;
@@ -115,7 +107,6 @@ export class BackdropView extends View {
 
   render(cx) {
     this.drawn = true;
-    // Only when that tick will move it: otherwise its idle branch redraws, this runs again, and the two loop.
     if (this.mode === "idle" && !this.waking && this.size && appWindow()?.active) {
       this.waking = true;
       cx.timer.after(0, cx => { this.waking = false; this.tick(cx); });
@@ -137,7 +128,6 @@ export class BackdropView extends View {
       .on_mouse_move((e, cx) => this.pointer(e, true, cx))
       .on_hover((hovered, cx) => { if (!hovered) this.scene.pointer.active = false; })
       .on_mouse_down("left", (e, cx) => { if (this.pointer(e, true, cx)) this.scene.splash(this.scene.pointer.x, this.scene.pointer.y); })
-      // An off-screen box that reports the app's zoom.
       .child(div().id("backdrop-zoom").absolute().top(0).left(-30000).w(PROBE_PX).h(PROBE_PX)
         .on_size_change((size, cx) => { const z = zoomFrom(size); if (Math.abs(z - this.zoom) > 0.001) { this.zoom = z; this.layout(); cx.notify(); } }))
       .children(runs);

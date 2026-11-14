@@ -1,7 +1,4 @@
 #!/bin/sh
-# Copies an SVG to the clipboard as a picture (diagram-copy.js), on Linux and macOS: drawn at twice its size by whichever
-# renderer is there (rsvg-convert, ImageMagick, Inkscape; Quick Look on macOS), then copied as PNG.
-# Arguments: the SVG, where to write the PNG, its width and height in px. Exit 3: no renderer; 4: nothing drawn; 5: no clipboard tool.
 svg=$1 png=$2 w=$(($3 * 2)) h=$(($4 * 2))
 rm -f "$png"
 if command -v rsvg-convert >/dev/null 2>&1; then rsvg-convert -w "$w" -h "$h" -o "$png" "$svg"

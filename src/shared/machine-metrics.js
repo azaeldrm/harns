@@ -33,7 +33,6 @@ export function machineMetrics(machine, compact, t = theme()) {
   });
   return compact
     ? v_flex().w_full().flex_none().children(items)
-    // The first icon starts where the machine's name does: the header's 9 + its 16 px icon slot + 8 gap = 33 px in the band.
     : h_flex().h(22).pl(33).pr(8).flex_none().gap(10).items_center().children(items);
 }
 

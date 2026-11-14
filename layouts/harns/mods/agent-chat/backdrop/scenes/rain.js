@@ -1,6 +1,3 @@
-// Rain on glass: drops streak down the page at their own speeds, a bright head and a fading tail, and splash into a
-// few specks where they land. Most are cool teal, a few catch the amber light. The pointer wipes a clear patch on the
-// glass; a click sends a ripple out from it.
 import { Grid } from "../grid.js";
 
 const TAIL = ["|", "|", ":", ":", "'", "'", ".", "."];
@@ -28,7 +25,6 @@ export class RainScene {
       x: (Math.floor(Math.random() * this.grid.cols) + 0.5) * this.grid.cw,
       y: anywhere ? Math.random() * H : -Math.random() * H * 0.3,
       v: 160 + Math.random() * 360, len: 3 + ((Math.random() * 6) | 0),
-      // Where it lands: most run to the bottom, some stop partway, beading on the glass.
       stop: Math.random() < 0.7 ? H - ch : H * (0.35 + Math.random() * 0.6),
       warm: Math.random() < 0.12,
     };

@@ -5,8 +5,11 @@ import { contextProbe } from './context-probe.js';
 import { newestSnapshots } from './snapshots.js';
 import { sessionOf } from './sessions.js';
 
+/**
+ * Reads the context of every machine's agents (or `only`'s) into shared `agents.context`: relay snapshots, and Codex
+ * footers with `footers`.
+ */
 export function refreshContext(view, cx, only, { footers = true } = {}) {
-  // Reads the context of every machine's agents (or `only`'s) into shared `agents.context`: relay snapshots, and Codex footers with `footers`.
   view.contextPending ??= new Set();
   view.contextAgain ??= new Set();
   view.footersDue ??= new Set();
@@ -44,8 +47,6 @@ export function refreshContext(view, cx, only, { footers = true } = {}) {
         }
         const codex = agents().filter(a => a.app === 'codex' && hostOf(a.address) === host);
         if (view.footersDue.delete(key)) {
-          // From each agent's log (its newest token_count), where agent-chat found it; else from its footer, which Codex
-          // cuts off on a narrow terminal (as one behind the chat is), so it's the fallback.
           const fromLogs = await codexLogContext(host, codex);
           for (const a of codex) {
             const logged = fromLogs[a.address];
@@ -85,9 +86,11 @@ for address, path in json.loads(sys.argv[1]):
 print(json.dumps(out))
 `;
 
+/**
+ * Each Codex agent's context as its log's newest token_count gives it (last input tokens of the model's window), for
+ * the agents whose log agent-chat found (its shared 'herdr-chat.paths', by address and start); { address: snapshot }.
+ */
 export async function codexLogContext(host, codex) {
-  // Each Codex agent's context as its log's newest token_count gives it (last input tokens of the model's window), for the
-  // agents whose log agent-chat found (its shared 'herdr-chat.paths', by address and start); { address: snapshot }.
   const all = terminals();
   const list = codex.map(a => {
     const path = sessionOf(a.address, all)?.path;
@@ -100,8 +103,8 @@ export async function codexLogContext(host, codex) {
   try { return r?.code === 0 ? JSON.parse(r.stdout.trim() || '{}') : {}; } catch { return {}; }
 }
 
+/** The context left in percent, as a Codex terminal's footer says ("Context 77% left"), or null. */
 export async function codexFooter(address) {
-  // The context left in percent, as a Codex terminal's footer says ("Context 77% left"), or null.
   try {
     const r = await hc(['read', address, '--lines', '4']);
     const found = r.code === 0 ? [...r.stdout.matchAll(/Context (\d+(?:\.\d+)?)% left/g)].at(-1) : null;
@@ -109,8 +112,8 @@ export async function codexFooter(address) {
   } catch { return null; }
 }
 
+/** This computer's snapshots, read from their folder without starting a process. */
 export async function readLocal() {
-  // This computer's snapshots, read from their folder without starting a process.
   const sep = home().includes('\\') ? '\\' : '/';
   const dir = [home(), '.config', 'harness', 'context'].join(sep);
   let names;

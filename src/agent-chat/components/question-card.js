@@ -19,14 +19,16 @@ const SCROLL_TRIES = 12;
 const ROW_SETTLE = 3000;
 const DAEMON_SKIP = 30000;
 
+/** Whether an option's description needs a line of its own. */
 function stacked(o) {
-  // Whether an option's description needs a line of its own.
   return o.desc.length > 0 && o.label.length + o.desc.join(" ").length > ROW_CHARS;
 }
 
+/**
+ * The height of a prompt's answers and options, up to where they scroll. `grown`: how much taller than one line the
+ * answer boxes have grown (measured as drawn); the limit rises with it, so a growing answer stays in view.
+ */
 function bodyHeight(q, grown = 0) {
-  // The height of a prompt's answers and options, up to where they scroll. `grown`: how much taller than one line the
-  // answer boxes have grown (measured as drawn); the limit rises with it, so a growing answer stays in view.
   const shown = q.options.filter(o => !o.next);
   const wrapped = o => q.preview ? (Math.ceil(o.label.length / PREVIEW_LABEL_CHARS) - 1) * 19 : 0;
   const rows = shown.reduce((sum, o) => sum + 34 + wrapped(o) + (stacked(o) ? Math.ceil(o.desc.join(" ").length / DESC_CHARS) * 19 : 0), 0) + (shown.length - 1) * 6;
@@ -36,8 +38,11 @@ function bodyHeight(q, grown = 0) {
 }
 
 export class QuestionCard {
+  /**
+   * A question on the agent's screen: read, shown as a card, answered with the harness's keys. `host` is the view: its
+   * `sending` lock, `note`, `key`, `list` and `zoom`.
+   */
   constructor(host) {
-    // A question on the agent's screen: read, shown as a card, answered with the harness's keys. `host` is the view: its `sending` lock, `note`, `key`, `list` and `zoom`.
     this.host = host;
     this.choices = null; this.screen = ""; this.unread = false; this.currentStep = "";
     this.cardFold = ""; this.cardFolded = false;
@@ -46,11 +51,8 @@ export class QuestionCard {
       chat: TextareaState.new({ placeholder: "Chat about this…", rows: 1 }),
     };
     for (const [kind, box] of Object.entries(this.rowInputs)) {
-      // As the reply box: long answers wrap, the box grows to 3 lines, then scrolls.
       box.set_soft_wrap(true);
       box.set_auto_grow(1, 3);
-      // Enter answers (Shift+Enter is a new line), as in the reply box: caught before the box takes it (below), and a
-      // newline that slips in with it is taken back out.
       box.on("submit", (e, cx) => { if (!e?.shift) this.enterRow(kind, cx); });
       box.on("change", (_e, cx) => {
         if (Date.now() - (this.enterAt ?? 0) < 400) {
@@ -62,34 +64,41 @@ export class QuestionCard {
     }
   }
 
+  /**
+   * An answer row's height as drawn, in design px (herdr reports zoomed ones): past one line (34 px), the options
+   * area grows by the difference.
+   */
   rowSized(kind, height, cx) {
-    // An answer row's height as drawn, in design px (herdr reports zoomed ones): past one line (34 px), the options
-    // area grows by the difference.
     const extra = Math.max(0, Math.round(height - 34));
     if ((this.rowExtra ??= {})[kind] === extra) return;
     this.rowExtra[kind] = extra;
     cx.notify();
   }
 
+  /**
+   * How much the answer boxes this question shows have grown, together (a box from an earlier question doesn't count).
+   */
   grown(q) {
-    // How much the answer boxes this question shows have grown, together (a box from an earlier question doesn't count).
     const kinds = new Set(q.options.map(o => o.input).filter(Boolean));
     return Object.entries(this.rowExtra ?? {}).reduce((sum, [kind, extra]) => sum + (kinds.has(kind) ? extra : 0), 0);
   }
 
+  /** Whether a question or an unparsed prompt is on screen. */
   get showing() {
-    // Whether a question or an unparsed prompt is on screen.
     return Boolean(this.choices || this.unread);
   }
 
+  /** Forgets the question: another conversation is shown. */
   clear() {
-    // Forgets the question: another conversation is shown.
     this.screen = ""; this.choices = null; this.unread = false;
     this.previews = new Map();
   }
 
+  /**
+   * Fills in a preview the terminal's height cut: in Chat, where the terminal isn't in view, it's read once per option
+   * at the height it needs, and remembered.
+   */
   showPreview(cx, t) {
-    // Fills in a preview the terminal's height cut: in Chat, where the terminal isn't in view, it's read once per option at the height it needs, and remembered.
     const q = this.choices;
     if (!q?.preview) return;
     this.previews ??= new Map();
@@ -112,8 +121,8 @@ export class QuestionCard {
     });
   }
 
+  /** Whether the prompt shown is still the one on screen. */
   async stillCurrent(t) {
-    // Whether the prompt shown is still the one on screen.
     if (target()?.address !== t.address) return false;
     if (this.choices?.daemon) {
       const r = await askDaemon(t, { op: "pending", thread: this.daemonThread(t) });
@@ -125,8 +134,8 @@ export class QuestionCard {
     return (target()?.status === "blocked" || this.unread) && Boolean(this.screen) && text === this.screen;
   }
 
+  /** Acts on a choice of the prompt on screen, with the keys its harness takes. */
   choose(index, cx) {
-    // Acts on a choice of the prompt on screen, with the keys its harness takes.
     const t = target(), shown = this.choices;
     if (!t || !shown || this.host.sending) return;
     if (shown.daemon) { this.chooseDaemon(index, "", cx); return; }
@@ -147,8 +156,8 @@ export class QuestionCard {
     });
   }
 
+  /** Keeps a multi-select's text row on the terminal as it's typed, once typing pauses. */
   rowChanged(kind, cx) {
-    // Keeps a multi-select's text row on the terminal as it's typed, once typing pauses.
     const t = target();
     if (kind !== "text" || !this.choices?.multi || this.rowSetting || !t) return;
     this.rowDirty = true;
@@ -163,8 +172,8 @@ export class QuestionCard {
     });
   }
 
+  /** The prompt with its text row on screen, scrolling a list cut off below it. */
   async revealRow(t, cx) {
-    // The prompt with its text row on screen, scrolling a list cut off below it.
     const read = async () => { const screen = await readPrompt(t); return screen != null ? parsePrompt(t.harness, screen) : null; };
     let now = await read();
     for (let i = 0; i < SCROLL_TRIES && now?.options.find(o => o.input === "text")?.hidden; i++) {
@@ -175,8 +184,8 @@ export class QuestionCard {
     return now;
   }
 
+  /** Puts a multi-select's typed text on the terminal, where text ticks the row and no text unticks it. */
   flushRow(t, cx) {
-    // Puts a multi-select's typed text on the terminal, where text ticks the row and no text unticks it.
     this.rowChain = (this.rowChain ?? Promise.resolve()).then(async () => {
       if (!this.rowDirty) return;
       this.rowDirty = false;
@@ -193,16 +202,16 @@ export class QuestionCard {
     return this.rowChain;
   }
 
+  /** Enter in an answer box: answers once, however many of its key and submit events arrive. */
   enterRow(kind, cx) {
-    // Enter in an answer box: answers once, however many of its key and submit events arrive.
     const now = Date.now();
     if (now - (this.enterAt ?? 0) < 300) return;
     this.enterAt = now;
     this.answerRow(kind, cx);
   }
 
+  /** Sends what's typed in a text row of the prompt; an empty row is picked like any choice. */
   answerRow(kind, cx) {
-    // Sends what's typed in a text row of the prompt; an empty row is picked like any choice.
     const shown = this.choices, index = shown?.options.findIndex(o => o.input === kind) ?? -1;
     if (index < 0) return;
     if (shown.daemon) { this.chooseDaemon(index, this.rowInputs[kind].value(), cx); return; }
@@ -249,14 +258,16 @@ export class QuestionCard {
     });
   }
 
+  /** The conversation the chat shows, as the agent's daemon names it ("" for agents with no daemon). */
   daemonThread(t) {
-    // The conversation the chat shows, as the agent's daemon names it ("" for agents with no daemon).
     return t?.harness.daemon && this.host.key === chatKey(t) ? t.harness.daemon.thread(this.host.sessionPath) : "";
   }
 
+  /**
+   * The card for the request the agent's daemon has open for this conversation, or undefined to read the screen
+   * instead, as for agents with no daemon, conversations the daemon has closed, and requests the terminal handles.
+   */
   async readDaemon(t) {
-    // The card for the request the agent's daemon has open for this conversation, or undefined to read the screen instead,
-    // as for agents with no daemon, conversations the daemon has closed, and requests the terminal handles.
     const thread = t.status === "blocked" ? this.daemonThread(t) : "";
     if (!thread || (this.daemonSkip?.thread === thread && Date.now() < this.daemonSkip.until)) return undefined;
     const r = await askDaemon(t, { op: "pending", thread });
@@ -269,15 +280,15 @@ export class QuestionCard {
     return t.harness.daemon.choices(request) ?? undefined;
   }
 
+  /** Puts a daemon request's card up: its step, and an empty text row for a new question. */
   showDaemon(choices) {
-    // Puts a daemon request's card up: its step, and an empty text row for a new question.
     if (choices !== this.choices) this.rowInputs.text.set_value("");
     this.choices = choices; this.screen = `daemon:${choices.daemon.item}`; this.unread = false;
     this.currentStep = choices.steps[choices.daemon.step ?? 0]?.label ?? "";
   }
 
+  /** Answers the daemon's request with a row's decision (or shows the next question, for a request with several). */
   chooseDaemon(index, typed, cx) {
-    // Answers the daemon's request with a row's decision (or shows the next question, for a request with several).
     const t = target(), shown = this.choices, reply = shown && t?.harness.daemon ? t.harness.daemon.reply(shown, index, typed) : null;
     if (!t || !reply || this.host.sending) return;
     if (reply.step !== undefined) { this.showDaemon(t.harness.daemon.choices(this.daemonRequest, reply.step, reply.answers)); cx.notify(); return; }
@@ -294,8 +305,8 @@ export class QuestionCard {
     });
   }
 
+  /** Reads the screen soon after keys, since a blocked agent reports no change when a question moves on. */
   lookAgain(cx, t) {
-    // Reads the screen soon after keys, since a blocked agent reports no change when a question moves on.
     cx.spawn(async cx => {
       for (const ms of [250, 700]) {
         await cx.sleep(ms);
@@ -304,15 +315,15 @@ export class QuestionCard {
     });
   }
 
+  /** Folds the prompt card down to its title row, or opens it again. */
   toggle(cx) {
-    // Folds the prompt card down to its title row, or opens it again.
     this.cardFolded = !this.cardFolded;
     if (this.host.list.following) this.host.list.follow();
     cx.notify();
   }
 
+  /** The card for a prompt on screen: a question with its choices, or a blocked agent's last lines. */
   render(t, active) {
-    // The card for a prompt on screen: a question with its choices, or a blocked agent's last lines.
     const q = active && (active.status === "blocked" || active.status === "working") ? this.choices : null;
     if (active?.status !== "blocked" && !q && !this.unread) return null;
     const fold = q ? JSON.stringify(q.steps.length ? q.steps.map(s => s.label) : q.question) : `screen:${active?.address}`;
@@ -358,7 +369,6 @@ export class QuestionCard {
           : o.input ? v_flex().id(`choice-${i}`).flex_none().w_full().px(10).py(5).rounded(7)
           .border_1().border_color(t.border).bg(t.background)
           .on_size_change((size, cx) => this.rowSized(o.input, designPx(size.height, this.host.zoom ?? 1), cx))
-          // The number or checkbox stays by the first line as the box grows.
           .child(h_flex().gap(7).items_start()
             .child(o.checked === undefined
               ? div().flex_none().text_size(12).text_color(t.dim).child(o.n ? `${o.n}.` : "")
@@ -399,8 +409,8 @@ export class QuestionCard {
         .child(key("k-term", "Open terminal", "terminal")));
   }
 
+  /** Reads the agent's screen for a question while it works or is blocked (Pi asks while working). */
   read(cx, t) {
-    // Reads the agent's screen for a question while it works or is blocked (Pi asks while working).
     if (t.status !== "blocked" && t.status !== "working") {
       if (this.screen) { this.screen = ""; this.choices = null; this.unread = false; cx.notify(); }
       return;
@@ -430,8 +440,8 @@ export class QuestionCard {
     });
   }
 
+  /** Shows a multi-select's typed text in its box, and clears the box when the question changes. */
   syncRowBox() {
-    // Shows a multi-select's typed text in its box, and clears the box when the question changes.
     if (this.rowDirty) return;
     const q = this.choices, page = q?.question.join("\n") ?? "";
     const box = this.rowInputs.text, kept = this.rowKept ??= new Map();
@@ -448,8 +458,8 @@ export class QuestionCard {
     this.rowSetting = false;
   }
 
+  /** Finds which step a prompt is on when it changes page: the screen's text doesn't show it, only its colours. */
   readStep(cx, t) {
-    // Finds which step a prompt is on when it changes page: the screen's text doesn't show it, only its colours.
     const sig = JSON.stringify([this.choices?.question, this.choices?.steps]);
     if (sig === this.stepSig) return;
     this.stepSig = sig; this.currentStep = "";

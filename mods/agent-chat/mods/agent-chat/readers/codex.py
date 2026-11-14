@@ -120,7 +120,6 @@ def codex_runs_with(lines):
                 if info.get("model_context_window"): meta["window"] = int(info["model_context_window"])
         if "model" in meta and "context" in meta: break
     if state["fresh"]:
-        # The models it offers, with their efforts, from its own list (read once, when the log is read from the start).
         root = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
         try:
             with open(os.path.join(root, "models_cache.json"), encoding="utf-8") as f: cache = json.load(f)
@@ -137,7 +136,6 @@ def parse_codex(path):
         if cwd: state["meta"]["cwd"] = cwd
     for line in lines:
         if '"token_count"' in line:
-            # One model request done: its output tokens, keyed by the running total (Codex repeats a count at times).
             o = loads(line) or {}
             info = (o.get("payload") or {}).get("info") or {}
             total = (info.get("total_token_usage") or {}).get("total_tokens")

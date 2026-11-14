@@ -1,12 +1,10 @@
-// The chat's own use of diagrams (the engine is diagrams.js, shared with the Files panel): an assistant message split
-// around its mermaid blocks, and a drawn diagram copied to the clipboard as a picture.
 import { appHome, exec } from "herdr";
 import * as fs from "fs/promises";
 import { diagramDir } from "./diagrams.js";
 import { onWindows, modFile } from "./platform.js";
 
+/** An assistant message split around its ```mermaid blocks: text, a diagram row, text, … */
 export function splitDiagrams(text) {
-  // An assistant message split around its ```mermaid blocks: text, a diagram row, text, …
   const parts = text.split(/```mermaid[^\n]*\n([\s\S]*?)```/g);
   if (parts.length === 1) return null;
   const out = [];
@@ -19,9 +17,11 @@ export function splitDiagrams(text) {
 
 export const COPY_PAD = 24;
 
+/**
+ * A drawn diagram's SVG on its own background with `pad` px around it, at its own size: what's copied as a picture, so
+ * its light text stays readable wherever it's pasted.
+ */
 export function framedSvg(svg, width, height, background, pad = COPY_PAD) {
-  // A drawn diagram's SVG on its own background with `pad` px around it, at its own size: what's copied as a picture, so its
-  // light text stays readable wherever it's pasted.
   const w = width + 2 * pad, h = height + 2 * pad;
   return svg.replace(/<svg\s[^>]*>/, tag => tag
     .replace(/viewBox="[^"]*"/, `viewBox="${-pad} ${-pad} ${w} ${h}"`)
@@ -37,8 +37,8 @@ const COPY_ERRORS = {
   5: "Copying a picture needs wl-copy or xclip.",
 };
 
+/** Puts a drawn diagram (diagramFor, ready) on the clipboard as a PNG; null when done, else why not. */
 export async function copyDiagramImage(d, background) {
-  // Puts a drawn diagram (diagramFor, ready) on the clipboard as a PNG; null when done, else why not.
   const dir = diagramDir();
   const at = name => onWindows() ? `${dir}\\${name}` : `${dir}/${name}`;
   const svg = at(`${d.key}.copy.svg`), png = at(`${d.key}.copy.png`);

@@ -1,4 +1,3 @@
-// Sharks hunting fish schools: ascii-sharks' sim, drawn by cells.js.
 import { Sea } from "./sea.js";
 import { SharkCells } from "./cells.js";
 import { pickSharks } from "./config.js";

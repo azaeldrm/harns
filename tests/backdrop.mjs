@@ -14,7 +14,6 @@ const check = (got, want, what) => {
   if (!ok) failed++;
 };
 
-// One row from strings: glyphs, a colour letter per cell (. none) and a background letter per cell (. none).
 const row = (g, f, b) => rowRuns([...g], [...f].map(x => x === "." ? null : x), [...b].map(x => x === "." ? null : x), g.length, 0)
   .map(u => [u.col, u.text, u.fg, u.bg]);
 check(row("          ", "..........", ".........."), [], "an empty row draws nothing");
@@ -32,7 +31,6 @@ check(pal.mix(10, 200, 30, 0.5) === pal.mix(10, 200, 30, 0.5), true, "the same c
 const sharks = pickSharks(() => 0.5);
 check([sharks.length, new Set(sharks.map(x => x.kind)).size, sharks.every(x => KINDS.includes(x.kind))], [3, 3, true], "three sharks, all of different known kinds");
 
-// The sim and the cells on a chat-sized page: it runs, sharks and fish land in cells, dimming dims all of it.
 const { cw, ch } = cellSize();
 const world = new World([{ kind: "hammerhead", size: 1.6 }, { kind: "tiger", size: 1.3 }, { kind: "zebra", size: 1.1 }]);
 const cells = new SharkCells();
@@ -50,7 +48,6 @@ const runs = frameRuns(cells);
 check(runs.length, cells.rows, "a list of runs per row");
 check(runs.flat().every(u => u.text.length === u.len && u.len > 0), true, "every run's text fills its cells");
 
-// Every scene: it runs on a chat-sized page, draws something, and its runs fill their cells; the button cycles them.
 const { SCENES, sceneFor, nextScene } = await s.load("backdrop/scenes/index.js");
 for (const entry of SCENES) {
   const scene = entry.make();

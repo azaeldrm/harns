@@ -5,9 +5,11 @@ import { hash } from "./hash.js";
 const quote = s => `'${String(s).replace(/'/g, "''")}'`;
 const ps = script => exec("powershell", ["-NoProfile", "-NonInteractive", "-Command", script]);
 
+/**
+ * The Simulator's Windows side: the Android SDK under %LOCALAPPDATA% (or ANDROID_HOME), programs started hidden
+ * through PowerShell, tunnels through Windows' OpenSSH, and harns-dock (dock.cs) placing the device windows.
+ */
 export async function windowsHost() {
-  // The Simulator's Windows side: the Android SDK under %LOCALAPPDATA% (or ANDROID_HOME), programs started hidden
-  // through PowerShell, tunnels through Windows' OpenSSH, and harns-dock (dock.cs) placing the device windows.
   const r = await ps("Write-Output \"$env:ANDROID_HOME|$env:ANDROID_SDK_ROOT|$env:LOCALAPPDATA|$env:WINDIR|$env:ANDROID_AVD_HOME|$HOME\"");
   const [home, root, local, win, avds, user] = r.stdout.trim().split("|");
   const sdk = home || root || (local ? `${local}\\Android\\Sdk` : null);
@@ -24,22 +26,26 @@ export async function windowsHost() {
     docks: true,
     noSdk: "No Android emulator found. Install the Android SDK's emulator, or set ANDROID_HOME (RECIPE.md: Simulator setup).",
 
+    /**
+     * Starts a program hidden: emulator.exe's own console stays out of sight; the device window shows, for harns-dock.
+     */
     start(program, args) {
-      // Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it.
       return ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(program)} -ArgumentList ${args.map(quote).join(",")}`);
     },
 
     closeTunnel(pid) { return exec("taskkill", ["/PID", String(pid), "/F"]).catch(() => {}); },
 
+    /** Tunnels a previous copy of the mod left (a reload, or a crash), found by the name SetEnv gave them. */
     closeTunnels() {
-      // Tunnels a previous copy of the mod left (a reload, or a crash), found by the name SetEnv gave them.
       return ps(`Get-CimInstance Win32_Process -Filter "Name='ssh.exe'" | Where-Object { $_.CommandLine -like '*harns-simulator*' } | ` +
         `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`).catch(() => {});
     },
 
+    /**
+     * An SSH reverse tunnel to `target`, its 127.0.0.1:<port> to this computer's <local>; its pid, or null when it
+     * exited (that port is taken there, or ssh can't log in).
+     */
     async openTunnel(target, port, local) {
-      // An SSH reverse tunnel to `target`, its 127.0.0.1:<port> to this computer's <local>; its pid, or null when it
-      // exited (that port is taken there, or ssh can't log in).
       const ssh = `${windir}\\System32\\OpenSSH\\ssh.exe`;
       const r = await ps(`$p = Start-Process -WindowStyle Hidden -PassThru -FilePath ${quote(ssh)} -ArgumentList ` +
         `'-N','-o','BatchMode=yes','-o','ExitOnForwardFailure=yes','-o','ServerAliveInterval=30','-o','ServerAliveCountMax=3',` +
@@ -48,8 +54,8 @@ export async function windowsHost() {
       return Number(r.stdout.trim()) || null;
     },
 
+    /** Another virtual device like `base`: its config.ini without its data, so it boots fresh. */
     async copyDevice(base, name) {
-      // Another virtual device like `base`: its config.ini without its data, so it boots fresh.
       const r = await ps(`$d = ${quote(host.avdHome)}; ` +
         `$src = Join-Path $d ${quote(`${base}.avd`)}; $dst = Join-Path $d ${quote(`${name}.avd`)}; ` +
         `New-Item -ItemType Directory -Force -Path $dst | Out-Null; ` +
@@ -60,8 +66,8 @@ export async function windowsHost() {
       if (r.code !== 0) throw new Error(r.stderr.trim().split("\n")[0] || "couldn't copy the virtual device");
     },
 
+    /** A fresh harns-dock, built from dock.cs with Windows' own C# compiler once per version of it. */
     async startDock() {
-      // A fresh harns-dock, built from dock.cs with Windows' own C# compiler once per version of it.
       const source = `${appHome()}\\mods\\emulator\\dock.cs`;
       const text = await readTextFile(source);
       if (!text) throw new Error("dock.cs is missing from the mod");
@@ -73,7 +79,6 @@ export async function windowsHost() {
       }
       await ps(`Get-Process -Name 'harns-dock-*' -ErrorAction SilentlyContinue | Stop-Process -Force; ` +
         `Start-Process -WindowStyle Hidden -FilePath ${quote(exe)} -ArgumentList ${quote(`run "${host.stateFile}"`)}`);
-      // Builds from older versions of dock.cs (the running one can't be deleted, and stays).
       for (const name of await fs.readdir(cache).catch(() => []))
         if (/^harns-dock-.*\.exe$/.test(name) && !exe.endsWith(name)) fs.unlink(`${cache}\\${name}`).catch(() => {});
     },

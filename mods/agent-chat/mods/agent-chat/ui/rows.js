@@ -6,9 +6,11 @@ import { SENT_DIR, previewFile } from "../images.js";
 import { KINDS, STEP, summary, stepText } from "../model/transcript.js";
 import { diagramFor } from "../diagrams.js";
 
-
+/**
+ * A code block in a box titled with its language; with `copied` set (true once copied), a copy icon sits at the top
+ * right.
+ */
 function codeBox(id, lang, source, t, copied) {
-  // A code block in a box titled with its language; with `copied` set (true once copied), a copy icon sits at the top right.
   const lines = source.replace(/\n$/, "").split("\n");
   return v_flex().id(id).w_full().rounded(10).border_1().border_color(t.border).bg(t.surface).overflow_hidden()
     .child(h_flex().h(30).px(12).gap(6).items_center().border_b(1).border_color(t.border)
@@ -19,25 +21,29 @@ function codeBox(id, lang, source, t, copied) {
       .children(lines.map((l, k) => div().id(`${id}-l${k}`).w_full().min_h(18).child(l.replace(/\t/g, "    ") || " "))));
 }
 
+/** A fenced code block of a reply as a row of its own: clicking it copies the code (see onItemClick in main.js). */
 function codeRow(m, { t, copied }) {
-  // A fenced code block of a reply as a row of its own: clicking it copies the code (see onItemClick in main.js).
   return codeBox(`code-${m.key}`, m.lang, m.text, t, copied === m.key);
 }
 
+/**
+ * A small icon button under the conversation (a diagram's, bordered; a message's copy, bare and smaller): the icon a
+ * check once it's done.
+ */
 function toolButton(t, id, glyph, done, busy, tip, bordered = true, size = 28) {
-  // A small icon button under the conversation (a diagram's, bordered; a message's copy, bare and smaller): the icon a check
-  // once it's done.
   return div().id(id).w(size === 28 ? TOOL_BUTTON : size).h(size).flex_none().flex().items_center().justify_center().rounded(size === 28 ? 8 : 6)
     .when(bordered, el => el.border_1().border_color(t.border)).hover(s => s.bg(t.raised)).tooltip(busy ? "Copying…" : done ? "Copied" : tip)
     .child(icon(done ? "check" : glyph, size === 28 ? 14 : 13, done || busy ? t.foreground : t.muted));
 }
 
+/**
+ * The copy button under an agent's response, at the left, or under one of the person's messages, at the right
+ * (`prompt`): clicking the row copies it (see onItemClick in main.js). Always shown: a list row can't react to hovering
+ * the message above it (no per-row hover in the list yet), so a hover-only bar would only show over its own strip. A
+ * response's turn numbers (m.stats) follow its button, each with its icon: time, output tokens, tokens per second. A
+ * caption of its message (24 px, right under it: see gapBefore in chat-list.js), not a row of its own.
+ */
 function copyRow(m, { t, copied }) {
-  // The copy button under an agent's response, at the left, or under one of the person's messages, at the right (`prompt`):
-  // clicking the row copies it (see onItemClick in main.js). Always shown: a list row can't react to hovering the message
-  // above it (no per-row hover in the list yet), so a hover-only bar would only show over its own strip.
-  // A response's turn numbers (m.stats) follow its button, each with its icon: time, output tokens, tokens per second.
-  // A caption of its message (24 px, right under it: see gapBefore in chat-list.js), not a row of its own.
   const done = copied === m.key, s = m.stats;
   const stat = (glyph, text, tip) => h_flex().id(`st-${glyph}-${m.key}`).gap(5).items_center().tooltip(tip)
     .child(icon(glyph, 12, t.dim)).child(div().text_size(11.5).text_color(t.dim).child(text));
@@ -50,16 +56,16 @@ function copyRow(m, { t, copied }) {
       .when(s?.tps != null, e => e.child(stat("circle-gauge", `${Math.round(s.tps)}tk/s`, "Tokens per second while the agent was writing (tool time left out)"))));
 }
 
+/** "8s", "42s", "3m 05s", "1h 02m". */
 export function duration(secs) {
-  // "8s", "42s", "3m 05s", "1h 02m".
   const n = Math.round(secs);
   if (n < 60) return `${n}s`;
   if (n < 3600) return `${Math.floor(n / 60)}m ${String(n % 60).padStart(2, "0")}s`;
   return `${Math.floor(n / 3600)}h ${String(Math.floor(n % 3600 / 60)).padStart(2, "0")}m`;
 }
 
+/** Markdown with each fenced code block in a titled box of its own. */
 function markdown(id, source, t) {
-  // Markdown with each fenced code block in a titled box of its own.
   const parts = source.split(/```([^\n`]*)\n([\s\S]*?)```/g);
   if (parts.length === 1) return TextView.markdown(id, source).selectable(true);
   const blocks = [];
@@ -72,15 +78,15 @@ function markdown(id, source, t) {
   return v_flex().w_full().gap(12).children(blocks);
 }
 
+/** A group's title line; opened, its steps follow as rows of their own (stepRows). */
 function toolsRow(m, { t, open }) {
-  // A group's title line; opened, its steps follow as rows of their own (stepRows).
   const kinds = [...new Set(m.calls.map(c => c.k).filter(k => k !== "think"))];
   const glyph = !kinds.length ? "brain" : kinds.length === 1 ? (KINDS[kinds[0]] ?? KINDS.other).icon : "layers";
   return v_flex().w_full().child(disclosure(t, glyph, summary(m.calls), Boolean(open[m.key])));
 }
 
+/** One step of an opened group: a thought in full markdown, or a call with its output in a box. */
 function stepRow(m, { t, open: opened }) {
-  // One step of an opened group: a thought in full markdown, or a call with its output in a box.
   const i = m.key, c = m.call, open = Boolean(opened[i]), shown = stepText(c, open);
   const toggle = shown.more || open && stepText(c, false).more;
   const body = !shown.text ? null
@@ -97,8 +103,8 @@ function stepRow(m, { t, open: opened }) {
     .when(body, el => el.child(body));
 }
 
+/** An image in the person's message: its preview in sent/, else a chip with its name. */
 function sentImage(t, id, path, sent, machine) {
-  // An image in the person's message: its preview in sent/, else a chip with its name.
   const name = path.split(/[\\/]/).pop(), preview = previewFile(sent, path, machine);
   if (preview) return div().id(id).size(120).flex_none().rounded(12).overflow_hidden().border_1().border_color(t.border).bg(t.raised)
     .tooltip(name).child(image(`${SENT_DIR}/${preview}`).size_full());
@@ -106,8 +112,8 @@ function sentImage(t, id, path, sent, machine) {
     .child(icon("image", 14, t.muted)).child(name || "Pasted image");
 }
 
+/** A message: the person's in a bubble (its images above it), the agent's as plain markdown across the column. */
 function messageRow(m, { t, width, sent, machine }) {
-  // A message: the person's in a bubble (its images above it), the agent's as plain markdown across the column.
   if (m.role === "user") {
     const room = Math.min(620, Math.round(Math.min(COLUMN, width - 48) * 0.85));
     const text = m.text ? bubble(t, room, markdown(`body-${m.key}`, m.text, t)) : null;
@@ -119,8 +125,11 @@ function messageRow(m, { t, width, sent, machine }) {
   return div().w_full().text_size(15).text_color(t.foreground).child(markdown(`body-${m.key}`, m.text, t));
 }
 
+/**
+ * A ```mermaid block from a reply, as its own row: the picture alone, in the reply's column; a click opens it larger
+ * (openDiagram).
+ */
 function diagramRow(m, { t, width }) {
-  // A ```mermaid block from a reply, as its own row: the picture alone, in the reply's column; a click opens it larger (openDiagram).
   const d = diagramFor(m.text, t);
   if (d.state === "queued") return div().w_full().h(24).flex().items_center().text_size(12.5).text_color(t.dim).child("Drawing diagram…");
   if (d.state === "failed") return v_flex().w_full().gap(6)
@@ -131,8 +140,6 @@ function diagramRow(m, { t, width }) {
   return div().id(`diagram-${m.key}`).w_full().cursor_pointer().tooltip("Click to open it larger").child(image(d.rel).w(w).h(h));
 }
 
-// The buttons under the conversation, at the left: a response's copy, and a diagram's two (copy the picture, copy the code),
-// which main.js tells apart by the pointer's place.
 export const TOOL_BUTTON = 30, TOOL_GAP = 6;
 
 function diagramToolsRow(m, { t, copied }) {
@@ -142,8 +149,11 @@ function diagramToolsRow(m, { t, copied }) {
     .child(button("code", "copy", "Copy the diagram's mermaid code"));
 }
 
+/**
+ * One conversation row, drawn from the row alone and `ctx` ({ t, open, width, sent, machine }), with the gap that
+ * starts a turn.
+ */
 export function row(m, ctx) {
-  // One conversation row, drawn from the row alone and `ctx` ({ t, open, width, sent, machine }), with the gap that starts a turn.
   const body = m.kind === "tools" ? toolsRow(m, ctx)
     : m.kind === "step" ? stepRow(m, ctx)
     : m.kind === "note" ? div().w_full().text_size(12.5).text_color(ctx.t.dim).child(m.text)

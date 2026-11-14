@@ -8,13 +8,16 @@ const STEP_ROW = /\bsubmit\s*→?\s*$/i;
 const CUT_STEP_ROW = /^\s*←\s.*[□☐■☑☒]/;
 const REVIEW_TITLE = /^\s*review your answers\s*$/i;
 
+/** The screen's lines without hc's notes, trailing space or the frame some harnesses draw around a prompt. */
 function screenLines(screen) {
-  // The screen's lines without hc's notes, trailing space or the frame some harnesses draw around a prompt.
   return screen.replace(/\u00a0/g, " ").split("\n").filter(l => !l.startsWith("[hc]")).map(l => l.replace(/^\s*[┃│] ?/, "").replace(/\s*[┃│]?\s*$/, ""));
 }
 
+/**
+ * Takes a question's preview box off the lines it shares with the options: the screen without it, and what it showed
+ * (its text, how many lines it cut).
+ */
 function pullPreview(screen) {
-  // Takes a question's preview box off the lines it shares with the options: the screen without it, and what it showed (its text, how many lines it cut).
   const lines = screen.split("\n");
   let top = -1, bottom = -1;
   for (let y = lines.length - 1; y >= 0 && top < 0; y--) {
@@ -37,66 +40,70 @@ function pullPreview(screen) {
   return { screen: lines.join("\n"), preview: { text, hidden } };
 }
 
+/** The line that closes a prompt, or -1. The review step has no footer, so its question closes it. */
 function findFooter(lines, end) {
-  // The line that closes a prompt, or -1. The review step has no footer, so its question closes it.
   for (let y = end; y >= Math.max(0, end - 6); y--) if (FOOTER.test(lines[y])) return y;
   for (let y = end; y >= Math.max(0, end - 6); y--) if (REVIEW.test(lines[y])) return lines.length;
   return -1;
 }
 
+/** Whether the screen ends like a prompt, even one whose choices can't be read. */
 export function looksLikePrompt(screen) {
-  // Whether the screen ends like a prompt, even one whose choices can't be read.
   const lines = screenLines(screen);
   let end = lines.length - 1;
   while (end >= 0 && !lines[end].trim()) end--;
   return findFooter(lines, end) >= 0;
 }
 
+/** What a preview belongs to: this question and the option the cursor is on. */
 export function previewKey(prompt) {
-  // What a preview belongs to: this question and the option the cursor is on.
   return `${prompt.sig}\u0000${prompt.options.find(o => o.selected)?.label ?? ""}`;
 }
 
+/**
+ * The whole preview from a taller reading of the screen, when it's still the same question and option; null otherwise.
+ */
 export function fullPreview(harness, screen, shown) {
-  // The whole preview from a taller reading of the screen, when it's still the same question and option; null otherwise.
   const seen = parsePrompt(harness, screen);
   return seen?.preview && !seen.preview.hidden && previewKey(seen) === previewKey(shown) ? seen.preview.text : null;
 }
 
+/** The prompt on an agent's screen, read the way its harness draws it. */
 export function parsePrompt(harness, screen) {
-  // The prompt on an agent's screen, read the way its harness draws it.
   return parseChoices(screen, harness?.prompt ?? {});
 }
 
+/**
+ * The keys that act on one option: its number where the harness takes one, else arrows from the selected one and Enter.
+ */
 export function keysFor(harness, prompt, index) {
-  // The keys that act on one option: its number where the harness takes one, else arrows from the selected one and Enter.
   const option = prompt.options[index];
   if (harness?.prompt?.byNumber) return option.next ? ["tab"] : [String(option.n)];
   if (option.next && option.hidden) return ["right"];
   return [...moves(prompt, index), "enter"];
 }
 
+/** The arrows from the selected option to one option. */
 function moves(prompt, index) {
-  // The arrows from the selected option to one option.
   const from = prompt.options.findIndex(o => o.selected);
   return Array(Math.abs(index - from)).fill(index > from ? "down" : "up");
 }
 
+/** Whether two readings of a prompt mean the same option, wherever a scrolled list puts it. */
 export function sameOption(a, b) {
-  // Whether two readings of a prompt mean the same option, wherever a scrolled list puts it.
   return a.next ? Boolean(b.next) : a.input ? a.input === b.input : a.label === b.label;
 }
 
+/** The keys that put the cursor in a text row, ready for a typed answer. */
 export function typedAnswer(harness, prompt, index) {
-  // The keys that put the cursor in a text row, ready for a typed answer.
   const { byNumber, notes } = harness?.prompt ?? {};
   const to = byNumber ? [String(prompt.options[index].n)] : moves(prompt, index);
   if (prompt.options[index].input === "chat") return { before: [...to, "enter"] };
   return { before: notes ? [...to, "tab"] : to };
 }
 
+/** What a review page lists between two lines: its answers and any warning, or null on other pages. */
 function reviewOf(lines, top, bottom) {
-  // What a review page lists between two lines: its answers and any warning, or null on other pages.
   const from = lines.slice(top, bottom).findIndex(l => REVIEW_TITLE.test(l));
   if (from < 0 && !lines.slice(top, bottom + 1).some(l => REVIEW.test(l))) return null;
   const answers = [];
@@ -110,8 +117,8 @@ function reviewOf(lines, top, bottom) {
   return { answers, warning };
 }
 
+/** The steps in a prompt's tab row, each with whether it's answered. */
 function stepsOf(tabs) {
-  // The steps in a prompt's tab row, each with whether it's answered.
   if (!tabs) return [];
   const bare = tabs.replace(/^←\s*/, "").replace(/\s*→$/, "").trim();
   return bare.split(/\s+(?=[□☐■☑☒✓✔])/).map(s => ({ label: s.replace(/^[□☐■☑☒✓✔]\s*/, ""), done: /^[■☑☒]/.test(s) }));

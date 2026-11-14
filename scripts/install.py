@@ -2,21 +2,15 @@ import json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 
 LAYOUT = 'harns'
-# The harns listing's share folder: what this installs (its mods/ built from src/ by scripts/package.py).
 SHARE = Path('layouts') / LAYOUT
 CHAT = 'agent-chat'
-# Mods renamed since older installs: their saved state (data/<name>) and the keys bound to their commands follow them.
 RENAMED = {
     'harness-chrome': 'harns-chrome', 'harness-tabs': 'harns-tabs', 'harness-settings': 'harns-settings',
     'harness-simulator': 'emulator', 'workspace-status-machine': 'harns-status',
     'machine-agents': 'machine-sidebar', 'harness-files': 'markdown-files', 'herdr-chat': 'agent-chat',
-    'harns-emulator': 'emulator',  # a name the emulator had briefly, before it was published
+    'harns-emulator': 'emulator',
 }
-# Mods older harns installs added that harns no longer has, removed from the Herdr home: the renamed ones' old copies;
-# machine-stats and machine-metrics, now code built into the mods that use them; machine-new-menu, now part of
-# machine-sidebar; and harness-pane, which went unused.
 RETIRED = [*RENAMED, 'harness-pane', 'machine-stats', 'machine-metrics', 'machine-new-menu']
-# Caches only those old mods wrote (the diagrams are in cache/diagrams now, shared by Files and the chat).
 OLD_CACHES = ['cache/harness-files', 'cache/harness-simulator', 'cache/harns-emulator', 'cache/herdr-chat']
 
 
@@ -127,7 +121,6 @@ def carry_over(home, backup):
     """Moves a renamed mod's saved state to its new name, where the new one has none yet, and points keys.json's
     bindings at the new names (keeping a copy of keys.json first, as `backup`). Returns what it moved and rebound."""
     moved = []
-    # Newest first, so where two old names became one (harness-simulator, then harns-emulator), the latest state wins.
     olds = sorted((old for old in RENAMED if (home / 'data' / old).is_dir()),
                   key=lambda old: (home / 'data' / old).stat().st_mtime, reverse=True)
     for old in olds:
@@ -141,7 +134,7 @@ def carry_over(home, backup):
         keys = json.loads(keys_path.read_text(encoding='utf-8-sig'))
 
         def rename(action):
-            # "machine-agents.next-machine" (or {"action": ...}) names the old mod.
+            """"machine-agents.next-machine" (or {"action": ...}) names the old mod."""
             if isinstance(action, dict):
                 return {**action, 'action': rename(action.get('action'))} if 'action' in action else action
             if isinstance(action, str) and '.' in action and action.split('.', 1)[0] in RENAMED:
@@ -173,7 +166,6 @@ def main():
 
     if subprocess.run([sys.executable, str(repo / 'scripts' / 'package.py')]).returncode != 0:
         fail('Building the share folders failed (scripts/package.py).')
-    # agent-chat is one of the listing's mods; --no-chat leaves whatever copy is installed as it is.
     mods = sorted(p.name for p in (share / 'mods').iterdir() if p.is_dir() and (chat or p.name != CHAT))
 
     if not same_folder(repo, home):
@@ -197,7 +189,6 @@ def main():
         layout_target = layouts / f'{LAYOUT}.json'
         back_up_if_changed(layout_target, share / 'layouts' / f'{LAYOUT}.json',
                            layouts / f'{LAYOUT}.json.before-install-{stamp}')
-        # Its picture in Herdr's layout picker (the layout's `preview`); an older install's screenshot goes.
         shutil.copy2(share / 'layouts' / f'{LAYOUT}.svg', layouts / f'{LAYOUT}.svg')
         (layouts / f'{LAYOUT}.png').unlink(missing_ok=True)
         shutil.copy2(share / 'layouts' / f'{LAYOUT}.json', layout_target)

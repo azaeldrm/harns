@@ -1,6 +1,3 @@
-// Harness's Files: herdr's lazy file browser for the focused pane's folder, with bounded
-// read-only previews, where Markdown reads as a document (mermaid drawn by Pele) instead of
-// source. Started from herdr's `files` mod; Preview/Source in the header switches views.
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState } from "gpui-base";
 import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, window, appHome, props, openOverlay, closeOverlay } from "herdr";
@@ -24,11 +21,13 @@ const extOf = path => { const name = path.split("/").pop(); return name.includes
 const readable = path => MARKDOWN.has(extOf(path)) || MERMAID.has(extOf(path));
 
 async function directory(path, on) {
+  /**
+   * A folder's entries through Windows PowerShell, its output set to UTF-8 (exec decodes UTF-8; PowerShell otherwise
+   * uses the console code page). A link is a folder only when its target is one, since links keep directory attributes
+   * even when dangling; other reparse points (OneDrive's folders) have no LinkType and are folders. Curly single quotes
+   * are doubled like ', since PowerShell reads them as quotes too.
+   */
   const windowsDirectory = async () => {
-    // Windows PowerShell otherwise uses the console code page; exec decodes UTF-8.
-    // Links keep directory attributes even when dangling; check their target.
-    // Other reparse points (OneDrive's folders) have no LinkType and are folders.
-    // PowerShell reads curly single quotes as quotes too, so they're doubled like '.
     const r = await exec("powershell", ["-NoProfile", "-Command", "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); & { param($p) @(Get-ChildItem -LiteralPath $p -Force -ErrorAction Stop | Where-Object Name -ne '.git' | Select-Object -First 501 | ForEach-Object { @{ name=$_.Name; dir=($_.PSIsContainer -and (-not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -or -not $_.LinkType -or ($_.Target -and [IO.Directory]::Exists(([IO.Path]::Combine([IO.Path]::GetDirectoryName($_.FullName), $_.Target[0])))))) } }) | ConvertTo-Json -Compress } '" + path.replace(/['‘’‚‛]/g, "$&$&") + "'"], { on });
     if (r.code !== 0) throw new Error(r.stderr || "Cannot list this folder");
     const result = JSON.parse(r.stdout || "[]");
@@ -48,21 +47,18 @@ async function directory(path, on) {
   return out;
 }
 
-
 export default class Files extends View {
+  /** props { file, on? }: a viewer for that one file (pane.split / tab.new), not the focused folder. */
   init(_props, cx) {
-    // props { file, on? }: a viewer for that one file (pane.split / tab.new), not the focused folder.
     const p = props() ?? {}, file = typeof p.file === "string" ? p.file.replace(/[\\]/g, "/") : null;
     this.fixed = file && file.includes("/") ? { cwd: file.slice(0, file.lastIndexOf("/")), on: p.on ?? null, name: file.slice(file.lastIndexOf("/") + 1) } : null;
     this.saved = new Map();
     this.entries = new Map(); this.folders = new Set(); this.pending = new Set(); this.marks = {};
     this.source = false; this.width = 600; this.zoom = 1; this.px = 0;
-    // Opened as a floating window (openDoc): its header drags it, everything else in it keeps its presses.
     this.window = Boolean(p.overlay);
     this.refresh(cx);
     if (this.fixed) this.show(this.fixed.name, cx);
     cx.timer.every(10000, cx => this.refresh(cx));
-    // Diagrams queue as the document draws (and again when the theme changes): draw them here.
     cx.timer.every(200, cx => {
       if (takeChanged()) cx.notify();
       if (!hasQueuedDiagrams() || this.drawing) return;
@@ -120,7 +116,6 @@ export default class Files extends View {
         const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on }).catch(() => null);
         const marks = {};
         if (top?.code === 0) {
-          // Writes nothing under .git (index lock, fsmonitor cookie): the folder watch would refresh again.
           const status = await exec("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all"], { cwd, on }).catch(() => null);
           if (status?.code === 0) for (const entry of status.stdout.split("\0").filter(Boolean).slice(0, TOTAL)) {
             const xy = entry.slice(0, 2);
@@ -162,8 +157,8 @@ export default class Files extends View {
     this.read(path, cx);
   }
 
+  /** The open file again (a save, a checkout): redrawn only when its text changed. */
   reload(cx) {
-    // The open file again (a save, a checkout): redrawn only when its text changed.
     if (this.file && !this.reading) this.read(this.file, cx, true);
   }
 
@@ -202,15 +197,17 @@ export default class Files extends View {
     cx.notify();
   }
 
+  /**
+   * A readable file (Markdown, mermaid) opens in a floating window over the work, with this panel's reading view;
+   * the panel stays on its folder. One window: another file replaces it, where it was left.
+   */
   openDoc(path) {
-    // A readable file (Markdown, mermaid) opens in a floating window over the work, with this panel's reading view;
-    // the panel stays on its folder. One window: another file replaces it, where it was left.
     openOverlay({ mod: "markdown-files", kind: "window", key: "markdown-files-doc", width: 0.6, height: 0.82,
       props: { file: `${String(this.root).replace(/\\/g, "/")}/${path}`, on: this.on ?? null } });
   }
 
+  /** A link in a document: a file beside it opens here, a web address in the browser. */
   link(url, cx) {
-    // A link in a document: a file beside it opens here, a web address in the browser.
     const target = this.file ? resolveLink(this.file, url) : null;
     if (target) { this.show(target, cx); cx.notify(); }
     else openUrl(url);
@@ -232,8 +229,8 @@ export default class Files extends View {
     return out;
   }
 
+  /** Preview | Source, for files that have a readable view. */
   viewToggle(t) {
-    // Preview | Source, for files that have a readable view.
     const option = (label, source) => div().id(`files-view-${label}`).px(8).h(22).flex().items_center().rounded(5).cursor_pointer().text_size(11.5)
       .when(this.source === source, el => el.bg(t.selected).text_color(t.foreground))
       .when(this.source !== source, el => el.text_color(t.muted).hover(s => s.bg(t.hover)))
@@ -254,12 +251,10 @@ export default class Files extends View {
     if (this.whereKey() !== this.context?.key) this.refresh(cx);
     const t = theme();
     return v_flex().id("files").relative().size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13)
-      // An off-screen box of known size: the app's zoom, so diagrams fit the column.
       .child(div().id("files-zoom-probe").absolute().top(0).left(-30000).w(PROBE).h(PROBE).flex_none()
         .on_size_change((size, cx) => { const z = size.width > 0 ? size.width / PROBE : 1; if (Math.abs(z - this.zoom) > 0.001) { this.zoom = z; if (this.px) this.width = this.px / z; cx.notify(); } }))
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .when(Boolean(this.file) && !this.fixed, el => el.child(div().id("files-back").w(20).cursor_pointer().text_color(t.muted).on_click((_e, cx) => { this.show(null); cx.notify(); }).child("←")))
-        // In a floating window (openDoc), the file's name heads it and its header is where it's dragged; × closes it.
         .child(div().font_semibold().child(this.window ? (this.file ?? "") : this.fixed ? "Preview" : "Files"))
         .child(div().flex_1().min_w(0).truncate().text_right().text_size(12).text_color(t.dim).child(this.window ? (this.root?.split(/[\\/]/).pop() ?? "") : this.file ?? this.root?.split(/[\\/]/).pop() ?? ""))
         .when(Boolean(this.file) && readable(this.file ?? ""), el => el.child(this.viewToggle(t)))

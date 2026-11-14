@@ -3,7 +3,6 @@ import { join } from "path";
 import { stage } from "./stage.mjs";
 
 const staged = stage();
-// The engine (diagrams.js, shared with the Files panel) and the chat's own splitting and copying (diagram-copy.js).
 const { diagramFor, renderQueuedDiagrams, hasQueuedDiagrams, bake } = await staged.load("diagrams.js");
 const { splitDiagrams, framedSvg } = await staged.load("diagram-copy.js");
 let failed = 0;

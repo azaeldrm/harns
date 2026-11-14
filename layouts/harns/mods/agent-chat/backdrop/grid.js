@@ -1,6 +1,3 @@
-// A page of character cells for a scene to draw on: per cell a glyph (" " for none), its colour and its background
-// (null for the page's own). runs.js turns it into rows of text.
-
 export class Grid {
   constructor() {
     this.cols = 0; this.rows = 0; this.cw = 8; this.ch = 16;

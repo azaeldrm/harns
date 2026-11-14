@@ -1,4 +1,3 @@
-// When the chat's reply box takes the keyboard: Chat switched to from Terminal, or Chat showing another agent.
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { stage } from "./stage.mjs";
@@ -18,7 +17,6 @@ const check = (name, got, want) => {
   if (!ok) failed++;
 };
 
-// Two Claude Code agents, one per tab; `show` focuses one tab in one view, as herdr and the stack would.
 globalThis.terms = [{ address: "t1", created_ms: 1 }, { address: "t2", created_ms: 2 }];
 globalThis.agentList = [
   { address: "t1", tab: "tb1", space: "sp", app: "claude-code", status: "idle", pane: "p1" },

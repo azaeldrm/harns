@@ -1,4 +1,3 @@
-// A web or mail link opened in the system's own handler (the browser), as a text view's link would be.
 import { appHome, exec } from "herdr";
 
 export function openUrl(url) {

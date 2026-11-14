@@ -7,15 +7,12 @@ import { designPx, designHeight } from "../measure.js";
 const TAIL = 20;
 const MEASURE_AT_ONCE = 12;
 const FADE = 20;
-// The space above each row, which makes a conversation read as messages: a turn's first row is set apart (32 px); a
-// message's copy row, and a diagram's buttons, sit right under it (4 px); an opened group's steps run on (0); the rest of a
-// reply keeps an even rhythm (10 px).
 const TURN_GAP = 32;
 const gapBefore = m => m.turnGap ? TURN_GAP : m.kind === "copy" || m.kind === "diagram-tools" ? 4 : m.kind === "step" ? 0 : 10;
 
 export class ChatList {
+  /** The conversation's scrolling list: row heights, measuring, and staying at the newest message. */
   constructor() {
-    // The conversation's scrolling list: row heights, measuring, and staying at the newest message.
     this.scroll = VirtualListScrollHandle.new();
     this.following = true; this.visibleEnd = 0; this.rowCount = 0;
     this.needsScroll = true; this.scrollAskedAt = Date.now(); this.lastAsk = Date.now(); this.laidOut = 0;
@@ -24,27 +21,29 @@ export class ChatList {
     this.listH = 0; this.sig = ""; this.settledSig = "";
   }
 
+  /** Keeps the chat at its newest message. */
   follow(restart = false) {
-    // Keeps the chat at its newest message.
     this.following = true;
     this.lastAsk = Date.now();
     if (!this.needsScroll || restart) { this.needsScroll = true; this.scrollAskedAt = Date.now(); }
   }
 
+  /** Another conversation is shown: hidden until its newest messages are measured and in view. */
   reset() {
-    // Another conversation is shown: hidden until its newest messages are measured and in view.
     this.needsScroll = false; this.settling = true; this.pendingCount = -1;
     this.follow();
   }
 
+  /** Back to Chat from elsewhere: to the newest message, hidden until it lands if anything changed. */
   revisit() {
-    // Back to Chat from elsewhere: to the newest message, hidden until it lands if anything changed.
     if (this.sig !== this.settledSig) this.settling = true;
     this.follow(true);
   }
 
+  /**
+   * The scrolling part of the view's timer: lands a pending scroll, then keeps `following` true to what's on screen.
+   */
   tick(cx) {
-    // The scrolling part of the view's timer: lands a pending scroll, then keeps `following` true to what's on screen.
     if (this.following && this.needsScroll) {
       const drawn = this.laidOut >= this.lastAsk;
       if (drawn && (this.pendingCount === 0 || Date.now() - this.scrollAskedAt > 1500)) {
@@ -61,8 +60,8 @@ export class ChatList {
     if (atBottom !== this.following) { this.following = atBottom; cx.notify(); }
   }
 
+  /** The list's body and its off-screen measurer (null when nothing needs measuring). */
   render(cx, { rows, empty, t, inner, zoom, heightKey, waitsFor, row, onItemClick, canJump, beforeScroll, seeThrough }) {
-    // The list's body and its off-screen measurer (null when nothing needs measuring).
     this.isEmpty = empty;
     const measuredAt = `${inner}@${window.rem_size()}`;
     if (measuredAt !== this.measuredAt) { this.heights = {}; this.changedAt = {}; this.lastHeight = {}; this.measuredAt = measuredAt; }
@@ -93,8 +92,6 @@ export class ChatList {
     this.rowCount = rows.length + 1;
     const body = v_flex().relative().flex_1().min_h(0).when(this.settling, el => el.opacity(0))
       .on_size_change(size => { this.listH = designPx(size.height, zoom); })
-      // Where the pointer is across the list (design px): a row with two buttons tells them apart by it, since a list row
-      // reports only that it was clicked (see the diagram tools in main.js).
       .on_mouse_move(e => { this.pointerX = designPx(e.local_position.x, zoom); })
       .child(v_virtual_list("herdr-chat-messages", rows.length + 1, [...sizes, TAIL], i => i < rows.length ? rows[i].key : "end-of-chat", range => {
         this.visibleEnd = range.end;
@@ -106,7 +103,6 @@ export class ChatList {
             : div().w_full().h(TAIL));
         return out;
       }).track_scroll(this.scroll).on_item_click(onItemClick).size_full())
-      // The fade into the reply box paints the page's color, so over the backdrop (`seeThrough`) it would be a solid band.
       .when(!seeThrough, el => el.child(v_flex().absolute().bottom(0).left(0).right(0).h(FADE)
         .children(Array.from({ length: 8 }, (_, i) => div().w_full().flex_1().bg(t.background).opacity((i + 1) / 8)))))
       .when(!this.following && !this.needsScroll && canJump, el => el.child(h_flex().absolute().bottom(12).left(0).right(0).justify_center()

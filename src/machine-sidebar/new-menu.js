@@ -1,6 +1,3 @@
-// The + menu by a machine (or the tab bar's): a terminal, the agents installed there, a new space or worktree. It's
-// machine-sidebar opened as a popup with props { newMenu: true, machine } (main.js hands it init and render), so the
-// sidebar ships as one mod.
 import { div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { theme, spaces, machines, panes, knownAgents, exec, run, openOverlay, closeOverlay, props, window, keys, shared } from "herdr";

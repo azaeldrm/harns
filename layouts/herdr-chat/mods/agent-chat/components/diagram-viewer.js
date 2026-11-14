@@ -8,16 +8,13 @@ import { onWindows } from "../platform.js";
 import { copyDiagramImage } from "../diagram-copy.js";
 
 const STEP = 1.25, MIN = 0.25, MAX = 4, FIT_MAX = 2;
-// Herdr rasterizes an SVG drawn by image() once, at its own width/height × 2, and keeps that bitmap for the path, so a
-// bigger draw is a stretched bitmap. Sharp zoom draws a copy of the SVG with width/height × 2, 4 or 8 (viewBox kept):
-// the smallest one at least as big as the zoom, within what a GPU texture holds.
 const BUCKETS = [1, 2, 4, 8];
 const RASTER_SIDE = 8192, RASTER_AREA = 32e6;
 
 function filePath(rel) { return onWindows() ? `${appHome()}\\${rel.replace(/\//g, "\\")}` : `${appHome()}/${rel}`; }
 
+/** The SVG with its root width and height × k; its viewBox keeps the drawing the same. */
 export function scaledSvg(svg, k) {
-  // The SVG with its root width and height × k; its viewBox keeps the drawing the same.
   return svg.replace(/<svg\s[^>]*>/, tag => tag
     .replace(/\swidth="([\d.]+)"/, (_a, w) => ` width="${+w * k}"`)
     .replace(/\sheight="([\d.]+)"/, (_a, h) => ` height="${+h * k}"`));
@@ -25,14 +22,14 @@ export function scaledSvg(svg, k) {
 
 export function isDiagramViewer(p) { return Boolean(p?.diagram); }
 
+/** A drawn diagram (diagramFor, ready) in a dialog of its own, at a readable size, scrolled in both directions. */
 export function openDiagram(d) {
-  // A drawn diagram (diagramFor, ready) in a dialog of its own, at a readable size, scrolled in both directions.
   openOverlay({ mod: "agent-chat", kind: "dialog", width: 0.92, height: 0.9,
     props: { diagram: d.rel, width: d.width, height: d.height, key: d.key, source: d.source } });
 }
 
+/** The dialog's view: the diagram, its zoom (− / percent / +; the percent fits it), and a close button. */
 export class DiagramViewer {
-  // The dialog's view: the diagram, its zoom (− / percent / +; the percent fits it), and a close button.
   constructor(cx) {
     const p = props();
     this.rel = p.diagram; this.w = Math.max(1, p.width || 1); this.h = Math.max(1, p.height || 1);
@@ -42,8 +39,8 @@ export class DiagramViewer {
     this.handle.focus();
   }
 
+  /** The scale that shows it whole in the box, up to FIT_MAX; until the box is measured, small enough not to spill. */
   fit() {
-    // The scale that shows it whole in the box, up to FIT_MAX; until the box is measured, small enough not to spill.
     if (!this.box) return MIN;
     return Math.min(FIT_MAX, (this.box.width - 32) / this.w, (this.box.height - 32) / this.h);
   }
@@ -75,14 +72,17 @@ export class DiagramViewer {
 
   relFor(k) { return k === 1 ? this.rel : this.rel.replace(/\.svg$/, `@${k}x.svg`); }
 
+  /**
+   * The smallest copy whose bitmap is at least as big as it's drawn (scale × the app's zoom), within the texture
+   * limits.
+   */
   bucketFor(scale) {
-    // The smallest copy whose bitmap is at least as big as it's drawn (scale × the app's zoom), within the texture limits.
     const fits = BUCKETS.filter(k => this.w * k * 2 <= RASTER_SIDE && this.h * k * 2 <= RASTER_SIDE && this.w * this.h * k * k * 4 <= RASTER_AREA);
     return fits.find(k => k >= scale * this.zoom) ?? fits[fits.length - 1] ?? 1;
   }
 
+  /** Writes the k× copy beside the diagram, once; drawn once it's there. */
   make(k, cx) {
-    // Writes the k× copy beside the diagram, once; drawn once it's there.
     if (this.ready.has(k) || this.making.has(k)) return;
     this.making.add(k);
     cx.spawn(async cx => {
@@ -95,13 +95,11 @@ export class DiagramViewer {
 
   render(cx) {
     const t = theme();
-    // Until zoomed by hand: whole in the box (zoom in and scroll to read the details).
     const scale = this.scale ?? this.fit();
     const want = this.bucketFor(scale);
     if (this.ready.has(want)) { if (want !== this.shown) { this.under = this.shown; this.shown = want; } }
     else this.make(want, cx);
     const w = Math.round(this.w * scale), h = Math.round(this.h * scale);
-    // The copy drawn before stays under the new one while it loads, so a switch never shows a blank frame.
     const layer = k => image(this.relFor(k)).absolute().top(0).left(0).w(w).h(h);
     const button = (id, child, onClick, tip) => div().id(id).h(26).min_w(26).px(6).flex().items_center().justify_center()
       .rounded(6).cursor_pointer().text_size(12).text_color(t.muted).hover(s => s.bg(t.hover).text_color(t.foreground))
@@ -117,7 +115,6 @@ export class DiagramViewer {
       .child(zoomProbe((zoom, cx) => { if (Math.abs(zoom - this.zoom) > 0.001) { this.zoom = zoom; cx.notify(); } }))
       .child(h_flex().h(42).flex_none().px(12).gap(4).items_center().border_b_1().border_color(t.border)
         .child(div().flex_1().text_size(13).text_color(t.muted).child(this.copyNote ?? "Diagram"))
-        // Copy image (the drawn diagram as a PNG, on the theme's background) and Copy code (its mermaid source).
         .child(button("copy-image", icon(this.copied === "image" ? "check" : "image", 14, this.copied === "image-busy" ? t.foreground : t.muted),
           cx => this.copyImage(cx), this.copied === "image-busy" ? "Copying…" : "Copy the diagram as a picture"))
         .child(button("copy-code", icon(this.copied === "code" ? "check" : "copy", 14, t.muted), cx => this.copyCode(cx), "Copy the diagram's mermaid code"))

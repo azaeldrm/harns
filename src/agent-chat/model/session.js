@@ -1,19 +1,19 @@
 import { foldActivity, CALL_SOURCE } from "./transcript.js";
 
+/** A session's state before anything is read. */
 export function blankSession(path = "", hint = "") {
-  // A session's state before anything is read.
   return { raw: [], calls: new Map(), offset: 0, leaf: "", path, hint, messages: [], clipped: false, note: "", open: {}, readAt: 0, meta: {} };
 }
 
+/** The reader's output as one update: its tags, and the entries it read, in order. */
 export function parseReader(stdout) {
-  // The reader's output as one update: its tags, and the entries it read, in order.
   const r = blankUpdate();
   for (let at = 0; at <= stdout.length; ) at = parseLine(r, stdout, at);
   return r;
 }
 
+/** parseReader in slices of about `sliceMs`, with `pause()` between them, so herdr doesn't stop a long read. */
 export async function parseReaderInSlices(stdout, pause, sliceMs = 15) {
-  // parseReader in slices of about `sliceMs`, with `pause()` between them, so herdr doesn't stop a long read.
   const r = blankUpdate();
   let since = Date.now();
   for (let at = 0; at <= stdout.length; ) {
@@ -27,8 +27,8 @@ function blankUpdate() {
   return { path: null, hint: null, note: "", offset: null, leaf: null, reset: false, need: false, meta: null, added: [] };
 }
 
+/** Reads the line of `stdout` starting at `at` into `r`; returns where the next line starts. */
 function parseLine(r, stdout, at) {
-  // Reads the line of `stdout` starting at `at` into `r`; returns where the next line starts.
   let end = stdout.indexOf("\n", at);
   if (end < 0) end = stdout.length;
   const line = stdout.charCodeAt(end - 1) === 13 ? stdout.slice(at, end - 1) : stdout.slice(at, end);
@@ -36,8 +36,8 @@ function parseLine(r, stdout, at) {
   return end + 1;
 }
 
+/** One tagged line of the reader's output (PATH, NOTE, M, C, O, …) into `r`. */
 function parseTagged(r, line) {
-  // One tagged line of the reader's output (PATH, NOTE, M, C, O, …) into `r`.
   const bar = line.indexOf("|"), tag = bar < 0 ? line : line.slice(0, bar), rest = line.slice(bar + 1);
   if (tag === "PATH") r.path = decodeURIComponent(rest);
   else if (tag === "HINT") r.hint = decodeURIComponent(rest);
@@ -65,16 +65,18 @@ function parseTagged(r, line) {
   }
 }
 
+/**
+ * Applies the reader's update `r` to session `s`: new entries added, rows rebuilt, note set. Returns whether anything
+ * shown changed: an update with nothing new keeps `s.messages` (the same array), so the view needn't redraw or rebuild
+ * rows.
+ */
 export function applyRead(s, r) {
-  // Applies the reader's update `r` to session `s`: new entries added, rows rebuilt, note set. Returns whether anything
-  // shown changed: an update with nothing new keeps `s.messages` (the same array), so the view needn't redraw or rebuild rows.
   const note = s.note;
   if (r.hint != null) s.hint = r.hint;
   if (r.offset != null) s.offset = r.offset;
   if (r.leaf != null) s.leaf = r.leaf;
   const path = r.path ?? s.path;
   const changed = Boolean(r.reset) || path !== s.path || r.added.length > 0;
-  // What the session runs with: the newest values the log gave (a read from where the last stopped may give only some).
   const meta = JSON.stringify(s.meta ?? {});
   if (r.reset || path !== s.path) { s.raw = []; s.calls = new Map(); s.meta = {}; }
   if (r.meta) s.meta = { ...(s.meta ?? {}), ...r.meta };
@@ -93,8 +95,8 @@ export function applyRead(s, r) {
   return changed || s.note !== note || JSON.stringify(s.meta ?? {}) !== meta;
 }
 
+/** The session's entries as rows: each run of tool calls one "tools" row, then activity folded. */
 function shapeRows(raw) {
-  // The session's entries as rows: each run of tool calls one "tools" row, then activity folded.
   const shaped = [], turn = new TurnClock();
   for (const e of raw) {
     if (e.kind === "tick") { turn.tick(e); continue; }
@@ -109,10 +111,13 @@ function shapeRows(raw) {
   return foldActivity(shaped);
 }
 
+/**
+ * A turn's numbers from the reader's ticks (each log line's time): how long it took, from the prompt to the reply's
+ * last line; its output tokens (each reply counted once, by id); and tokens per second over the model's own time (each
+ * reply's lines since the log line before it, so tool time is left out). end() adds them as a "stats" row at the turn's
+ * end.
+ */
 export class TurnClock {
-  // A turn's numbers from the reader's ticks (each log line's time): how long it took, from the prompt to the reply's last
-  // line; its output tokens (each reply counted once, by id); and tokens per second over the model's own time (each reply's
-  // lines since the log line before it, so tool time is left out). end() adds them as a "stats" row at the turn's end.
   constructor() { this.prev = null; this.reset(); }
   reset() { this.start = null; this.last = null; this.replies = new Map(); }
   tick(e) {
@@ -140,8 +145,8 @@ export class TurnClock {
 const REMOTE_TAIL_MB = 6;
 const REMOTE_ENTRIES = 150;
 
+/** The reader's arguments for a terminal, from where its session was last read. */
 export function readerArgs(t, at) {
-  // The reader's arguments for a terminal, from where its session was last read.
   const args = ["--app", t.harness.reader, "--label", t.label, "--pid", String(t.pid), "--created", String(t.created), "--offset", String(at.offset || 0)];
   if (at.screen != null) args.push("--screen", at.screen);
   if (at.peers) args.push("--peers", String(at.peers));
@@ -155,38 +160,47 @@ export function readerArgs(t, at) {
 
 const SPLIT = "--herdr-chat-session--";
 
+/**
+ * A Python expression for the reader's code, carried whole in the command: for machines that don't have the mod's
+ * files.
+ */
 export function embeddedReader(readerBase64) {
-  // A Python expression for the reader's code, carried whole in the command: for machines that don't have the mod's files.
   return `compile(__import__('base64').b64decode('${readerBase64}'),'read_session.py','exec')`;
 }
 
+/** A Python expression for the reader's source, joined from readers/ in manifest order. */
 function folderSource(folderBase64) {
-  // A Python expression for the reader's source, joined from readers/ in manifest order.
   return `(lambda d:'\\n'.join(open(d+'/'+f,encoding='utf-8').read() for f in __import__('json').load(open(d+'/manifest.json'))))(__import__('base64').b64decode('${folderBase64}').decode('utf-8'))`;
 }
 
+/**
+ * A Python expression for the reader's code, loaded from readers/: short enough for Windows' 32767-character command
+ * line, which the whole reader isn't.
+ */
 export function readerFromFolder(folderBase64) {
-  // A Python expression for the reader's code, loaded from readers/: short enough for Windows' 32767-character command line, which the whole reader isn't.
   return `compile(${folderSource(folderBase64)},'read_session.py','exec')`;
 }
 
+/** A `python3 -c` program that prints the reader's source, compressed, for compressedReader. */
 export function compressProgram(folderBase64) {
-  // A `python3 -c` program that prints the reader's source, compressed, for compressedReader.
   return `import base64,zlib;print(base64.b64encode(zlib.compress(${folderSource(folderBase64)}.encode('utf-8'),9)).decode())`;
 }
 
+/**
+ * A Python expression for the reader's code, compressed in the command: how Windows, with its short command line, sends
+ * it to other machines.
+ */
 export function compressedReader(zlibBase64) {
-  // A Python expression for the reader's code, compressed in the command: how Windows, with its short command line, sends it to other machines.
   return `compile(__import__('zlib').decompress(__import__('base64').b64decode('${zlibBase64}')),'read_session.py','exec')`;
 }
 
+/** A `python3 -c` program that runs the reader once, with the arguments that follow it. */
 export function readerProgram(code) {
-  // A `python3 -c` program that runs the reader once, with the arguments that follow it.
   return `import sys;sys.argv[0]='read_session';exec(${code})`;
 }
 
+/** A `python3 -c` program that runs the reader once per argument list, in one process for all of a machine's agents. */
 export function batchProgram(code) {
-  // A `python3 -c` program that runs the reader once per argument list, in one process for all of a machine's agents.
   return [
     "import base64,io,json,sys",
     `code=${code}`,
@@ -201,7 +215,7 @@ export function batchProgram(code) {
   ].join("\n");
 }
 
+/** A batch run's output, split into each session's own (in the order they were asked for). */
 export function splitBatch(stdout) {
-  // A batch run's output, split into each session's own (in the order they were asked for).
   return stdout.split(new RegExp(SPLIT + "\\r?\\n")).slice(1);
 }

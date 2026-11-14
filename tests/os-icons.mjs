@@ -1,4 +1,3 @@
-// The machine icons: each system's probe words pick the right icon, and every icon named has its file.
 import { ICONS, distroIcon } from '../layouts/harns/mods/machine-sidebar/os-icons.js';
 import { existsSync } from 'fs';
 

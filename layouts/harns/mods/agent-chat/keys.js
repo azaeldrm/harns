@@ -13,8 +13,8 @@ const COMPOSER_KEYS = [
 
 let keymap = {}, keymapText = null, keymapChanged = false;
 
+/** Reads keys.json into the keymap, noting when its text changed since the last read. */
 async function readKeymap() {
-  // Reads keys.json into the keymap, noting when its text changed since the last read.
   let text;
   try { text = await readFile(onWindows() ? `${appHome()}\\keys.json` : `${appHome()}/keys.json`, "utf8"); }
   catch { text = ""; }
@@ -24,8 +24,10 @@ async function readKeymap() {
 }
 readKeymap();
 
+/**
+ * Binds the composer's keys, and binds them again each time keys.json changes, as Herdr then installs its keymap anew.
+ */
 export function bindComposerKeys(cx) {
-  // Binds the composer's keys, and binds them again each time keys.json changes, as Herdr then installs its keymap anew.
   if (globalThis.herdrChatComposerKeys) return;
   globalThis.herdrChatComposerKeys = true;
   cx.bind_keys(COMPOSER_KEYS);
@@ -35,13 +37,13 @@ export function bindComposerKeys(cx) {
   });
 }
 
+/** What keys.json binds this chord to for the shown layout, else globally. */
 function bound(keystroke) {
-  // What keys.json binds this chord to for the shown layout, else globally.
   return keymap[`layout:${shared("layout")}`]?.[keystroke] ?? keymap.global?.[keystroke];
 }
 
+/** Runs keys.json's binding for a layout key the composer's text input would otherwise take; true when it ran one. */
 export function passKey(keystroke) {
-  // Runs keys.json's binding for a layout key the composer's text input would otherwise take; true when it ran one.
   if (!(keystroke in LAYOUT_KEYS)) return false;
   const action = bound(keystroke);
   if (typeof action === "string" && !action.includes(":") && action !== "terminal") { run(action); return true; }

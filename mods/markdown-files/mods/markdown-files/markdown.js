@@ -1,5 +1,3 @@
-// A Markdown file as a readable document: prose through TextView, code in titled boxes,
-// ```mermaid blocks as Pele diagrams, images from the cache images.js fills, front matter as a box.
 import { div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView } from "gpui-base";
 import { settings } from "herdr";
@@ -11,8 +9,11 @@ export const COLUMN = 820;
 
 let copiedId = null;
 
+/**
+ * A code block in a box titled with its language, in the terminal font, lines kept as written, with a copy button at
+ * the top right.
+ */
 function codeBox(id, label, source, t) {
-  // A code block in a box titled with its language, in the terminal font, lines kept as written, with a copy button at the top right.
   const lines = source.replace(/\n$/, "").split("\n");
   const shown = l => l.replace(/\t/g, "    ").replace(/^ +/, s => " ".repeat(s.length)) || " ";
   const copied = copiedId === id;
@@ -32,8 +33,8 @@ function codeBox(id, label, source, t) {
       .children(lines.map((l, k) => div().id(`${id}-l${k}`).w_full().min_h(18).child(shown(l)))));
 }
 
+/** A GFM table: equal columns, a header row on the surface color, cells as inline markdown. */
 function table(id, b, t, onLink) {
-  // A GFM table: equal columns, a header row on the surface color, cells as inline markdown.
   const cell = (text, k, r, head) => div().id(`${id}-${r}-${k}`).flex_1().min_w(0).px(10).py(6)
     .when(k > 0, el => el.border_l(1).border_color(t.border))
     .child(h_flex().w_full().when(b.align[k] === "center", el => el.justify_center()).when(b.align[k] === "right", el => el.justify_end())
@@ -45,8 +46,8 @@ function table(id, b, t, onLink) {
     .child(row(b.head, 0, true)).children(b.rows.map((r, i) => row(r, i + 1, false)));
 }
 
+/** A mermaid block: the picture once Pele has drawn it, else a note (and the source if it failed). */
 function diagram(id, source, t, room) {
-  // A mermaid block: the picture once Pele has drawn it, else a note (and the source if it failed).
   const d = diagramFor(source, t);
   if (d.state === "queued") return div().id(id).w_full().h(28).flex().items_center().text_size(12.5).text_color(t.dim).child("Drawing diagram…");
   if (d.state === "failed") return v_flex().id(id).w_full().gap(6)
@@ -58,12 +59,11 @@ function diagram(id, source, t, room) {
 
 const hostOf = url => /^[a-z]+:\/\/([^/?#]+)/i.exec(url)?.[1]?.replace(/^www\./, "") ?? "";
 
+/** A row of images (a lone figure, or badges side by side), each sized to fit the column. */
 function pictures(id, items, t, room, { onLink, file, root, on }) {
-  // A row of images (a lone figure, or badges side by side), each sized to fit the column.
   const one = (item, k) => {
     const target = imageTarget(item.src, file ?? "");
     const label = item.alt || item.src.split(/[?#]/)[0].split(/[\\/]/).pop() || "image";
-    // A web image isn't downloaded (opening a file contacts nothing): it's a link to open it in the browser.
     if (target?.web) return h_flex().id(`${id}-${k}`).max_w(room).min_w(0).px(10).py(5).gap(6).items_center().rounded(6)
       .border_1().border_color(t.border).bg(t.surface).text_size(12).cursor_pointer().hover(s => s.bg(t.hover))
       .tooltip(item.src).on_click((_e, cx) => onLink(item.src, cx))
@@ -86,8 +86,8 @@ function pictures(id, items, t, room, { onLink, file, root, on }) {
     .children(items.map(one));
 }
 
+/** The whole document, centred in a readable column. */
 export function document(blocks, { t, width, onLink, key, file, root, on }) {
-  // The whole document, centred in a readable column.
   const room = Math.max(160, Math.min(COLUMN, width) - 48);
   const children = blocks.map((b, i) => {
     const id = `md-${key}-${i}`;

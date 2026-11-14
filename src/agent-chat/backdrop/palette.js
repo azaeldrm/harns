@@ -1,5 +1,3 @@
-// Colours over the page's background, from the theme, each one a single shared string: every scene draws with these.
-
 const quant = v => { const q = Math.round(v * 0.25) * 4; return q < 0 ? 0 : q > 252 ? 252 : q; };
 
 const hex = c => {

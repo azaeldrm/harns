@@ -1,6 +1,4 @@
 #!/bin/sh
-# Runs scripts/install.py with the first Python 3 that starts. Each one is tried, since on
-# Windows `python3` can be the Microsoft Store placeholder, which exists but doesn't run.
 set -e
 dir=$(dirname "$0")
 for python in python3 python 'py -3'; do

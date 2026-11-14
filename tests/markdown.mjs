@@ -1,4 +1,3 @@
-// markdown-files: Markdown split into prose, code, mermaid and front matter; links resolved.
 import assert from "node:assert/strict";
 import { parse, resolveLink, imageTarget } from "../layouts/harns/mods/markdown-files/parse.js";
 import { sniff, hashBytes, toBase64 } from "../layouts/harns/mods/markdown-files/bytes.js";
@@ -40,7 +39,6 @@ assert.deepEqual(parse("a | b\n---|---\nc | d")[0].rows, [["c", "d"]]);
 assert.deepEqual(parse("Title\n---").map(b => b.kind), ["text"]);
 console.log("tables: ok");
 
-// Images: their own rows, badges sharing one, links kept, code left alone.
 const pics = parse([
   "Before.",
   "![Diagram](img/arch.png \"Architecture\")",
@@ -76,13 +74,11 @@ assert.deepEqual(imageTarget("D:/pics/a.png", "a.md"), { abs: "D:/pics/a.png" })
 assert.equal(imageTarget("ftp://x/a.png", "a.md"), null);
 console.log("images: ok");
 
-// Sizes from the bytes themselves.
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAEklEQVR4nGP4z8DwnwEKGBgBADnzBP0Nr8RJAAAAAElFTkSuQmCC", "base64");
 assert.deepEqual(sniff(png), { type: "png", width: 3, height: 2 });
 assert.deepEqual(sniff(Buffer.from("R0lGODlhBQAEAIAAAAAAAP///yH5BAEAAAAALAAAAAAFAAQAAAIEhI+pWAA7", "base64")), { type: "gif", width: 5, height: 4 });
 const jpg = Buffer.alloc(40); jpg.set([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 7, 0, 9]);
 assert.deepEqual(sniff(jpg), { type: "jpg", width: 9, height: 7 });
-// The base64 an image is saved through (herdr's own writes binary data as an empty file): Node's, at every padding.
 for (const len of [0, 1, 2, 3, 4, 5, 64, 65537]) {
   const bytes = new Uint8Array(len).map((_, i) => (i * 37 + 11) & 255);
   assert.equal(toBase64(bytes), Buffer.from(bytes).toString("base64"), `toBase64 of ${len} bytes`);

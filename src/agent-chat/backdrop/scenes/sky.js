@@ -1,9 +1,5 @@
-// A night sky: three layers of stars drifting sideways at their own pace (the far ones slowest), thicker along a
-// faint band like the Milky Way, each twinkling on its own clock; now and then a shooting star. Stars near the
-// pointer brighten; a click sends a shooting star from there.
 import { Grid, strokeFor } from "../grid.js";
 
-// Two tints, and brightness in six steps: stars of one look merge into one run across a row.
 const TINTS = [[214, 224, 255], [255, 238, 214]];
 
 export class SkyScene {
@@ -26,7 +22,6 @@ export class SkyScene {
 
   seed() {
     const { W, H } = this, n = Math.round((W * H) / 900);
-    // The band: a slanted strip across the sky where stars crowd.
     const slope = 0.35, mid = H * 0.5;
     this.stars = [];
     while (this.stars.length < n) {
