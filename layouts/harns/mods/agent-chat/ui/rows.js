@@ -6,7 +6,6 @@ import { SENT_DIR, previewFile } from "../images.js";
 import { KINDS, STEP, summary, stepText } from "../model/transcript.js";
 import { diagramFor } from "../diagrams.js";
 
-const TURN_GAP = 28;
 
 function codeBox(id, lang, source, t, copied) {
   // A code block in a box titled with its language; with `copied` set (true once copied), a copy icon sits at the top right.
@@ -25,11 +24,12 @@ function codeRow(m, { t, copied }) {
   return codeBox(`code-${m.key}`, m.lang, m.text, t, copied === m.key);
 }
 
-function toolButton(t, id, glyph, done, busy, tip, bordered = true) {
-  // A small icon button under the conversation (a diagram's, bordered; a message's copy, bare): the icon a check once it's done.
-  return div().id(id).w(TOOL_BUTTON).h(28).flex_none().flex().items_center().justify_center().rounded(8)
+function toolButton(t, id, glyph, done, busy, tip, bordered = true, size = 28) {
+  // A small icon button under the conversation (a diagram's, bordered; a message's copy, bare and smaller): the icon a check
+  // once it's done.
+  return div().id(id).w(size === 28 ? TOOL_BUTTON : size).h(size).flex_none().flex().items_center().justify_center().rounded(size === 28 ? 8 : 6)
     .when(bordered, el => el.border_1().border_color(t.border)).hover(s => s.bg(t.raised)).tooltip(busy ? "Copying…" : done ? "Copied" : tip)
-    .child(icon(done ? "check" : glyph, 14, done || busy ? t.foreground : t.muted));
+    .child(icon(done ? "check" : glyph, size === 28 ? 14 : 13, done || busy ? t.foreground : t.muted));
 }
 
 function copyRow(m, { t, copied }) {
@@ -37,14 +37,14 @@ function copyRow(m, { t, copied }) {
   // clicking the row copies it (see onItemClick in main.js). Always shown: a list row can't react to hovering the message
   // above it (no per-row hover in the list yet), so a hover-only bar would only show over its own strip.
   // A response's turn numbers (m.stats) follow its button, each with its icon: time, output tokens, tokens per second.
-  if (m.writing) return div().w_full().h(32);
+  // A caption of its message (24 px, right under it: see gapBefore in chat-list.js), not a row of its own.
   const done = copied === m.key, s = m.stats;
   const stat = (glyph, text, tip) => h_flex().id(`st-${glyph}-${m.key}`).gap(5).items_center().tooltip(tip)
-    .child(icon(glyph, 13, t.dim)).child(div().text_size(12).text_color(t.dim).child(text));
-  return h_flex().id(`copy-row-${m.key}`).w_full().h(32).gap(14).items_center().when(m.prompt, el => el.justify_end()).when(!m.prompt, el => el.justify_start())
-    .child(toolButton(t, `copy-${m.key}`, "copy", done, false, m.prompt ? "Copy your message" : "Copy the response", false))
+    .child(icon(glyph, 12, t.dim)).child(div().text_size(11.5).text_color(t.dim).child(text));
+  return h_flex().id(`copy-row-${m.key}`).w_full().h(24).gap(12).items_center().when(m.prompt, el => el.justify_end()).when(!m.prompt, el => el.justify_start())
+    .child(toolButton(t, `copy-${m.key}`, "copy", done, false, m.prompt ? "Copy your message" : "Copy the response", false, 24))
     .when(Boolean(s && !m.prompt), el => el
-      .child(div().text_size(12).text_color(t.dim).child("•"))
+      .child(div().text_size(11.5).text_color(t.dim).child("•"))
       .when(s?.secs != null, e => e.child(stat("clock", duration(s.secs), "How long the turn took")))
       .when(Boolean(s?.out), e => e.child(stat("coins", `${tokens(s?.out ?? 0)} tokens`, "Tokens the agent wrote this turn (thinking included)")))
       .when(s?.tps != null, e => e.child(stat("circle-gauge", `${Math.round(s.tps)}tk/s`, "Tokens per second while the agent was writing (tool time left out)"))));
@@ -152,5 +152,5 @@ export function row(m, ctx) {
     : m.kind === "code" ? codeRow(m, ctx)
     : m.kind === "copy" ? copyRow(m, ctx)
     : messageRow(m, ctx);
-  return m.turnGap ? v_flex().w_full().pt(TURN_GAP).child(body) : body;
+  return body;
 }

@@ -4,10 +4,14 @@ import { ICONS } from "../common.js";
 import { COLUMN } from "../ui/primitives.js";
 import { designPx, designHeight } from "../measure.js";
 
-const TAIL = 32;
+const TAIL = 20;
 const MEASURE_AT_ONCE = 12;
 const FADE = 20;
-const rowPadding = m => m.kind === "step" ? 0 : 8;
+// The space above each row, which makes a conversation read as messages: a turn's first row is set apart (32 px); a
+// message's copy row, and a diagram's buttons, sit right under it (4 px); an opened group's steps run on (0); the rest of a
+// reply keeps an even rhythm (10 px).
+const TURN_GAP = 32;
+const gapBefore = m => m.turnGap ? TURN_GAP : m.kind === "copy" || m.kind === "diagram-tools" ? 4 : m.kind === "step" ? 0 : 10;
 
 export class ChatList {
   constructor() {
@@ -66,7 +70,7 @@ export class ChatList {
     const now = Date.now();
     const settling = rows.filter(m => { const k = heightKey(m); return k in this.heights && now - (this.changedAt[k] ?? 0) < 2000; });
     const pending = [...settling, ...unmeasured];
-    const sizes = rows.map(m => (this.heights[heightKey(m)] ?? this.lastHeight[m.key] ?? 40) + rowPadding(m) * 2);
+    const sizes = rows.map(m => (this.heights[heightKey(m)] ?? this.lastHeight[m.key] ?? 40) + gapBefore(m));
     let bottom = rows.length;
     for (let h = 0; bottom > 0 && h < (this.listH || 900) + 240; ) h += sizes[--bottom];
     const near = rows.slice(bottom);
@@ -98,7 +102,7 @@ export class ChatList {
         const out = [];
         for (let i = range.start; i < range.end; i++)
           out.push(i < rows.length
-            ? h_flex().w_full().justify_center().px(24).py(rowPadding(rows[i])).child(div().w_full().max_w(COLUMN).child(row(rows[i])))
+            ? h_flex().w_full().justify_center().px(24).pt(gapBefore(rows[i])).child(div().w_full().max_w(COLUMN).child(row(rows[i])))
             : div().w_full().h(TAIL));
         return out;
       }).track_scroll(this.scroll).on_item_click(onItemClick).size_full())
