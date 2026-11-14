@@ -61,7 +61,7 @@ export class ChatList {
     if (atBottom !== this.following) { this.following = atBottom; cx.notify(); }
   }
 
-  render(cx, { rows, empty, t, inner, zoom, heightKey, waitsFor, row, onItemClick, canJump, beforeScroll }) {
+  render(cx, { rows, empty, t, inner, zoom, heightKey, waitsFor, row, onItemClick, canJump, beforeScroll, seeThrough }) {
     // The list's body and its off-screen measurer (null when nothing needs measuring).
     this.isEmpty = empty;
     const measuredAt = `${inner}@${window.rem_size()}`;
@@ -106,8 +106,9 @@ export class ChatList {
             : div().w_full().h(TAIL));
         return out;
       }).track_scroll(this.scroll).on_item_click(onItemClick).size_full())
-      .child(v_flex().absolute().bottom(0).left(0).right(0).h(FADE)
-        .children(Array.from({ length: 8 }, (_, i) => div().w_full().flex_1().bg(t.background).opacity((i + 1) / 8))))
+      // The fade into the reply box paints the page's color, so over the backdrop (`seeThrough`) it would be a solid band.
+      .when(!seeThrough, el => el.child(v_flex().absolute().bottom(0).left(0).right(0).h(FADE)
+        .children(Array.from({ length: 8 }, (_, i) => div().w_full().flex_1().bg(t.background).opacity((i + 1) / 8)))))
       .when(!this.following && !this.needsScroll && canJump, el => el.child(h_flex().absolute().bottom(12).left(0).right(0).justify_center()
         .child(div().id("jump-bottom").size(34).flex().items_center().justify_center().rounded(17).cursor_pointer()
           .bg(t.popover ?? t.surface).border_1().border_color(t.border).shadow_md().text_color(t.foreground)

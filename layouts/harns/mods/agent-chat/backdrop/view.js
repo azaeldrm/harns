@@ -1,22 +1,26 @@
 // The backdrop: a nested view playing a scene (sharks hunting fish, jellyfish, a night sky, rain) drawn as text
-// behind a page. props: {dim, sceneKey}: the shared value naming the scene (an id from scenes/index.js). The view
-// reads it every tick and switches when it changes, so whatever sets it (the chat's button) needs no other channel.
-// It animates only while it's drawn and the window is in front. Anything else (the welcome gone, the Terminal view
-// shown, another app in front) drops it to one look a second, and a look that finds it drawn again picks the
-// motion back up. Shown for REST_MS with the pointer still, it rests on its last frame until the pointer moves over
-// it: every frame costs the whole window a redraw, and a welcome can sit open for hours. Drawn again while it looks only
-// once a second, it moves at once rather than at the next look, so a welcome doesn't open on a frozen frame.
+// behind a page. props: {dim, slow, sceneKey, stir}. `slow` plays it at SLOW_FPS (behind a conversation) instead of
+// FPS; a parent changes it and `dim` with set_props. A new `stir` (any changed value) counts as activity, like the
+// pointer moving over it: the parent's way to keep it from resting while the page over it is in use. `sceneKey` is the
+// shared value naming the scene (an id from scenes/index.js). The view reads it every tick and switches when it changes,
+// so whatever sets it (the chat's button) needs no other channel.
+// It animates only while it's drawn and the window is in front. Anything else (the Terminal view shown, the animation
+// turned off, another app in front) drops it to one look a second, and a look that finds it drawn again picks the
+// motion back up. Shown for REST_MS with no pointer over it and no stir, it rests on its last frame until either comes:
+// every frame costs the whole window a redraw, and a chat can sit open for hours. Drawn again while it looks only once
+// a second, it moves at once rather than at the next look, so a welcome doesn't open on a frozen frame.
 import { View, div } from "gpui-kit";
 import { theme, shared, window as appWindow } from "herdr";
 import { Palette } from "./palette.js";
 import { frameRuns } from "./runs.js";
 import { sceneFor } from "./scenes/index.js";
-import { FPS, IDLE_MS, REST_MS, cellSize } from "./config.js";
+import { FPS, SLOW_FPS, IDLE_MS, REST_MS, cellSize } from "./config.js";
 import { designPx, zoomFrom, PROBE_PX } from "../measure.js";
 
 export class BackdropView extends View {
   init(props, cx) {
     this.dim = props?.dim ?? 1;
+    this.slow = Boolean(props?.slow);
     this.cell = cellSize();
     this.sceneKey = props?.sceneKey ?? null;
     this.show(this.wanted());
@@ -27,6 +31,15 @@ export class BackdropView extends View {
     this.mode = null;
     this.stirred = Date.now();
     this.speed("fast", cx);
+  }
+
+  /** A new dim, pace or stir from the parent. The pace and a wake from resting take effect at the next tick (within a
+   *  second while resting), which has the context to restart the timer. */
+  update(props) {
+    this.slow = Boolean(props?.slow);
+    if (props?.stir !== undefined && props.stir !== this.stir) { this.stir = props.stir; this.stirred = Date.now(); }
+    const dim = props?.dim ?? 1;
+    if (dim !== this.dim) { this.dim = dim; if (this.size) this.scene.setDim(dim); }
   }
 
   /** The scene shared state asks for. */
@@ -44,10 +57,12 @@ export class BackdropView extends View {
   }
 
   speed(mode, cx) {
-    if (this.mode === mode) return;
+    const every = mode === "fast" ? Math.round(1000 / (this.slow ? SLOW_FPS : FPS)) : IDLE_MS;
+    if (this.mode === mode && this.every === every) return;
     this.task?.cancel();
     this.mode = mode;
-    this.task = cx.timer.every(mode === "fast" ? Math.round(1000 / FPS) : IDLE_MS, cx => this.tick(cx));
+    this.every = every;
+    this.task = cx.timer.every(every, cx => this.tick(cx));
   }
 
   tick(cx) {

@@ -31,7 +31,10 @@ function inputHighlight(cx) {
   set_theme({ appearance: th.appearance, tokens: { colors: { ...th.colors, accent: want, selection: see }, spacing: th.spacing, radius: th.radius } });
 }
 
-const BACKDROP_SCENE = "herdr-chat.backdrop", BACKDROP_DIM = 0.3;
+// The backdrop's dim over an empty chat, and the dimmer one behind a conversation, so the messages stay easy to read.
+const BACKDROP_SCENE = "herdr-chat.backdrop", BACKDROP_DIM = 0.3, BACKDROP_CHAT_DIM = 0.12;
+// How often, at most, activity in the chat stirs the backdrop: well inside its REST_MS, so it never rests while in use.
+const STIR_MS = 5000;
 
 const SPARK = ["·", "✢", "✶", "✻", "✽", "✻", "✶", "✢"];
 
@@ -49,11 +52,13 @@ export default class HerdrChat extends View {
     this.card = new QuestionCard(this);
     this.composer = new Composer(this, cx);
     this.width = 900; this.zoom = 1; this.rootPx = 0;
-    // With props {backdrop: true} (harns sets it), an animated scene plays, dimmed, behind the whole chat while it has no
-    // conversation to show: a new session's welcome, or no agent in view. One backdrop for every conversation (this view
-    // stays as the chat switches), and it stops whenever it isn't drawn. The button at the bottom right steps through
-    // its scenes; the one picked is kept in shared state.
+    // With props {backdrop: true} (harns sets it), an animated scene plays, dimmed, behind the whole chat: at full speed
+    // while it has no conversation to show (a new session's welcome, or no agent in view), and slower and dimmer behind
+    // a conversation. One backdrop for every conversation (this view stays as the chat switches, and so does the scene),
+    // and it stops whenever it isn't drawn. The button at the bottom right steps through its scenes; the one picked is
+    // kept in shared state.
     if (props()?.backdrop) this.backdrop = cx.new(BackdropView, { dim: BACKDROP_DIM, sceneKey: BACKDROP_SCENE });
+    this.stirAt = 0;
     this.visit = shared("herdr-chat.visit");
     this.refresh(cx);
     cx.timer.every(1500, cx => inputHighlight(cx));
@@ -62,6 +67,7 @@ export default class HerdrChat extends View {
       this.applyView();
       this.noticeStack();
       this.composer.mirrorOnSwitch(cx);
+      this.noticeActivity();
       const t = target();
       if (chatKey(t) !== this.key || this.reader.needsFirstRead || this.composer.pendingDraft) this.refresh(cx);
       this.reader.noticeAgents(cx);
@@ -437,6 +443,29 @@ export default class HerdrChat extends View {
       .when(Boolean(gauge), el => el.child(gauge));
   }
 
+  /** What the backdrop is told: slower and dimmer behind a conversation, and the last stir. */
+  backdropProps() {
+    const slow = Boolean(this.backdropSlow);
+    return { dim: slow ? BACKDROP_CHAT_DIM : BACKDROP_DIM, slow, sceneKey: BACKDROP_SCENE, stir: this.stirAt };
+  }
+
+  /** The chat is in use (the pointer moving over it, a message, typing): keeps the backdrop from resting on its last
+   *  frame, at most once per STIR_MS. Only from an event or a timer, since set_props can't run in a render. */
+  stirBackdrop() {
+    if (!this.backdropShown || Date.now() - this.stirAt < STIR_MS) return;
+    this.stirAt = Date.now();
+    this.backdrop.set_props(this.backdropProps());
+  }
+
+  /** Looks (every 100 ms) for activity that isn't the pointer: a new message, the agent's status changing, typing. */
+  noticeActivity() {
+    if (!this.backdropShown) return;
+    const messages = this.reader.session.messages;
+    const last = messages[messages.length - 1];
+    const sign = `${this.key}|${messages.length}|${String(last?.text ?? "").length}|${target()?.status}|${this.composer.input.value().length}`;
+    if (sign !== this.activitySign) { this.activitySign = sign; this.stirBackdrop(); }
+  }
+
   renderInner(cx) {
     if (this.asHeader) return terminalHeader(this);
     if (this.diagram) return this.diagram.render(cx);
@@ -451,8 +480,16 @@ export default class HerdrChat extends View {
     keyRows(rows);
     rows.splice(0, rows.length, ...rows.flatMap(r => r.kind === "tools" && this.reader.session.open[r.key] ? [r, ...stepRows(r)] : [r]));
     const inner = Math.min(COLUMN, Math.max(280, Math.floor(this.width) - 50));
+    // What the composer and the list ask to make themselves see-through: whether the backdrop is behind them now.
+    this.backdropShown = Boolean(this.backdrop) && shared("herdr-chat.animation") !== false;
+    // Its pace and dim follow whether there's a conversation, handed over after this render: set_props repaints it, which
+    // a render can't do.
+    if (this.backdropShown && this.backdropSlow !== !empty) {
+      this.backdropSlow = !empty;
+      cx.timer.after(0, () => this.backdrop.set_props(this.backdropProps()));
+    }
     const { body, measure } = this.list.render(cx, {
-      rows, empty, t, inner, zoom: this.zoom, beforeScroll: () => this.noticeVisit(),
+      rows, empty, t, inner, zoom: this.zoom, beforeScroll: () => this.noticeVisit(), seeThrough: this.backdropShown,
       heightKey: m => `${m.key}${this.reader.session.open[m.key] ? ":open" : ""}${m.kind === "diagram" ? `:${diagramFor(m.text, t).state}` : ""}`,
       waitsFor: m => m.kind === "diagram" && diagramFor(m.text, t).state === "queued",
       row: m => row(m, { t, open: this.reader.session.open, width: this.width, sent: this.composer.sent, machine: target()?.machine, copied: this.copied }),
@@ -476,12 +513,12 @@ export default class HerdrChat extends View {
       canJump: !this.card.showing && active?.status !== "blocked",
     });
     const status = this.status(t, active);
-    // What the composer asks to make its box see-through: whether the backdrop is behind it now.
-    this.backdropShown = Boolean(this.backdrop) && empty && shared("herdr-chat.animation") !== false;
     return v_flex().id("herdr-chat-root").relative().size_full().min_h(0).rounded(10).border_1().border_color(t.border)
       .bg(t.background).text_color(t.foreground)
       .when(this.backdropShown, el => el.child(this.backdrop))
-      .when(this.backdropShown, el => el.child(this.backdropButton(t)))
+      // The scene's button only over an empty chat: behind a conversation, its corner is the context meter's.
+      .when(this.backdropShown && empty, el => el.child(this.backdropButton(t)))
+      .on_mouse_move(() => this.stirBackdrop())
       .on_size_change((size, cx) => { this.rootPx = size.width; const w = designPx(size.width, this.zoom); if (w >= 200 && Math.abs(w - this.width) > 8) { this.width = w; cx.notify(); } })
       .child(zoomProbe((zoom, cx) => { if (Math.abs(zoom - this.zoom) > 0.001) { this.zoom = zoom; if (this.rootPx) this.width = designPx(this.rootPx, zoom); cx.notify(); } }))
       .on_drop((e, cx) => this.composer.dropFiles(e.paths ?? [], cx))

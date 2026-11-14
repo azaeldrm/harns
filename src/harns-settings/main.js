@@ -140,12 +140,12 @@ export default class HarnessSettings extends View {
   }
 
   chat(t) {
-    // agent-chat's switches (its settings keys keep their herdr-chat. names): agents as a chat, and the animation behind a new conversation.
+    // agent-chat's switches (its settings keys keep their herdr-chat. names): agents as a chat, and the animation behind it.
     return v_flex().w_full()
       .child(this.heading(t, "Chat"))
       .child(this.flag(t, "herdr-chat.chat", "Open agents as a chat", "Off: agents' tabs show their terminal, without the Chat and Terminal switch.",
         on => { if (!on && find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" }); }))
-      .child(this.flag(t, "herdr-chat.animation", "Welcome animation", "The dimmed scene behind a new conversation: sharks, jellyfish, a night sky or rain."));
+      .child(this.flag(t, "herdr-chat.animation", "Chat animation", "A dimmed scene behind the chat, slower behind a conversation: sharks, jellyfish, a night sky or rain."));
   }
 
   status(t) {
