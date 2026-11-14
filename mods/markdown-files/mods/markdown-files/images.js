@@ -111,7 +111,7 @@ async function readBytes(path) {
 
 /** The file's bytes as base64 through a shell on its machine (exec's output is text). */
 async function shellBytes(path, on) {
-  /** A .NET exception doesn't end the script with an error code: check first, exit with ours. */
+  /** The bytes through PowerShell: a .NET exception doesn't end the script with an error code, so it checks first. */
   const powershell = async () => {
     const script = "& { param($p) if (-not [IO.File]::Exists($p)) { exit 2 }; if ((Get-Item -LiteralPath $p).Length -gt " + MAX_BYTES + ") { exit 3 }; [Convert]::ToBase64String([IO.File]::ReadAllBytes($p)) } '" + path.replace(/['‘’‚‛]/g, "$&$&") + "'";
     return exec("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], { on });

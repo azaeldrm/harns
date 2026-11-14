@@ -26,7 +26,9 @@ export async function windowsHost() {
     docks: true,
     noSdk: "No Android emulator found. Install the Android SDK's emulator, or set ANDROID_HOME (RECIPE.md: Simulator setup).",
 
-    /** Hidden: emulator.exe's own console. The device window shows, and harns-dock takes it. */
+    /**
+     * Starts a program hidden: emulator.exe's own console stays out of sight; the device window shows, for harns-dock.
+     */
     start(program, args) {
       return ps(`Start-Process -WindowStyle Hidden -FilePath ${quote(program)} -ArgumentList ${args.map(quote).join(",")}`);
     },

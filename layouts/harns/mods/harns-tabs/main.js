@@ -9,7 +9,9 @@ export default class Tabs extends View {
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
   }
 
-  /** The side panel is remembered per space. */
+  /**
+   * Keeps the side panel per space: switching spaces brings back the one that space had, and a change is kept for it.
+   */
   syncPanel(space, panel, body, enabled) {
     if (!space || !panel) return;
     const now = panel.hidden ? null : body?.active ?? null;

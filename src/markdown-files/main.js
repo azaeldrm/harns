@@ -22,10 +22,10 @@ const readable = path => MARKDOWN.has(extOf(path)) || MERMAID.has(extOf(path));
 
 async function directory(path, on) {
   /**
-   * Windows PowerShell otherwise uses the console code page; exec decodes UTF-8.
-   * Links keep directory attributes even when dangling; check their target.
-   * Other reparse points (OneDrive's folders) have no LinkType and are folders.
-   * PowerShell reads curly single quotes as quotes too, so they're doubled like '.
+   * A folder's entries through Windows PowerShell, its output set to UTF-8 (exec decodes UTF-8; PowerShell otherwise
+   * uses the console code page). A link is a folder only when its target is one, since links keep directory attributes
+   * even when dangling; other reparse points (OneDrive's folders) have no LinkType and are folders. Curly single quotes
+   * are doubled like ', since PowerShell reads them as quotes too.
    */
   const windowsDirectory = async () => {
     const r = await exec("powershell", ["-NoProfile", "-Command", "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); & { param($p) @(Get-ChildItem -LiteralPath $p -Force -ErrorAction Stop | Where-Object Name -ne '.git' | Select-Object -First 501 | ForEach-Object { @{ name=$_.Name; dir=($_.PSIsContainer -and (-not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -or -not $_.LinkType -or ($_.Target -and [IO.Directory]::Exists(([IO.Path]::Combine([IO.Path]::GetDirectoryName($_.FullName), $_.Target[0])))))) } }) | ConvertTo-Json -Compress } '" + path.replace(/['‘’‚‛]/g, "$&$&") + "'"], { on });

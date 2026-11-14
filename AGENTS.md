@@ -76,7 +76,7 @@ of the live app, set `git -c core.hooksPath=<empty folder>` for those commands.
 
 - Commit, push and merge when the person asks, one merge command at a time.
 - One focused PR per change, stacked on an open PR when it depends on it. Descriptions end with a Checks section.
-- Review a PR's diff for stale code, comments and docs before merging. Pushed history stays as it is: fix with a new
+- Review a PR's diff for stale code, docstrings and docs before merging. Pushed history stays as it is: fix with a new
   commit and squash-merge when a change needs to stay out of `main`.
 
 ## Environment

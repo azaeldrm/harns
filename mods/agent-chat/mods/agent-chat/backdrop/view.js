@@ -54,7 +54,10 @@ export class BackdropView extends View {
     this.task = cx.timer.every(every, cx => this.tick(cx));
   }
 
-  /** render() sets drawn; a tick that finds it unset since the last one means nothing drew this view. */
+  /**
+   * One step of the animation: a frame while it's drawn and the window is in front, else a slow look (idle) or none
+   * (resting). render() sets `drawn`, so a tick that finds it unset since the last one knows nothing drew the view.
+   */
   tick(cx) {
     const drawn = this.drawn;
     this.drawn = false;

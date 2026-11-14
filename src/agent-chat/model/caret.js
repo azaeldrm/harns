@@ -16,7 +16,7 @@ export function caretOf(state) {
   return { start: at, end: at + selected };
 }
 
-/** Never between the two halves of a character outside the BMP (an emoji): offsets are UTF-16. */
+/** Offset `at`, moved back off the second half of a character outside the BMP (an emoji), since offsets are UTF-16. */
 function onCharacter(text, at) {
   const c = text.charCodeAt(at);
   return at > 0 && at < text.length && c >= 0xdc00 && c <= 0xdfff ? at - 1 : at;

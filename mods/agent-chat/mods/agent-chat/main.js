@@ -377,9 +377,9 @@ export default class HerdrChat extends View {
   }
 
   /**
-   * Its button opens the menu, or closes it. Pressing the button while it's open is a press outside the menu, which
-   * closes it first; that same press's click then lands here and would open it again, so a menu just closed that way
-   * stays shut.
+   * Opens menu `id` from its button, or closes it. Pressing the button while it's open is a press outside the menu,
+   * which closes it first; that same press's click then lands here and would open it again, so a menu just closed that
+   * way stays shut.
    */
   toggleMenu(id, cx) {
     const justClosed = this.menuClosed?.id === id && Date.now() - this.menuClosed.at < 400;

@@ -66,7 +66,7 @@ export class Composer {
     else if (was === "terminal" && mode === "chat") this.pullDraft(t, session, cx);
   }
 
-  /** One mirror step at a time: a quick switch back waits for the push before reading the box. */
+  /** Runs a mirror step after the ones before it, one at a time: a quick switch back waits for the push to finish. */
   queueMirror(cx, step) {
     this.mirrorChain = this.mirrorChain.then(() => new Promise(done => cx.spawn(async cx => {
       try { await step(cx); } catch {} finally { done(); }
