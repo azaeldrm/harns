@@ -141,15 +141,13 @@ export function splitCode(text) {
 
 export function withCopyRows(rows, working) {
   // The rows with a copy row after each agent response (the run of rows up to the next message from the person; the one still
-  // being written gets none), and one after each of the person's messages (`prompt`, drawn at the right, under its bubble).
+  // being written gets none, so no empty band sits between the conversation and the working line over the reply box), and
+  // one after each of the person's messages (`prompt`, drawn at the right, under its bubble).
   // A turn's "stats" row (see TurnClock) goes onto its response's copy row, which shows it.
   const out = [];
   let texts = [], stats = null;
   const close = last => {
-    // The response still being written gets an empty copy row (`writing`), keeping its room so the list doesn't shift when
-    // the turn ends and the button and numbers fill in.
-    if (texts.length && last && working) out.push({ kind: "copy", text: "", writing: true });
-    else if (texts.length) out.push({ kind: "copy", text: texts.join("\n\n"), ...(stats ? { stats } : {}) });
+    if (texts.length && !(last && working)) out.push({ kind: "copy", text: texts.join("\n\n"), ...(stats ? { stats } : {}) });
     texts = []; stats = null;
   };
   for (const m of rows) {

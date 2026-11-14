@@ -16,7 +16,7 @@ assert.equal(rows.at(-1).kind, "copy");
 
 const live = withCopyRows([u("hi"), a("one"), u("again"), a("partial")], true);
 assert.deepEqual(answers(live), ["one"]);
-assert.deepEqual(live.at(-1), { kind: "copy", text: "", writing: true }, "the response being written keeps an empty copy row's room");
+assert.notEqual(live.at(-1).kind, "copy", "the response being written gets no copy row (yet): no empty band above the working line");
 
 assert.deepEqual(answers(withCopyRows([u("hi"), tools], false)), []);
 assert.deepEqual(prompts(withCopyRows([u("  "), tools], false)), [], "an empty message (an image alone) gets none");
