@@ -4,7 +4,7 @@ import { ICONS } from "../common.js";
 import { COLUMN } from "../ui/primitives.js";
 import { designPx, designHeight } from "../measure.js";
 
-const TAIL = 32;
+const TAIL = 20;
 const MEASURE_AT_ONCE = 12;
 const FADE = 20;
 const rowPadding = m => m.kind === "step" ? 0 : 8;
