@@ -270,8 +270,8 @@ export default class Agents extends View {
   }
 
   /**
-   * A working logo's place in its own hops ({ n, up, go, ripple } for agentPic): counted from the beat it
-   * was first drawn working on, rising on its even beats (each landing starts a hop) and falling on its odd ones.
+   * A working logo's place in its own hops ({ n, up, go, ripple } for agentPic): counted from the beat it was first
+   * drawn working on, rising on its even beats (each landing starts a hop) and falling on its odd ones.
    * `ripple` names its latest landing's ring: its address, so two logos landing on one beat don't share a ring, and
    * the shared beat of that landing, since its own count starts again at 0 each time it starts working.
    */
