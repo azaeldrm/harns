@@ -104,9 +104,9 @@ function icon(p, size, color) {
   return p.icon.endsWith('.svg') ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
-// One hop of a working agent's logo, up and down, in ms; GROUND: where its feet land in the 16 px icon slot (the logo
-// ends about 8 px into its 12 px box, which sits at top 10).
-const HOP_MS = 700, GROUND = 18.8;
+// One hop of a working agent's logo, up and down, in ms. Its feet land about 73% of the way down the logo's box (8.8 px
+// into the 12 px box of a 16 px icon's logo).
+const HOP_MS = 700, FEET = 8.8 / 12;
 // Eight 1 px nudges: copies of a glyph at these offsets, in the background's color, make a halo that follows its outline.
 const HALO = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
 
@@ -129,8 +129,9 @@ function haloed(src, size, color, ring) {
 
 function agentPic(t, p, size, color, ring, sub = false, hop = false, tint = null, corner = null) {
   // The agent icon (a sub-agent's: the same bot without its antenna), with its program's icon small at its bottom right
-  // on a halo of the row's color (badgeOf). `hop` (working; the view's beat, { n, up, go }): that logo hops in amber
-  // from side to side over the bot, its halo masking the bot as it passes, a ripple spreading where it lands.
+  // on a halo of the row's color (badgeOf). `hop` (working; its own place in its hops, { n, up, go }, from hopFor): that
+  // logo hops in amber from side to side over the bot, its halo masking the bot as it passes, a ripple spreading where
+  // it lands.
   const bot = svg(`mods/machine-sidebar/icons/${sub ? "bot-small" : "bot"}.svg`).size(size).flex_none().text_color(color);
   // The logo's color: amber while it hops (working), else `tint` (amber, still: it needs you mid-task), else the row's.
   const badge = badgeOf(p, Math.round(size * 0.65), hop ? t.working : tint ?? color, ring);
@@ -142,21 +143,35 @@ function agentPic(t, p, size, color, ring, sub = false, hop = false, tint = null
   if (!hop || !badge) return div().relative().size(size).flex_none().child(bot)
     .when(Boolean(badge), el => el.child(badge.absolute().right(-5).bottom(-4)))
     .when(Boolean(mark), el => el.child(cornerMark()));
-  // The view's beat (hopTick) drives it, each step a native transition: across to the other side over one hop at an
-  // even pace while it rises (slowing) and falls (speeding up), so it traces a round arc. Every landing starts a fresh
-  // ripple ring there, spreading and fading, so ring and landing stay together however long it runs.
-  const to = hop.n % 2 ? 12 : 7, landed = hop.n % 2 ? 7 : 12;
-  const ripple = () => {
-    // A thin oval (ripple.svg, stretched to its size), spreading fast and slowing as it fades.
-    const w = hop.go ? 16 : 5, h = hop.go ? 4 : 1.4, policy = { duration: 480, easing: "ease-out" };
-    return svg("mods/machine-sidebar/icons/ripple.svg").id(`ripple-${hop.n}`).absolute().left(landed + 6 - w / 2).top(GROUND - h / 2).w(w).h(h)
-      .text_color(t.working).opacity(hop.go ? 0 : 0.9)
-      .transition("width", policy).transition("height", policy).transition("left", policy).transition("top", policy).transition("opacity", policy);
-  };
+  // Its places follow the icon's size (a 16 px agent's, a 14 px sub-agent's): its two sides 2 px left of where the still
+  // logo sits and 3 px right of it, 2 px lower; for 16 px, lefts 7 and 12 at top 10.
+  const box = Math.round(size * 0.65) + 2, rest = size + 5 - box;
   return div().relative().size(size).flex_none().child(bot)
-    .when(hop.n > 0, el => el.child(ripple()))
-    .child(div().absolute().top(10).left(to).transition("left", { duration: HOP_MS, easing: "linear" })
-      .child(badge.relative().top(hop.up ? -4 : 0).transition("top", { duration: HOP_MS / 2, easing: hop.up ? "ease-out" : "ease-in" })));
+    .children(hopParts(t, badge, box, size + 6 - box, [rest - 2, rest + 3], size / 16, hop));
+}
+
+function hopParts(t, badge, box, top, [a, b], scale, hop) {
+  // A logo hopping between lefts a and b at `top` (its box `box` px), with its ripple, for a relative parent. The view's
+  // beat (hopTick) drives it, each step a native transition: across to the other side over one hop at an even pace
+  // while it rises (slowing) and falls (speeding up), so it traces a round arc. Every landing starts a fresh ripple ring
+  // there, spreading and fading, so ring and landing stay together however long it runs.
+  const to = hop.n % 2 ? b : a, landed = hop.n % 2 ? a : b, ground = top + box * FEET;
+  // A thin oval (ripple.svg, stretched to its size), spreading fast and slowing as it fades.
+  const w = (hop.go ? 16 : 5) * scale, h = (hop.go ? 4 : 1.4) * scale, policy = { duration: 480, easing: "ease-out" };
+  return [
+    ...(hop.n > 0 ? [svg("mods/machine-sidebar/icons/ripple.svg").id(`ripple-${hop.n}`).absolute().left(landed + box / 2 - w / 2)
+      .top(ground - h / 2).w(w).h(h).text_color(t.working).opacity(hop.go ? 0 : 0.9)
+      .transition("width", policy).transition("height", policy).transition("left", policy).transition("top", policy).transition("opacity", policy)] : []),
+    div().absolute().top(top).left(to).transition("left", { duration: HOP_MS, easing: "linear" })
+      .child(badge.relative().top(hop.up ? -4 : 0).transition("top", { duration: HOP_MS / 2, easing: hop.up ? "ease-out" : "ease-in" })),
+  ];
+}
+
+function hopSpot(t, p, ring, hop) {
+  // A working sub-agent's logo hopping at the right end of its row, where an agent's status sits: the 14 px icon's logo
+  // (9 px) in a 22 px slot, on a halo of the row's colour.
+  const badge = badgeOf(p, 9, t.working, ring);
+  return badge && div().relative().w(22).h(20).flex_none().children(hopParts(t, badge, 11, 6, [2, 9], 14 / 16, hop));
 }
 
 const READ_AFTER = [1000, 4000];
@@ -187,8 +202,12 @@ export default class Agents extends View {
     // A reload starts the list at the top, where scrollY starts (the list would otherwise keep its old place).
     this.scrollHandle = ScrollHandle.new();
     this.scrollHandle.scroll_to_item(0);
-    // The working logos' beat (agentPic): every half hop it lands (a new hop and ripple) or reaches the top of its arc.
-    this.hop = { n: 0, up: false, go: false };
+    // The working logos' beat (agentPic): one shared timer, every half hop. Each logo counts its own hops from the beat it
+    // started working on (hopFrom, by address; hopFor), so logos that started on different beats land on alternate
+    // beats and head different ways instead of hopping in step.
+    this.hop = { beat: 0, go: true };
+    this.hopFrom = new Map();
+    this.hopSeen = new Set();
     cx.timer.every(HOP_MS / 2, (cx) => this.hopTick(cx));
     cx.timer.every(1000, (cx) => {
       this.noticeOs(cx);
@@ -247,14 +266,26 @@ export default class Agents extends View {
   }
 
   hopTick(cx) {
-    // Half a hop: landing starts the next hop (its ripple drawn small, then let go to spread on the next frame), or the
-    // top of the arc turns it down. Nothing to draw while no logo hops.
+    // Half a hop: for each logo, a landing that starts its next hop, or the top of its arc. Nothing to draw while no
+    // logo hops. Logos that stopped hopping since the last beat are forgotten. When one lands, its ripple is drawn small
+    // and let go to spread on the next frame (30 ms on); a beat where none lands needs no second frame.
+    for (const address of this.hopFrom.keys()) if (!this.hopSeen.has(address)) this.hopFrom.delete(address);
     if (!this.hopping) return;
     const h = this.hop;
-    if (h.up) { h.up = false; cx.notify(); return; }
-    h.n++; h.up = true; h.go = false;
+    h.beat++;
+    const lands = [...this.hopFrom.values()].some(from => (h.beat - from) % 2 === 0);
+    h.go = !lands;
     cx.notify();
-    cx.timer.after(30, (cx) => { h.go = true; cx.notify(); });
+    if (lands) cx.timer.after(30, (cx) => { h.go = true; cx.notify(); });
+  }
+
+  hopFor(address) {
+    // A working logo's place in its own hops ({ n, up, go } for agentPic and hopSpot): counted from the beat it was first
+    // drawn working on, rising on its even beats (each landing starts a hop) and falling on its odd ones.
+    if (!this.hopFrom.has(address)) this.hopFrom.set(address, this.hop.beat);
+    this.hopSeen.add(address);
+    const k = this.hop.beat - this.hopFrom.get(address), up = k % 2 === 0;
+    return { n: Math.floor(k / 2), up, go: up ? this.hop.go : true };
   }
 
   treeTop(t, g, collapsed, band) {
@@ -691,13 +722,20 @@ export default class Agents extends View {
     const k = s.t;
     const st = kidStatus(k, this.listed);
     const on = k.address === shown;
-    // As an agent's row: the name white while it's working, finished or needs you (or is being looked at), gray when idle;
-    // the icon gray, amber for the one being looked at. On the rail, where there's no name, the icon takes the name's
-    // white or gray instead, so the same rows stand out open and folded.
-    const bright = on || st !== "idle";
+    // With the Health bar context bars (Tree) a working sub-agent's logo leaves its bot and hops at the right end of the
+    // row, in the spinner's place (hopSpot); on the rail, with no right end, it hops over the bot as an agent's does.
+    const hops = !classic() && healthBars() && Boolean(k.program?.icon) && st === "working";
+    // As an agent's row: the name white while it's working, finished or needs you (or is being looked at), gray when idle,
+    // and gray while its logo hops, which already says it's working; the icon gray, amber for the one being looked at. On
+    // the rail, where there's no name, the icon takes the name's white or gray instead, so the same rows stand out open
+    // and folded.
+    const bright = on || (st !== "idle" && !hops);
     const color = on ? t.accent : compact && bright ? t.foreground : t.muted;
     const ring = this.hoveredSub === k.address ? t.hover : on ? t.raised : t.surface;
-    const pic = classic() ? icon(k.program, 14, color) : agentPic(t, k.program, 14, color, ring, true);
+    if (hops) this.hopping = true;
+    const pic = classic() ? icon(k.program, 14, color)
+      : hops && !compact ? agentPic(t, null, 14, color, ring, true)
+      : agentPic(t, k.program, 14, color, ring, true, hops ? this.hopFor(k.address) : null);
     const name = k.name || k.template || k.program?.name || k.address;
     // One box, open or on the rail: 26 px, its shade when looked at, hover, and a click to peek. Inside: open, the tree
     // lines, the icon, the name and its status; on the rail the icon alone, centred, with the name in its tooltip.
@@ -719,7 +757,7 @@ export default class Agents extends View {
         : s.lines.flatMap((l, j) => treeLines(t, 17 + 23 * j, 13, l === "│" || l === "├", l === "├" || l === "└")))
       .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
       .child(div().flex_1().truncate().text_color(bright ? t.foreground : t.muted).child(name))
-      .child(this.status(t, { status: st }));
+      .child(hops ? hopSpot(t, k.program, ring, this.hopFor(k.address)) : this.status(t, { status: st }));
   }
 
   plainTerminals(machine) {
@@ -783,6 +821,7 @@ export default class Agents extends View {
     if (this.menu) return this.menu.render();
     const collapsed = narrow();
     this.hopping = false;
+    this.hopSeen = new Set();
     let list = agents();
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
@@ -851,7 +890,7 @@ export default class Agents extends View {
       const iconColor = logoStatus ? (a.focused ? t.foreground : t.muted) : a.focused ? t.accent : t.muted;
       if (hops) this.hopping = true;
       const pic = classic() ? icon(a.program, 16, a.focused ? t.accent : t.muted)
-        : agentPic(t, a.program, 16, iconColor, ring, false, hops ? this.hop : null, asks ? t.working : null, asks ? "ask" : finished ? "done" : null);
+        : agentPic(t, a.program, 16, iconColor, ring, false, hops ? this.hopFor(a.address) : null, asks ? t.working : null, asks ? "ask" : finished ? "done" : null);
       // The name: white while it's working, finished, needs you or is in front, gray when idle; when the logo carries the
       // status, white only for the agent in front.
       const idle = logoStatus ? !a.focused : a.status === "idle" && !a.focused;

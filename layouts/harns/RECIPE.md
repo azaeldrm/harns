@@ -85,10 +85,14 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   With the Health bar (Tree), the program logo carries the status instead: working, it hops in amber from side to side
   over the bot in a round arc (even pace across, easing up and down), an amber ripple ring spreading where it lands
   (`harns-chrome/ripple.svg`, an oval stretched as it grows). The sidebar drives it, one beat per half hop, each step
-  a native transition and a fresh ring each landing, so ring and landing never drift apart. Above the logo, on its own
+  a native transition and a fresh ring each landing, so ring and landing never drift apart. Each logo counts its hops
+  from the beat it started working on, so logos that started on different beats land on alternate beats and head
+  different ways. Above the logo, on its own
   halo: the green check (done, until it's looked at) or a red question mark (`harns-chrome/question.svg`, blocked; the
   logo stays amber). So there's no spinner, check or "Needs you" badge; on the rail every agent's second line is its
-  context bar; names and icons are gray but for the agent in front's, white.
+  context bar; names and icons are gray but for the agent in front's, white. A working sub-agent's logo leaves its bot
+  and hops at the right end of its row, in a 22 px slot where the spinner was (over its bot on the rail), and its name
+  stays gray; the hop's places scale with the icon (16 px agents, 14 px sub-agents).
   Tabs show the same spinner, or a dot for blocked and done.
 - **Context readings:** Claude Code and Pi report through the relays (Watch out). Codex's
   reading is its log's newest `token_count` (last input tokens of the model's window), from the
