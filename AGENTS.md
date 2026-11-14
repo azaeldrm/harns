@@ -67,6 +67,8 @@ of the live app, set `git -c core.hooksPath=<empty folder>` for those commands.
 - `herdr-app shot` returns the last drawn frame, which is stale while the window is covered; a screen capture shows the
   window when it's in front.
 - A dialog opens once other overlays close; `herdr-app status` lists the open ones.
+- herdr keeps an element's animation state by its id across the view: two animated elements sharing an id (the same
+  ripple name in two rows) take each other's position and transitions. Give them ids unique to what they belong to.
 
 ## Git and PRs
 
