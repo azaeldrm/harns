@@ -21,9 +21,11 @@ const mix = (a, b, share) => {
   if (!x || !y) return b;
   return "#" + x.map((v, i) => Math.round(v * share + y[i] * (1 - share)).toString(16).padStart(2, "0")).join("");
 };
+// The colour of a tree's lines: from a machine's icon down to its agents, and between them.
+const treeColor = t => mix(t.dim, t.surface, 0.4);
 const treeLines = (t, x, elbowAt, down, elbow, from = 0, reach = 9) => {
   // A tree's lines in a row at x px, starting from px above it: on down past the row, and an elbow reach px into it elbowAt px down.
-  const color = mix(t.dim, t.surface, 0.4);
+  const color = treeColor(t);
   return [
     ...(down ? [div().absolute().left(x).top(from).bottom(0).w(1).bg(color)] : []),
     ...(elbow ? [div().absolute().left(x).top(from).w(reach).h(elbowAt - from).overflow_hidden()
@@ -31,9 +33,10 @@ const treeLines = (t, x, elbowAt, down, elbow, from = 0, reach = 9) => {
   ];
 };
 const underMachine = (t, rows, last, elbowAt) => {
-  // One of a machine's agents or terminals, its rows hung from the machine's icon, 18 px in.
+  // One of a machine's agents or terminals, its rows hung from the machine's icon, 19 px in: the line at 18 and its
+  // elbow reaching the row at 28.
   return rows.map((r, i) => v_flex().relative().w_full().flex_none().pl(28).child(r)
-    .children(treeLines(t, 17, elbowAt, !last, i === 0, 0, 10)));
+    .children(treeLines(t, 18, elbowAt, !last, i === 0, 0, 10)));
 };
 
 
@@ -252,6 +255,15 @@ export default class Agents extends View {
     h.n++; h.up = true; h.go = false;
     cx.notify();
     cx.timer.after(30, (cx) => { h.go = true; cx.notify(); });
+  }
+
+  treeTop(t, g, collapsed, band) {
+    // A machine's band in Tree, with the start of its agents' line: from its icon (under the disc) down through the band
+    // and its 2 px margin to the first agent's elbow. Drawn before the band, so the band's hover covers it there.
+    const hangs = !collapsed && !this.folded.has(g.id) && (g.members.length > 0 || this.plainTerminals(g.machine).length > 0);
+    return div().relative().w_full().flex_none().pb(2)
+      .when(hangs, el => el.child(div().absolute().left(18).top(19).bottom(0).w(1).bg(treeColor(t))))
+      .child(band);
   }
 
   headerIcon(machine) {
@@ -997,13 +1009,18 @@ export default class Agents extends View {
       const open = !this.folded.has(g.id);
       const isMachine = Boolean(g.machine);
       const top = g.members.reduce((m, a) => ((RANK[a.status] ?? 0) > (RANK[m] ?? 0) ? a.status : m), null);
+      // A machine's icon, open or on the rail. In Tree it sits in a disc the colour of the band's hover, where the
+      // agents' line starts (treeTop): hovered, the disc and the line's start melt into the band and the icon stays.
+      const machineMark = () => div().relative().size(16).flex_none().flex().items_center().justify_center()
+        .when(!classic(), d => d.child(div().absolute().left(-3).top(-3).size(22).rounded_full().bg(t.hover)))
+        .child(svg(this.headerIcon(g.machine)).size(14).flex_none().text_color(t.muted));
       if (collapsed) {
         // The rail's header: the open one's box (30 px, the same top padding), its icon alone and centred: the machine's
         // logo as the open header shows it in this style, or Pinned's pin, which folds the group as open.
         return h_flex().id(g.id).h(30).pt(isMachine ? 6 : 8).flex_none().items_center().justify_center().cursor_pointer()
           .tooltip(g.label)
           .when(!isMachine, el => el.on_click((_e, cx) => { open ? this.folded.add(g.id) : this.folded.delete(g.id); cx.notify(); }))
-          .child(svg(isMachine ? this.headerIcon(g.machine) : "mods/machine-sidebar/icons/pin.svg").size(isMachine ? 14 : 12).flex_none().text_color(isMachine ? t.muted : t.dim));
+          .child(isMachine ? machineMark() : svg("mods/machine-sidebar/icons/pin.svg").size(12).flex_none().text_color(t.dim));
       }
       return h_flex()
         .id(g.id)
@@ -1022,9 +1039,9 @@ export default class Agents extends View {
           open ? this.folded.add(g.id) : this.folded.delete(g.id);
           cx.notify();
         }))
-        .when(isMachine, el => el.gap(8).text_size(13).font_semibold().pt(6).pl(9)
-          .child(div().size(16).flex_none().flex().items_center().justify_center()
-            .child(svg(this.headerIcon(g.machine)).size(14).flex_none().text_color(t.muted))))
+        // 10 px in (with the band's 1 px border), the icon's centre is where the rail centres it, so it stays put as the
+        // sidebar folds.
+        .when(isMachine, el => el.gap(8).text_size(13).font_semibold().pt(6).pl(10).child(machineMark()))
         .child(div().truncate().text_color(isMachine ? t.muted : t[g.status] ?? t.dim).child(g.label))
         .when(isMachine && classic(), (el) => {
           const n = this.plainTerminals(g.machine).length, count = (id, glyph, value, tip) => h_flex().id(id).gap(3).items_center()
@@ -1094,7 +1111,7 @@ export default class Agents extends View {
         // read as a group; in Tree its header alone, the agents hanging from its icon.
         ...(g.machine ? [this.machineCard(t, g.machine, v_flex().id(`band-${g.id}`).w_full().pb(3).rounded(8).border_1()
           .when(classic(), el => el.rounded(0).bg(t.raised).border_color(t.raised).hover(s => s.bg(t.hover)))
-          .when(!classic(), el => el.mb(2).border_color(t.surface).hover(s => s.bg(t.hover)))
+          .when(!classic(), el => el.border_color("#00000000").hover(s => s.bg(t.hover)))
           .relative().cursor_pointer()
           .on_mouse_down("left", (e) => { this.mdrag = { key: g.machine.name ?? "", y: e.position.y, moved: false }; this.mdrop = null; })
           .on_mouse_move((e, cx) => {
@@ -1122,7 +1139,8 @@ export default class Agents extends View {
           })
           .when(Boolean(this.mdrag?.moved) && this.mdrop?.target === (g.machine.name ?? ""), el => el.child(div().absolute().left(6).right(6).h(2).rounded_full().bg(t.accent)
             .when(this.mdrop.after, d => d.bottom(-1)).when(!this.mdrop.after, d => d.top(-1))))
-          .child(header(g)).when(classic(), el => el.child(collapsed ? this.railCpu(t, g.machine.name ?? null) : statsFor(g.machine.name ?? null, t))))] : [header(g)]),
+          .child(header(g)).when(classic(), el => el.child(collapsed ? this.railCpu(t, g.machine.name ?? null) : statsFor(g.machine.name ?? null, t))))]
+          .map(card => classic() ? card : this.treeTop(t, g, collapsed, card)) : [header(g)]),
         ...(this.folded.has(g.id) ? [] : !g.machine ? g.members.flatMap(withKids) : classic() ? [
           ...(g.members.length ? g.members.flatMap(withKids) : [empty(g)]),
           ...this.terminalRows(t, g.machine, collapsed),

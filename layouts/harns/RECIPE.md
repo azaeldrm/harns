@@ -44,8 +44,11 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     footer) fade, as 32 px of 12 bands of `surface`. The position is followed from the wheel (a mod can't read it).
     That's the Classic style (shared `harness.sidebar` `classic`); the Tree style (the default) drops the band's box,
     system icon, rings and counts and hangs each machine's agents and terminals from its icon (a laptop or a server) on
-    1 px lines, each agent's bot icon with its program's icon small at its corner. In both, machines can be dragged into
-    an order by their bands (kept in the mod's localStorage, `machines.order`).
+    1 px lines, each agent's bot icon with its program's icon small at its corner. The machine's icon sits in a 22 px
+    disc the colour of the band's hover, open and on the rail; the line starts under the disc and runs out of the band,
+    drawn before it, so a hovered band covers both and only the icon stays. The icon's centre is where the rail centres
+    it, so it doesn't move as the sidebar folds. In both, machines can be dragged into an order by their bands (kept in
+    the mod's localStorage, `machines.order`).
   - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
     harns's Settings (the logo, a 760 px dialog from `harns-settings`: General, Sidebar, Chat, Status bar, Simulator,
     which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `herdr-chat.chat`, `herdr-chat.animation`,
