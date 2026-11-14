@@ -38,18 +38,18 @@ its system, CPU, memory, GPUs and disks.
 
 ![A machine's details](docs/machine-card.png)
 
-**A chat for every agent.** An agent's tab is a chat ([herdr-chat](layouts/herdr-chat/RECIPE.md)) or its
-live terminal, one click apart. Mermaid diagrams in replies are drawn by [Pele](https://github.com/obsidianmd/pele).
+**A chat for every agent.** An agent's tab is a chat ([agent-chat](mods/agent-chat/RECIPE.md)) or its live terminal,
+one click apart. Mermaid diagrams in replies are drawn by [Pele](https://github.com/obsidianmd/pele).
 
 ![A mermaid diagram in the chat](docs/diagram.png)
 
 **Something to look at.** A dimmed animation plays behind the chat: sharks, jellyfish, a night sky or rain. It's lively
 behind a new conversation's welcome, and slow and faint behind a conversation, out of the way of the text.
 
-![The welcome's animation](docs/welcome.webp)
+![The chat's animation](docs/welcome.webp)
 
-**Markdown, rendered.** Click a Markdown or `.mmd` file in the Files panel and it opens rendered in a floating
-window, with its images and mermaid diagrams.
+**Markdown, rendered.** Click a Markdown or `.mmd` file in the Files panel ([markdown-files](mods/markdown-files/RECIPE.md))
+and it opens rendered in a floating window, with its images and mermaid diagrams.
 
 ![A Markdown file in its floating window](docs/files.png)
 
@@ -63,78 +63,51 @@ Claude Code and Codex quota left.
 
 **Settings of its own.** The harns logo in the sidebar's footer opens harns's Settings: this computer's name, the
 sidebar's style (Tree, agents hanging from their machine on lines, or Classic, each machine boxed with its agents and
-stats), whether agents open as a chat, the chat's animated background (on or off, and which scene, each card showing
-a frame of it), what the status bar shows, and whether the tab bar
-offers the Simulator. Drag a machine's band to reorder the machines in the sidebar.
+stats), whether agents open as a chat, the chat's animated background (on or off, and which scene), what the status
+bar shows, and whether the tab bar offers the Simulator. Drag a machine's band to reorder the machines in the sidebar.
 
 ## Install
 
-Needs the Herdr app and Python 3 on each machine. The chat in agent tabs is agent-chat, one of
-harns's mods: the installer installs it with the rest (`--no-chat` leaves an installed copy as it is).
+Needs the Herdr app, and Python 3 on each machine. Ask your agent to add the harns layout, or from a clone run
+`./install.sh` (on Windows, `python scripts/install.py` in PowerShell).
 
-Ask your agent to add this layout, or run `./install.sh` from a clone (on Windows, from Git
-Bash, or run `python scripts/install.py` in PowerShell, with the same options). It builds the
-generated files, copies the mods, theme, assets and layout into
-`~/.config/herdr-app` (or `HERDR_APP_HOME` when it's set), sets the icon and tint for Codex,
-Claude Code and Pi in your `programs.json` (its other entries stay as they are), adds the layout's
-keys to your `keys.json` (only keys you haven't bound for `harns`), checks every mod,
-installs this computer's relays (below) and switches to `harns` (`--no-switch` to
-skip). `ctrl-shift-l` switches back. A `harns` layout you
-changed is kept beside the new one as `harns.json.before-install-<time>`.
+The installer copies harns into `~/.config/herdr-app` (or `HERDR_APP_HOME`), adds its program icons and keys to yours
+without replacing any you set, sets up the context relays on this computer (below), checks every mod and switches to
+`harns`; `ctrl-shift-l` switches back. A `harns` layout you changed is kept beside the new one as
+`harns.json.before-install-<time>`. Options: `--no-switch`, `--no-relays`, and `--no-chat` to leave an installed
+agent-chat as it is.
 
-Optional:
+For a nickname instead of the computer's own name, set Name in harns's Settings (General).
 
-- **Context bars** (on each agent's card) come from relays: Claude Code's status line and a Pi extension
-  (`scripts/install-context.py`, on Windows, Linux and macOS). Codex's comes from its log
-  (the one agent-chat found for it), else its footer, when `context-remaining` is one of its
-  `tui.status_line` items. The Claude Code and Codex
-  quota bars read the account from each service and need no relay.
-  The installer sets the relays up on this computer (`--no-relays` to skip);
-  for each connected machine run `python scripts/install-context.py --on MACHINE`. They write:
-  - `~/.config/harness/context-relay.py`, and the snapshots it keeps in `context/` beside it;
-  - `~/.pi/agent/extensions/harness-context.ts`;
-  - `statusLine` in `~/.claude/settings.json`, after copying the file to
-    `settings.json.before-harness-context` once. A status line you had is kept in
-    `~/.config/harness/claude-statusline-original.json`, and the relay still runs it;
-  - in `~/.codex/config.toml`, only removing a `notify` line an older relay added.
+## Context bars
 
-  Pi sessions already running pick up the relay after `/reload`, typed in their terminal.
-- **Simulator** (Windows and Linux): the panel beside Files and Changes runs Android virtual devices
-  from the Android SDK (`ANDROID_HOME`, else `%LOCALAPPDATA%\Android\Sdk` on Windows and `~/Android/Sdk` on
-  Linux). [RECIPE.md](layouts/harns/RECIPE.md)'s "Simulator setup" lists what to install and how to create a device. Each session (an agent's tab) gets its
-  own emulator, and its sub-agents use the same one; when another session needs one, the panel
-  copies a virtual device for it. The panel shows the focused session's emulator, its own
-  window placed over the panel so it runs at full speed with its own input, and the others
-  keep running, hidden. That's on Windows and on Linux under Hyprland; on other Linux desktops each
-  emulator opens in its own window, and the panel's buttons work the same. Stop saves where Android was, and the next Start resumes it; Restart
-  (the circular arrow) shuts the emulator down and boots it fresh, keeping its apps and data.
-  Closing a tab stops its emulator and keeps the device. For Expo apps,
-  run `expo start` and open the dev build as usual. The iOS Simulator needs a Mac.
+Each agent's card shows how full its context window is. Claude Code's and Pi's come from a relay, Codex's from its log
+(or its footer, when `context-remaining` is one of its `tui.status_line` items); the Claude Code and Codex quota bars
+need no relay. The installer sets the relays up on this computer; for another machine, run
+`python scripts/install-context.py --on MACHINE`. They write:
 
-  Each emulator starts with 4 GB of RAM, 4 cores and the graphics card (`-gpu host`), over what
-  its virtual device says; storage is the virtual device's own. These are limits rather than
-  reservations: cores are threads the system runs anywhere, and memory is taken as Android uses
-  it (though memory Android has filled isn't given back until the emulator stops). The defaults
-  are in the Simulator mod's `emulator.json` (`src/emulator/emulator.json` here); change them in `~/.config/herdr-app/harness.json`,
-  which updates don't overwrite, as `{ "emulator": { "default": { "memory": 6144 }, "devices":
-  { "harns_phone": { "cores": 6 } } } }` (`memory` in MB, `cores`, `gpu`; `devices` by a virtual
-  device's name, for that one only). The panel title's tooltip shows what the session's emulator
-  uses. A new value applies the next time it starts; one the emulator wouldn't take is left out
-  and named while it starts.
+- `~/.config/harness/context-relay.py`, with the snapshots it keeps in `context/` beside it;
+- `~/.pi/agent/extensions/harness-context.ts` (Pi sessions already running pick it up after `/reload`);
+- `statusLine` in `~/.claude/settings.json`, backed up once as `settings.json.before-harness-context`. A status line
+  you had is kept in `~/.config/harness/claude-statusline-original.json`, and the relay still runs it.
 
-  Sessions on other machines reach their emulator with that machine's own `adb`. The panel
-  shares each one there through an SSH reverse tunnel, listening only
-  on that machine's localhost (on Linux, a forward on herdr's own connection to the machine, so
-  no ssh key is needed; on Windows, or with no herdr connection, OpenSSH with herdr's ssh config,
-  so ssh to it needs to work with a key), and installs a small `~/.local/bin/adb` script there that points
-  each session's terminals at their own emulator before running the machine's own adb. In
-  that session, `adb devices` lists its emulator (and any phones, but not other sessions'
-  emulators), and `adb`, `adb install` and `expo run:android` reach it. An `adb` already in
-  `~/.local/bin` that isn't harns's is left alone. If that machine's adb server restarts, or a
-  connection drops, the panel connects it again within a minute. A share that can't be set up
-  (no way to ssh in, someone else's `adb` there) shows why and is tried again later, less and less often.
-- **This computer's name:** it shows the computer's own name. For a nickname, set Name in harns's Settings
-  (General), or put `{ "localMachineName": "my-pc" }` in `~/.config/herdr-app/harness.json`.
+## Simulator
+
+On Windows and Linux, the panel beside Files and Changes runs an Android emulator for each session (an agent's tab and
+its sub-agents), from the Android SDK (`ANDROID_HOME`, else its default folder). [RECIPE.md](layouts/harns/RECIPE.md)'s
+"Simulator setup" lists what to install. The panel shows the focused session's emulator in place (on Windows and under
+Hyprland; elsewhere each opens in its own window) and keeps the others running hidden. Stop saves where Android was,
+Restart boots it fresh with its apps and data, and closing a tab stops its emulator. The iOS Simulator needs a Mac.
+
+Each emulator gets 4 GB of RAM, 4 cores and the graphics card, as limits rather than reservations. Change them in
+`~/.config/herdr-app/harness.json`, which updates don't overwrite:
+`{ "emulator": { "default": { "memory": 6144 }, "devices": { "harns_phone": { "cores": 6 } } } }` (`memory` in MB,
+`cores`, `gpu`; `devices` by virtual device name).
+
+A session on another machine reaches its emulator with that machine's own `adb`: the panel shares it there over an SSH
+reverse tunnel on that machine's localhost (on Windows, ssh to it needs to work with a key; Linux reuses herdr's
+connection) and installs a small `~/.local/bin/adb` that points each session at its own emulator, so `adb install` and
+`expo run:android` work as usual. An `adb` there that isn't harns's is left alone.
 
 ## Platforms
 
@@ -162,8 +135,5 @@ are entries in `src/shared/gpus.js`, with a place for AMD, Intel and Apple.
   as `python3`, `python` or `py -3`, so it runs as installed on Windows, Linux and macOS. The
   stats and account probes are tested the way each platform runs them: PowerShell on Windows,
   Python on Linux and macOS.
-- `markdown-files` is herdr's Files panel where Markdown and `.mmd` files open in a floating window as a readable
-  document: images (beside the file or on its machine; web images show as links, never fetched) and
-  mermaid blocks drawn by Pele (the same vendored copy as agent-chat's). Preview and
-  Source in its header switch views. To update Pele, change the pin in `package.json`, then run
-  `npm install && npm run vendor:pele`.
+- agent-chat and markdown-files share one vendored copy of Pele. To update it, change the pin in `package.json`, then
+  run `npm install && npm run vendor:pele`.
