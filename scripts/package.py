@@ -30,8 +30,10 @@ ICONS = SHARED / 'icons'
 
 
 def write(path, text):
+    # Generated text gets the system's line endings, as the files copied from src/ have in a checkout, so a build on
+    # Windows leaves git seeing nothing changed.
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding='utf-8', newline='\n')
+    path.write_text(text, encoding='utf-8')
 
 
 IMPORT = re.compile(r"""(?:from\s*|import\s*\(\s*)["'](\.{1,2}/[^"']+\.js)["']""")
