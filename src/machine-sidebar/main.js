@@ -129,9 +129,9 @@ function haloed(src, size, color, ring) {
 
 function agentPic(t, p, size, color, ring, sub = false, hop = false, tint = null, corner = null) {
   // The agent icon (a sub-agent's: the same bot without its antenna), with its program's icon small at its bottom right
-  // on a halo of the row's color (badgeOf). `hop` (working; its own place in its hops, { n, up, go }, from hopFor): that
-  // logo hops in amber from side to side over the bot, its halo masking the bot as it passes, a ripple spreading where
-  // it lands.
+  // on a halo of the row's color (badgeOf). `hop` (working; its own place in its hops, { n, up, go, ripple }, from
+  // hopFor): that logo hops in amber from side to side over the bot, its halo masking the bot as it passes, a ripple
+  // spreading where it lands.
   const bot = svg(`mods/machine-sidebar/icons/${sub ? "bot-small" : "bot"}.svg`).size(size).flex_none().text_color(color);
   // The logo's color: amber while it hops (working), else `tint` (amber, still: it needs you mid-task), else the row's.
   const badge = badgeOf(p, Math.round(size * 0.65), hop ? t.working : tint ?? color, ring);
@@ -154,12 +154,14 @@ function hopParts(t, badge, box, top, [a, b], scale, hop) {
   // A logo hopping between lefts a and b at `top` (its box `box` px), with its ripple, for a relative parent. The view's
   // beat (hopTick) drives it, each step a native transition: across to the other side over one hop at an even pace
   // while it rises (slowing) and falls (speeding up), so it traces a round arc. Every landing starts a fresh ripple ring
-  // there, spreading and fading, so ring and landing stay together however long it runs.
+  // there, spreading and fading, so ring and landing stay together however long it runs. Each ring is a new element,
+  // named by its logo's address and the beat it landed on (`ripple`): herdr keeps an element's last state by its id,
+  // so a ring that reused an older one's id, or another logo's landing on the same beat, would animate from that.
   const to = hop.n % 2 ? b : a, landed = hop.n % 2 ? a : b, ground = top + box * FEET;
   // A thin oval (ripple.svg, stretched to its size), spreading fast and slowing as it fades.
   const w = (hop.go ? 16 : 5) * scale, h = (hop.go ? 4 : 1.4) * scale, policy = { duration: 480, easing: "ease-out" };
   return [
-    ...(hop.n > 0 ? [svg("mods/machine-sidebar/icons/ripple.svg").id(`ripple-${hop.n}`).absolute().left(landed + box / 2 - w / 2)
+    ...(hop.n > 0 ? [svg("mods/machine-sidebar/icons/ripple.svg").id(`ripple-${hop.ripple}`).absolute().left(landed + box / 2 - w / 2)
       .top(ground - h / 2).w(w).h(h).text_color(t.working).opacity(hop.go ? 0 : 0.9)
       .transition("width", policy).transition("height", policy).transition("left", policy).transition("top", policy).transition("opacity", policy)] : []),
     div().absolute().top(top).left(to).transition("left", { duration: HOP_MS, easing: "linear" })
@@ -168,10 +170,13 @@ function hopParts(t, badge, box, top, [a, b], scale, hop) {
 }
 
 function hopSpot(t, p, ring, hop) {
-  // A working sub-agent's logo hopping at the right end of its row, where an agent's status sits: the 14 px icon's logo
-  // (9 px) in a 22 px slot, on a halo of the row's colour.
-  const badge = badgeOf(p, 9, t.working, ring);
-  return badge && div().relative().w(22).h(20).flex_none().children(hopParts(t, badge, 11, 6, [2, 9], 14 / 16, hop));
+  // A working sub-agent's logo hopping at the right end of its row, where an agent's status sits: the hop it would make
+  // over its 14 px bot (agentPic's height and 5 px swing), without the bot, the swing centred in a 22 px slot.
+  const size = 14, slot = 22, badge = badgeOf(p, Math.round(size * 0.65), t.working, ring);
+  if (!badge) return null;
+  const box = Math.round(size * 0.65) + 2, left = (slot - box - 5) / 2;
+  return div().relative().w(slot).h(size).flex_none()
+    .children(hopParts(t, badge, box, size + 6 - box, [left, left + 5], size / 16, hop));
 }
 
 const READ_AFTER = [1000, 4000];
@@ -280,12 +285,14 @@ export default class Agents extends View {
   }
 
   hopFor(address) {
-    // A working logo's place in its own hops ({ n, up, go } for agentPic and hopSpot): counted from the beat it was first
-    // drawn working on, rising on its even beats (each landing starts a hop) and falling on its odd ones.
+    // A working logo's place in its own hops ({ n, up, go, ripple } for agentPic and hopSpot): counted from the beat it
+    // was first drawn working on, rising on its even beats (each landing starts a hop) and falling on its odd ones.
+    // `ripple` names its latest landing's ring: its address, so two logos landing on one beat don't share a ring, and
+    // the shared beat of that landing, since its own count starts again at 0 each time it starts working.
     if (!this.hopFrom.has(address)) this.hopFrom.set(address, this.hop.beat);
     this.hopSeen.add(address);
-    const k = this.hop.beat - this.hopFrom.get(address), up = k % 2 === 0;
-    return { n: Math.floor(k / 2), up, go: up ? this.hop.go : true };
+    const from = this.hopFrom.get(address), k = this.hop.beat - from, up = k % 2 === 0, n = Math.floor(k / 2);
+    return { n, up, go: up ? this.hop.go : true, ripple: `${address}-${from + 2 * n}` };
   }
 
   treeTop(t, g, collapsed, band) {
