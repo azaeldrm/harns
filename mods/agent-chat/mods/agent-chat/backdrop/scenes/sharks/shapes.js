@@ -1,5 +1,3 @@
-// Shark outlines and fin layouts, from ascii-sharks' renderer.ts (MIT, see vendor/ascii-sharks/LICENSE).
-// All values are fractions of the shark's length; s runs from the snout (0) to the tail (1).
 import { smoothstep } from "../../vendor/ascii-sharks/math.js";
 
 function classicHalfWidth(s) {
@@ -10,9 +8,6 @@ function classicHalfWidth(s) {
   return 0.019 * (1 - k) + 0.012 * Math.sin(k * Math.PI);
 }
 
-// halfWidth(s); pectoral [lead root, trail root, tip along, reach]; falcate: notched pectorals; pelvic likewise;
-// caudal: forked tail reach (0 for a ribbon tail); dorsal and secondDorsal spans; head: a hammerhead's cephalofoil;
-// eye span (null when the eyes sit on the cephalofoil); gills span; tint: skin colour multipliers.
 export const SHAPES = {
   classic: {
     halfWidth: classicHalfWidth,

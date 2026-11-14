@@ -10,7 +10,7 @@ ID = "01a185bc-bc6d-7860-b909-dfd06239af87"
 def iso(t): return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + ".000Z"
 
 def rollout(home, name, started, cwd, source, said, mtime):
-    # said None: a log with no conversation yet, as Codex starts one at launch.
+    """said None: a log with no conversation yet, as Codex starts one at launch."""
     path = Path(home, ".codex", "sessions", name)
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = [{"type": "session_meta", "payload": {"id": ID, "timestamp": iso(started), "cwd": cwd, "source": source}}]
@@ -56,7 +56,6 @@ with tempfile.TemporaryDirectory() as home:
     check("resume --last", said, ["latest part"])
 
 with tempfile.TemporaryDirectory() as home:
-    # Plain `codex`, then a conversation picked in its /resume: the launch log stays empty, the picked one (from another folder) grows.
     work = os.path.realpath(tempfile.mkdtemp(dir=home))
     started = now - 120
     launch = rollout(home, "2026/11/10/rollout-launch-01a1c8d4-a5dd-7ba0-9b6c-ff5b5a325115.jsonl", started + 2, work, "cli", None, now - 100)

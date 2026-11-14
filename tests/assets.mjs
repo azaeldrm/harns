@@ -1,5 +1,3 @@
-// Every picture a built mod names (`mods/<mod>/....svg`, .png, .webp) is in that mod's own folder: a listing's mods
-// work alone, and no picture is missing. herdr's own mods (files, changes, pane) are herdr's to ship.
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";

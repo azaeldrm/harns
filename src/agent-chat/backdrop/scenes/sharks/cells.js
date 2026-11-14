@@ -1,7 +1,3 @@
-// The sharks scene as a grid of character cells: what each cell shows (a glyph, its colour, a background) for one frame.
-// A port of ascii-sharks' canvas renderer (renderer.ts, MIT, see ../../vendor/ascii-sharks/LICENSE) to cells a mod can draw
-// as text: the same wake field, fish and sharks (each cell tested once against the shark's shape, its edge shaded by
-// how far inside it is), with every colour quantized so neighbouring cells share one and a row draws as a few runs.
 import { clamp, hash3, smoothstep } from "../../vendor/ascii-sharks/math.js";
 import { SHARK_NODES } from "../../vendor/ascii-sharks/world.js";
 import { SHAPES, KINDS } from "./shapes.js";
@@ -15,7 +11,6 @@ const EDGE_LIGHT = ".',`";
 
 const FLAG_BODY = 1, FLAG_EDGE = 2, FLAG_FIN = 3, FLAG_RIDGE = 4, FLAG_EYE = 5, FLAG_MARK = 6;
 const FISH_ALPHAS = [0.28, 0.42, 0.58, 0.74, 0.9];
-// Steps a shade is rounded to, so a shark's flank is a few bands of one colour rather than a new colour per cell.
 const SHADE_STEPS = 7;
 
 function inTriangle(px, py, ax, ay, bx, by, cx, cy) {
@@ -30,7 +25,6 @@ export class SharkCells {
     this.cols = 0; this.rows = 0; this.cw = 8; this.ch = 16;
     this.spine = new Float32Array(SHARK_NODES * 2);
     this.arc = new Float32Array(SHARK_NODES);
-    // Per spine segment: its vector, length and 1 / length², for the shark being drawn.
     this.segX = new Float64Array(SHARK_NODES - 1);
     this.segY = new Float64Array(SHARK_NODES - 1);
     this.segLen = new Float64Array(SHARK_NODES - 1);
@@ -41,7 +35,6 @@ export class SharkCells {
     this.finTipLeft = 0; this.finTipRight = 0;
     this.hitFlag = 0; this.hitShade = 0; this.hitS = 0; this.hitV = 0; this.hitDist = 0;
     this.frameId = 0;
-    // How bright the whole scene is, 0 to 1: it sits dimmed behind a page. `alpha` is that in twelfths, what paint uses.
     this.dim = 1; this.alpha = 1;
     this.alloc(0);
   }
@@ -64,7 +57,6 @@ export class SharkCells {
     this.candidateCross = new Float64Array(n);
     this.candidateList = new Int32Array(n);
     this.candidateFrame = 0;
-    // The frame: per cell a glyph (" " for none), its colour and its background (null for the page's own).
     this.glyph = new Array(n).fill(" ");
     this.fg = new Array(n).fill(null);
     this.bg = new Array(n).fill(null);
@@ -129,7 +121,6 @@ export class SharkCells {
       if (i >= 0) energy[i] = Math.min(1.6, energy[i] + 0.012 + f.alarm * 0.03);
     }
     for (const sh of world.sharks) {
-      // The tail sweeps the most water.
       for (let k = SHARK_NODES - 6; k < SHARK_NODES; k++) {
         const i = this.cellIndex(sh.nodes[k * 2], sh.nodes[k * 2 + 1]);
         if (i >= 0) energy[i] = Math.min(1.6, energy[i] + 0.05 + sh.speed * 0.0012);
@@ -142,7 +133,6 @@ export class SharkCells {
   diffuse(dt) {
     const { cols, rows, energy, energyTmp: tmp, heat } = this;
     const decay = Math.exp(-dt * 1.5);
-    // The edges repeat their own value past the border; the inside, most of the grid, needs no checks for that.
     const edge = i => {
       const c = i % cols, r = (i / cols) | 0;
       const l = c > 0 ? energy[i - 1] : energy[i];
@@ -180,7 +170,6 @@ export class SharkCells {
 
     const head = shape.head;
     if (head && u < L * (head.sweep + head.depth + head.notch)) {
-      // Cephalofoil: a wide wing across the snout, tips swept back toward the eyes.
       const span = L * head.span, r = a / span;
       const front = L * head.sweep * r * r + L * head.notch * Math.max(0, 1 - r / 0.14);
       const depth = L * head.depth * (1 - 0.2 * r * r * r * r);
@@ -194,7 +183,6 @@ export class SharkCells {
 
     if (a <= w) {
       const across = a / (w || 1);
-      // A rounded back lit from the top left; the flanks fall into shadow.
       const facing = (bestNx * -0.6 + bestNy * -0.8) * across;
       let shade = 0.58 - across * across * 0.42 + facing * 0.26;
       let flag = FLAG_BODY;
@@ -211,7 +199,6 @@ export class SharkCells {
       return true;
     }
 
-    // Fins, each tested only where it can be (the triangle's own span along the body).
     const tip = bestSign > 0 ? this.finTipRight : this.finTipLeft;
     const pec = shape.pectoral, p0 = pec[0], p1 = pec[1], p2 = pec[2];
     if (s >= p0 && s <= p2 && a <= tip && inTriangle(u, a, L * p0, 0, L * p1, 0, L * p2, tip)
@@ -269,7 +256,6 @@ export class SharkCells {
       this.shape = SHAPES[sh.kind] ?? SHAPES.classic;
       this.sharkId = sh.id;
       const kindIndex = Math.max(0, KINDS.indexOf(sh.kind));
-      // A travelling body wave, growing toward the tail.
       for (let k = 0; k < N; k++) {
         const s = k / (N - 1), a = Math.max(0, k - 1), b = Math.min(N - 1, k + 1);
         let tx = n[a * 2] - n[b * 2], ty = n[a * 2 + 1] - n[b * 2 + 1];
@@ -288,17 +274,12 @@ export class SharkCells {
         arc[k + 1] = arc[k] + this.segLen[k];
       }
       this.arcTotal = arc[N - 1] || 1;
-      // Banking into a turn: the inside fin foreshortens, the outside one spreads.
       const bank = clamp(sh.turn * 0.45, -0.35, 0.35);
       const flex = 1 + 0.06 * Math.sin(sh.phase * 0.5);
       const reachFin = this.shape.pectoral[3];
       this.finTipRight = L * reachFin * flex * (1 - bank);
       this.finTipLeft = L * reachFin * flex * (1 + bank);
 
-      // Candidate cells: each spine segment marks the cell centres within its own reach of it (the body's width there,
-      // or a fin's or the cephalofoil's), and each cell keeps the nearest point on the spine among the segments that
-      // reach it. A cell on the shark is within reach of its nearest segment, so that's the true nearest point, found
-      // once here; herdr's engine is far slower than a browser's, and the shape test below needs no search of its own.
       const diag = Math.hypot(cw, ch) / 2;
       const stamp = ++this.candidateFrame;
       const { candidate, candidateSeg, candidateDist, candidateU, candidateCross, segX, segY, segInv2 } = this;
@@ -330,9 +311,6 @@ export class SharkCells {
         const i = this.candidateList[j];
         const centerHit = this.classify(candidateDist[i], candidateSeg[i], candidateU[i], candidateCross[i], L);
         const flag = this.hitFlag, shade = this.hitShade, s = this.hitS, v = this.hitV;
-        // How much of the cell the body covers, from how far its centre is inside the outline (the original
-        // supersampled every edge cell, too slow here): the cell's own depth across the outline is its width and
-        // height weighed by the body's normal there. Fins and the cephalofoil count by their centre alone.
         let coverage = centerHit ? 1 : 0;
         const onBody = !centerHit || (flag !== FLAG_FIN && !this.hitHead);
         if (onBody) {
@@ -341,7 +319,6 @@ export class SharkCells {
           coverage = centerHit ? Math.max(body, 0.6) : body;
         }
         if (coverage < 0.15) continue;
-        // Keyed to the body, so each glyph rides along with the skin.
         sharkKey[i] = (hash3(Math.round(s * 52), Math.round(v / (cw * 0.9)), sh.id) * 4294967295) >>> 0;
         sharkDepth[i] = sh.depth;
         sharkKind[i] = kindIndex;
@@ -378,7 +355,6 @@ export class SharkCells {
         const key = sharkKey[i], shade = step(sharkShade[i]);
         const dim = 0.7 + 0.3 * sharkDepth[i];
         const tint = SHAPES[KINDS[sharkKind[i]]].tint, tr = tint[0], tg = tint[1], tb = tint[2];
-        // Colours re-roll on a staggered clock, so the hide shimmers.
         const roll = hash3(key, Math.floor(t * 2.4 + (key % 997) / 97), 7);
         const accent = pal.accents[key % pal.accents.length];
         if (flag === FLAG_EDGE) {
@@ -421,7 +397,6 @@ export class SharkCells {
       }
       const e = energy[i];
       if (e > 0.45) {
-        // The wake: where things swim, the water lights up.
         const lvl = clamp(Math.floor((e - 0.45) * 5), 0, 5);
         glyph[i] = lvl >= 2 ? "•" : "·";
         fg[i] = pal.mix(pal.wake[0], pal.wake[1], pal.wake[2], ((lvl + 1) / 6) * a);

@@ -2,8 +2,11 @@ import { appHome, exec } from "herdr";
 
 export function onWindows() { return appHome().includes("\\"); }
 
+/**
+ * Runs Python 3 with `args`: python3 here and on other machines, the py launcher (or python) on Windows; null when
+ * there's none.
+ */
 export async function python(args, opts) {
-  // Runs Python 3 with `args`: python3 here and on other machines, the py launcher (or python) on Windows; null when there's none.
   if (opts?.on || !onWindows()) return exec("python3", args, opts);
   for (const [cmd, pre] of [["py", ["-3"]], ["python", []]]) {
     const r = await exec(cmd, [...pre, ...args], opts).catch(() => null);
@@ -12,18 +15,18 @@ export async function python(args, opts) {
   return null;
 }
 
+/** A file of this mod, as a path for programs to open. */
 export function modFile(name) {
-  // A file of this mod, as a path for programs to open.
   return onWindows() ? `${appHome()}\\mods\\agent-chat\\${name}` : `${appHome()}/mods/agent-chat/${name}`;
 }
 
+/** `s` as a PowerShell single-quoted string. */
 export function psQuote(s) {
-  // `s` as a PowerShell single-quoted string.
   return `'${String(s).replace(/'/g, "''")}'`;
 }
 
+/** Text as base64 of its UTF-8 bytes (no Buffer or btoa here). */
 export function base64Utf8(text) {
-  // Text as base64 of its UTF-8 bytes (no Buffer or btoa here).
   const bytes = [];
   for (const ch of text) {
     const c = ch.codePointAt(0);
@@ -41,16 +44,19 @@ export function base64Utf8(text) {
   return out;
 }
 
+/** Deletes files on this computer, quietly (ones already gone are fine). */
 export function removeFiles(files) {
-  // Deletes files on this computer, quietly (ones already gone are fine).
   if (!files.length) return;
   (onWindows()
     ? exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath ${files.map(psQuote).join(", ")}`])
     : exec("rm", ["-f", "--", ...files])).catch(() => null);
 }
 
+/**
+ * Deletes the files in `dir`, and the folders in it, older than a day, except those named in `keep` and the folders
+ * named in `spare`.
+ */
 export function pruneOld(dir, keep = [], spare = []) {
-  // Deletes the files in `dir`, and the folders in it, older than a day, except those named in `keep` and the folders named in `spare`.
   const skip = [...keep.flatMap(name => ["!", "-name", name]), ...spare.flatMap(name => ["!", "-path", `*/${name}/*`])];
   (onWindows()
     ? exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",

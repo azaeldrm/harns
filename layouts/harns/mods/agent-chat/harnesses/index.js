@@ -7,31 +7,33 @@ import opencode from "./opencode.js";
 export const HARNESSES = Object.fromEntries([claudeCode, codex, pi, opencode].map(h => [h.id, h]));
 export const SUPPORTED = Object.fromEntries(Object.values(HARNESSES).map(h => [h.id, h.label]));
 
+/** The adapter for an agent's app, or null when the chat doesn't support it. */
 export function harnessFor(app) {
-  // The adapter for an agent's app, or null when the chat doesn't support it.
   return HARNESSES[app] ?? null;
 }
 
+/** The supported harnesses' names as one phrase: "A, B or C". */
 export function supportedNames() {
-  // The supported harnesses' names as one phrase: "A, B or C".
   const names = Object.values(HARNESSES).map(h => h.label);
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : names.join("");
 }
 
+/** How this harness gets images here: pasting needs a pty, so on Windows a pasting harness gets the plain path. */
 export function imageStyle(h) {
-  // How this harness gets images here: pasting needs a pty, so on Windows a pasting harness gets the plain path.
   const style = h?.images ?? "path";
   return style === "paste" && onWindows() ? "path" : style;
 }
 
+/** Whether the chat and this harness's own box keep one draft (input-box.py needs a pty: not on Windows). */
 export function canMirror(h) {
-  // Whether the chat and this harness's own box keep one draft (input-box.py needs a pty: not on Windows).
   return Boolean(h?.mirror) && !onWindows();
 }
 
+/**
+ * Whether a message goes through the harness's daemon rather than typed into its terminal. Answers to a waiting prompt,
+ * commands, shell lines and skills stay typed, since the terminal handles those.
+ */
 export function viaDaemon(h, status, typed) {
-  // Whether a message goes through the harness's daemon rather than typed into its terminal. Answers to a waiting prompt,
-  // commands, shell lines and skills stay typed, since the terminal handles those.
   if (!h?.daemon || status === "blocked" || /^[/!]/.test(typed)) return false;
   const invoke = h.skills?.invoke ?? "";
   return !(invoke && typed.split(/\s+/).some(w => w.length > 1 && w.startsWith(invoke)));
@@ -39,8 +41,8 @@ export function viaDaemon(h, status, typed) {
 
 function mention(path) { return /\s/.test(path) ? `@"${path}"` : `@${path}`; }
 
+/** The message as sent: images named the harness's way ahead of the text (pasted ones went first). */
 export function withImages(h, paths, text) {
-  // The message as sent: images named the harness's way ahead of the text (pasted ones went first).
   if (!paths.length) return text;
   const style = imageStyle(h);
   if (style === "paste") return text;
@@ -48,21 +50,21 @@ export function withImages(h, paths, text) {
   return [refs.join(" "), text].filter(Boolean).join(" ");
 }
 
+/** The chat's draft as the harness's own box shows it. */
 export function draftPastes(h, paths, text) {
-  // The chat's draft as the harness's own box shows it.
   if (h.images === "paste") return { pastes: [...paths, text], pasted: text };
   const refs = paths.map(p => h.images === "mention" ? mention(p) : p);
   const pasted = [refs.join(" "), text].filter(Boolean).join(" ");
   return { pastes: [pasted], pasted };
 }
 
+/** What the text became in the box, the images left out (pasted images show as placeholders). */
 export function textOfBox(h, box) {
-  // What the text became in the box, the images left out (pasted images show as placeholders).
   return h.images === "paste" ? box.replace(/\[Image #\d+\]\s?/g, "").trim() : box;
 }
 
+/** The harness's box read back into the chat's draft. */
 export function readBack(h, box, m) {
-  // The harness's box read back into the chat's draft.
   let s = box;
   if (m && m.textBox && m.textBox !== m.pasted && s.includes(m.textBox)) s = s.replace(m.textBox, m.pasted);
   const kept = [];

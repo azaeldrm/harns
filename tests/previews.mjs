@@ -65,8 +65,6 @@ writeFileSync(tiny, tinyBytes);
 check("a small placed image is fetched as it is", await live.fetchSent(tiny, null), "local~t7~tiny.png");
 check("byte for byte", [...readFileSync(join(sentHere, "local~t7~tiny.png"))], [...tinyBytes]);
 check("a missing one gives nothing", await live.fetchSent(join(away, "gone.png"), null), null);
-// Another machine's image comes through `hc exec`, faked here by a shell script on PATH: Linux and macOS only (Windows
-// runs neither an extensionless script nor a ":"-separated PATH).
 if (process.platform !== "win32") {
   const fakeBin = join(real.dir, "bin"), elsewhere = join(away, "from-box.png");
   mkdirSync(fakeBin);
@@ -78,7 +76,6 @@ if (process.platform !== "win32") {
   check("every byte intact, zero bytes and all", [...readFileSync(join(sentHere, "box~t7~from-box.png"))], [...moreBytes]);
   check("one that isn't there leaves nothing behind", [await live.fetchSent(join(away, "gone2.png"), "box"), existsSync(join(sentHere, "box~t7~gone2.png"))], [null, false]);
 }
-// prepare-image.sh shrinks with ImageMagick on Linux and macOS (Windows uses prepare-image.ps1).
 const hasMagick = process.platform !== "win32" && spawnSync("sh", ["-c", "command -v magick || command -v convert"]).status === 0;
 if (hasMagick) {
   const big = join(away, "big.png");

@@ -1,16 +1,5 @@
 #!/bin/sh
 # harns: points adb at this session's Simulator, then runs this machine's own adb.
-#
-# Installed by harns's Simulator panel as ~/.local/bin/adb on machines whose sessions have an
-# emulator. Each session's emulator (on the computer showing harns) reaches this machine's adb
-# server through an SSH tunnel as 127.0.0.1:<port>; ~/.config/harness/devices lists, per herdr
-# terminal, which one is its own:
-#
-#   <terminal id> <serial>     an agent or sub-agent terminal, and its session's emulator
-#
-# In a terminal listed there (HC_TERMINAL_ID), adb defaults to that emulator (ANDROID_SERIAL),
-# and `adb devices` leaves out the other sessions' emulators; phones and anything else still
-# show. Anywhere else, adb runs exactly as it would without this script.
 
 self_dir=$(cd "$(dirname "$0")" && pwd)
 real=
@@ -34,9 +23,6 @@ if [ -z "$ANDROID_SERIAL" ] && [ -n "$mine" ]; then
   ANDROID_SERIAL=$mine
   export ANDROID_SERIAL
 elif [ -z "$ANDROID_SERIAL" ] && [ -n "$HC_TERMINAL_ID" ] && [ -s "$map" ]; then
-  # A session without its own emulator never lands on another session's: with only one
-  # device connected, adb would pick it unasked. One other device (a phone) is the default;
-  # with none, the target is a name no device has, so adb says so instead.
   others=$("$real" devices 2>/dev/null | awk -v map="$map" '
     BEGIN { while ((getline line < map) > 0) { split(line, f, " "); if (f[2] != "") harns[f[2]] = 1 } }
     NR > 1 && $2 == "device" && !($1 in harns) { print $1 }')

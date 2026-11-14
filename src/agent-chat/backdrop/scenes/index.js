@@ -1,5 +1,3 @@
-// Every scene the backdrop can show, in the order the chat's button steps through them: the shared list of names
-// (harns Settings offers the same ones), each with how to make it.
 import { SCENE_NAMES } from "../../backdrop-scenes.js";
 import { SharksScene } from "./sharks/scene.js";
 import { SkyScene } from "./sky.js";

@@ -18,8 +18,6 @@ const STYLES = [
   { id: "tree", name: "Tree", about: "Agents hang from their machine on lines." },
 ];
 
-// The chat's backgrounds: its animated scenes. A card's picture is PREVIEW_W × PREVIEW_H inside its border (a card is
-// 168 wide with 6 px of padding, its picture box 92 tall).
 const PREVIEW_W = 154, PREVIEW_H = 90;
 const BACKGROUNDS = SCENE_NAMES.map(s => ({ id: s.id, name: s.label, about: `${s.about} Dimmed, and slower behind a conversation.` }));
 
@@ -27,7 +25,6 @@ const CONTEXT_BARS = [
   { id: "fill", name: "Fill", about: "Fills up as a session uses its context window: gray, amber past 75%, red past 90%." },
   { id: "health", name: "Health bar", about: "Drains as a session uses its context window: green, amber below 45% left, red below 25%." },
 ];
-
 
 export default class HarnessSettings extends View {
   init(_props, cx) {
@@ -45,13 +42,13 @@ export default class HarnessSettings extends View {
     this.name.on("blur", (_e, cx) => { this.typing = false; cx.notify(); });
   }
 
+  /** A group's title, as Herdr's settings write them. */
   heading(t, text) {
-    // A group's title, as Herdr's settings write them.
     return div().pt(6).pb(8).text_size(12).font_semibold().text_color(t.dim).child(text.toUpperCase());
   }
 
+  /** One setting: what it is on the left, the control on the right. */
   row(t, title, about, control) {
-    // One setting: what it is on the left, the control on the right.
     return h_flex().w_full().gap(16).py(12).items_center().border_b(1).border_color(t.border)
       .child(v_flex().flex_1().min_w(0).gap(3)
         .child(div().text_size(14).text_color(t.foreground).child(title))
@@ -59,21 +56,21 @@ export default class HarnessSettings extends View {
       .child(div().flex_none().child(control));
   }
 
+  /** An on/off switch, as Herdr's settings draw it. */
   toggle(t, id, on, onClick) {
-    // An on/off switch, as Herdr's settings draw it.
     return div().id(id).w(36).h(20).rounded(10).p(2).cursor_pointer().bg(on ? t.accent : t.hover).flex()
       .when(on, el => el.justify_end()).on_click(onClick)
       .child(div().w(16).h(16).rounded(8).bg(on ? t.accent_foreground ?? t.background : t.muted));
   }
 
+  /** A row switching a shared value that's on unless set to false. */
   flag(t, key, title, about, onChange) {
-    // A row switching a shared value that's on unless set to false.
     const on = shared(key) !== false;
     return this.row(t, title, about, this.toggle(t, `flag-${key}`, on, () => { setShared(key, !on); onChange?.(!on); }));
   }
 
+  /** This computer's name in the sidebar and the status bar. */
   general(t) {
-    // This computer's name in the sidebar and the status bar.
     return v_flex().w_full()
       .child(this.heading(t, "This computer"))
       .child(this.row(t, "Name", "How this computer is called in the sidebar and the status bar. Empty: its hostname.",
@@ -82,9 +79,11 @@ export default class HarnessSettings extends View {
           .child(Input.new(this.name).h_full().text_size(13).text_color(t.foreground))));
   }
 
+  /**
+   * One option as Herdr's settings show layouts: a picture of it, its name under it with a check when it's the one in
+   * use, the chosen card outlined in amber. With `bleed` the picture fills its box to the edges.
+   */
   card(t, id, name, chosen, preview, onClick, bleed = false) {
-    // One option as Herdr's settings show layouts: a picture of it, its name under it with a check when it's the one in
-    // use, the chosen card outlined in amber. With `bleed` the picture fills its box to the edges.
     return v_flex().id(id).w(168).p(6).gap(8).rounded(10).border_1().border_color(chosen ? t.accent : "#00000000")
       .cursor_pointer().hover(s => s.bg(t.raised)).on_click(onClick)
       .child(div().relative().w_full().h(92).flex().flex_col().justify_center().rounded(7).bg(bleed ? t.background : t.surface ?? t.background).border_1().border_color(t.border).overflow_hidden()
@@ -95,8 +94,8 @@ export default class HarnessSettings extends View {
         .when(chosen, el => el.child(svg("mods/harns-settings/icons/check.svg").size(13).text_color(t.accent))));
   }
 
+  /** A choice between options, drawn as cards, and what the chosen one does under them. */
   cards(t, options, chosen, preview, choose, bleed = false) {
-    // A choice between options, drawn as cards, and what the chosen one does under them.
     const now = options.find(o => o.id === chosen);
     return v_flex().w_full().gap(10).pb(18).border_b(1).border_color(t.border)
       .child(h_flex().gap(10).flex_wrap()
@@ -104,8 +103,8 @@ export default class HarnessSettings extends View {
       .when(Boolean(now?.about), el => el.child(div().px(2).text_size(12.5).line_height("18px").text_color(t.dim).child(now.about)));
   }
 
+  /** A machine with three agents, drawn small in a style: Classic boxed with its rings, Tree hanging from lines. */
   stylePreview(t, id) {
-    // A machine with three agents, drawn small in a style: Classic boxed with its rings, Tree hanging from lines.
     const line = (w, c) => div().h(3).w(w).flex_none().rounded_full().bg(c);
     const dot = c => div().size(5).flex_none().rounded(1.5).bg(c);
     const agent = w => h_flex().gap(5).items_center().child(dot(t.muted)).child(line(w, t.dim));
@@ -122,8 +121,8 @@ export default class HarnessSettings extends View {
         .children([62, 48, 56].map(w => h_flex().relative().child(div().absolute().left(-8).top(1).w(6).h(1).bg(t.dim)).child(agent(w)))));
   }
 
+  /** Three sessions' context bars as a style draws them: early, halfway, nearly full. */
   barPreview(t, id) {
-    // Three sessions' context bars as a style draws them: early, halfway, nearly full.
     const crit = "#d88179";
     const bars = id === "health"
       ? [[80, t.ansi2 ?? t.done], [40, t.working], [18, crit]]
@@ -135,9 +134,11 @@ export default class HarnessSettings extends View {
           .child(div().h_full().rounded_full().w(Math.round(96 * share / 100)).bg(color)))));
   }
 
+  /**
+   * A frame of the scene itself (scene-previews.js), its 13 px cells shrunk to fill the card's picture, in the chat's
+   * mono font; its colours are tints that sit on the theme's background.
+   */
   backgroundPreview(t, id) {
-    // A frame of the scene itself (scene-previews.js), its 13 px cells shrunk to fill the card's picture, in the chat's
-    // mono font; its colours are tints that sit on the theme's background.
     const p = SCENE_PREVIEWS[id];
     if (!p) return div();
     const cw = PREVIEW_W / p.cols, ch = PREVIEW_H / p.rows;
@@ -153,8 +154,8 @@ export default class HarnessSettings extends View {
       .children(runs);
   }
 
+  /** The sidebar's look (one of the styles) and how its agents' context bars read, each a row of picture cards. */
   sidebar(t) {
-    // The sidebar's look (one of the styles) and how its agents' context bars read, each a row of picture cards.
     const style = ["classic", "contained"].includes(shared("harness.sidebar")) ? "classic" : "tree";
     const bar = shared("harness.context-bar") === "health" ? "health" : "fill";
     return v_flex().w_full()
@@ -165,10 +166,12 @@ export default class HarnessSettings extends View {
       .child(this.cards(t, CONTEXT_BARS, bar, id => this.barPreview(t, id), id => setShared("harness.context-bar", id)));
   }
 
+  /**
+   * agent-chat's settings (its keys keep their herdr-chat. names): agents as a chat, and the background behind the
+   * chat: on unless `herdr-chat.animation` is false, playing one of its scenes (`herdr-chat.backdrop`). Picking a
+   * scene while it's off turns it on.
+   */
   chat(t) {
-    // agent-chat's settings (its keys keep their herdr-chat. names): agents as a chat, and the background behind the
-    // chat: on unless `herdr-chat.animation` is false, playing one of its scenes (`herdr-chat.backdrop`). Picking a
-    // scene while it's off turns it on.
     const scene = SCENE_NAMES.some(s => s.id === shared("herdr-chat.backdrop")) ? shared("herdr-chat.backdrop") : SCENE_NAMES[0].id;
     return v_flex().w_full()
       .child(this.heading(t, "Chat"))
@@ -184,8 +187,8 @@ export default class HarnessSettings extends View {
       }, true));
   }
 
+  /** The status bar at the bottom, and what it shows. */
   status(t) {
-    // The status bar at the bottom, and what it shows.
     return v_flex().w_full()
       .child(this.heading(t, "Status bar"))
       .child(this.flag(t, "harness.status", "Show the status bar", "The bar under the work area.",
@@ -195,8 +198,8 @@ export default class HarnessSettings extends View {
       .child(this.flag(t, "harness.commands-hint", "Commands hint", "The shortcut that opens the command palette, at the right end."));
   }
 
+  /** Whether the tab bar offers the Simulator panel. */
   simulator(t) {
-    // Whether the tab bar offers the Simulator panel.
     const supported = ["windows", "linux"].includes(window()?.platform);
     const on = shared("harness.simulator") !== false;
     return v_flex().w_full()

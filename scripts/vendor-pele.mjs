@@ -2,8 +2,6 @@ import { readFileSync, existsSync, mkdirSync, copyFileSync, rmSync, readdirSync,
 import { dirname, join, relative as nativeRelative, resolve } from "path";
 import { fileURLToPath } from "url";
 
-// Paths inside the copy, always with "/": on Windows path.relative answers with "\", which
-// wouldn't match the "diagrams/x.js" entries below.
 const relative = (from, to) => nativeRelative(from, to).split("\\").join("/");
 
 export const DIAGRAMS = ["flowchart", "sequence", "state", "class", "er", "gantt", "pie", "mindmap", "timeline", "gitGraph"];
@@ -11,7 +9,6 @@ export const DIAGRAMS = ["flowchart", "sequence", "state", "class", "er", "gantt
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = join(root, "node_modules", "pele");
 const esm = join(pkg, "dist", "esm");
-// Both mods that draw mermaid carry the same copy: the Files panel and the chat.
 const OUTS = ["markdown-files", "agent-chat"].map(mod => join(root, "src", mod, "vendor", "pele"));
 const check = process.argv.includes("--check");
 

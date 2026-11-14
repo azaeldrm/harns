@@ -9,15 +9,21 @@ const ROWS = 8;
 const FRESH_MS = 30000;
 
 export class SkillMenu {
+  /**
+   * The list of an agent's skills above the reply box, as the agent's own terminal offers them. `host` is the composer:
+   * its `input` and `keepDraft`. Lists load in the background and filter in memory, so typing never waits.
+   */
   constructor(host) {
-    // The list of an agent's skills above the reply box, as the agent's own terminal offers them. `host` is the composer: its `input` and `keepDraft`. Lists load in the background and filter in memory, so typing never waits.
     this.host = host;
     this.lists = new Map();
     this.index = 0;
   }
 
+  /**
+   * Keeps the shown agent's list fresh: on switching to it, when its session starts, and every so often while the menu
+   * shows.
+   */
   warm(t, path, cx) {
-    // Keeps the shown agent's list fresh: on switching to it, when its session starts, and every so often while the menu shows.
     if (!t?.harness.skills) return;
     const key = sessionOf(t), have = this.lists.get(key);
     const open = Boolean(this.view(t));
@@ -32,8 +38,8 @@ export class SkillMenu {
     });
   }
 
+  /** What the menu shows now: the token being typed and its matches, or null when it's closed. */
   view(t) {
-    // What the menu shows now: the token being typed and its matches, or null when it's closed.
     const skills = t?.harness.skills;
     if (!skills) return null;
     const text = this.host.input.value();
@@ -47,8 +53,8 @@ export class SkillMenu {
     return { token, items, invoke: skills.invoke };
   }
 
+  /** ↑ or ↓ while it's open moves the selection, wrapping; false when it's closed. */
   move(t, dir, cx) {
-    // ↑ or ↓ while it's open moves the selection, wrapping; false when it's closed.
     const v = this.view(t);
     if (!v) return false;
     this.index = (this.index + dir + v.items.length) % v.items.length;
@@ -56,8 +62,8 @@ export class SkillMenu {
     return true;
   }
 
+  /** Puts the skill in the box; false when the menu is closed. */
   accept(t, cx, index = this.index) {
-    // Puts the skill in the box; false when the menu is closed.
     const v = this.view(t);
     if (!v) return false;
     const text = withSkill(this.host.input.value(), v.token, v.invoke, v.items[index].name);
@@ -69,16 +75,16 @@ export class SkillMenu {
     return true;
   }
 
+  /** Esc closes it until the text changes; false when it's closed. */
   dismiss(t, cx) {
-    // Esc closes it until the text changes; false when it's closed.
     if (!this.view(t)) return false;
     this.dismissed = this.host.input.value();
     cx.notify();
     return true;
   }
 
+  /** The menu, floating above the reply box so the conversation doesn't move; null when it's closed. */
   render(t, active) {
-    // The menu, floating above the reply box so the conversation doesn't move; null when it's closed.
     const v = this.view(active);
     if (!v) return null;
     const first = Math.max(0, Math.min(this.index - Math.floor(ROWS / 2), v.items.length - ROWS));

@@ -1,8 +1,8 @@
 const psString = s => `'${String(s).replace(/'/g, "''")}'`;
 const pyString = s => JSON.stringify(String(s));
 
+/** Windows: PowerShell with CIM counters. */
 export function windowsProbe(queries) {
-  // Windows: PowerShell with CIM counters.
   return `
 $ErrorActionPreference = 'Stop'
 $cpu = Get-CimInstance Win32_PerfRawData_PerfOS_Processor -Filter "Name='_Total'"
@@ -22,8 +22,8 @@ foreach ($q in @($queries)) {
 `;
 }
 
+/** Windows: the account probe in PowerShell (see pythonAccountProbe). */
 export function windowsAccountProbe(services) {
-  // Windows: the account probe in PowerShell (see pythonAccountProbe).
   return `
 $ErrorActionPreference = 'Stop'
 $wanted = ${psString(JSON.stringify(services))} | ConvertFrom-Json
@@ -99,8 +99,8 @@ for q in json.loads(${pyString(JSON.stringify(queries))}):
         pass
 `;
 
+/** Linux and macOS: the account probe in Python 3. */
 export function pythonAccountProbe(services) {
-  // Linux and macOS: the account probe in Python 3.
   return `
 import datetime, json, os, select, shutil, subprocess, sys, time, urllib.error, urllib.request
 wanted = json.loads(${pyString(JSON.stringify(services))})
@@ -207,8 +207,8 @@ print(json.dumps(out))
 `;
 }
 
+/** Linux: Python 3 reading /proc. */
 export function linuxProbe(queries) {
-  // Linux: Python 3 reading /proc.
   return `${pythonGpus(queries)}
 import time
 def cpu():
@@ -225,8 +225,8 @@ print(json.dumps(dict(cpu=100*(1-(j-i)/(b-a)) if b>a else None, memory=100*(1-me
 `;
 }
 
+/** macOS: Python 3 with top, vm_stat and sysctl. */
 export function macosProbe(queries) {
-  // macOS: Python 3 with top, vm_stat and sysctl.
   return `${pythonGpus(queries)}
 import re
 cpu = None

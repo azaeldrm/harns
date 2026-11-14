@@ -18,9 +18,7 @@ const SHAPE = {
   box: (v, h) => v === null ? h.mirror === false : Boolean(v && (v.style === "rules" || (v.style === "mark" && typeof v.mark === "string" && v.mark.length > 0))),
   skills: v => Boolean(v && Array.isArray(v.triggers) && v.triggers.length && typeof v.invoke === "string" && v.triggers.includes(v.invoke[0]) && Array.isArray(v.user) && Array.isArray(v.project) && Array.isArray(v.skip) && Object.keys(v).every(k => ["triggers", "invoke", "user", "project", "skip", "enterTwice"].includes(k))),
   reader: v => typeof v === "string" && v.length > 0,
-  // Optional: its permission modes' names, by the word its log records.
   modes: v => v === undefined || Boolean(v && typeof v === "object" && Object.values(v).every(n => typeof n === "string" && n)),
-  // Optional: the models and efforts the chat offers, and how it switches them ({model} and {effort} filled in; nextMode: keys).
   models: v => v === undefined || (Array.isArray(v) && v.every(m => m && typeof m.id === "string" && typeof m.name === "string")),
   efforts: v => v === undefined || (Array.isArray(v) && v.every(e => typeof e === "string" && e)),
   switching: v => v === undefined || Boolean(v && typeof v === "object" && ["model", "effort"].every(k => v[k] === undefined || typeof v[k] === "string")
@@ -52,8 +50,8 @@ check("an agent without a daemon types every message", viaDaemon(HARNESSES["clau
 const ids = Object.keys(HARNESSES);
 const literal = new RegExp(`["'](${ids.map(i => i.replace(/[-]/g, "\\-")).join("|")})["']`);
 const ALLOWED = [/^harnesses\//, /^readers\/(?!common\.py$|main\.py$)/, /^vendor\//];
+/** Every file under dir, as paths relative to the mod. */
 function files(dir) {
-  // Every file under dir, as paths relative to the mod.
   return readdirSync(dir).flatMap(f => statSync(join(dir, f)).isDirectory() ? files(join(dir, f)) : [join(dir, f)]);
 }
 for (const file of files(MOD).filter(f => /\.(js|py|ps1|sh)$/.test(f))) {

@@ -1,14 +1,9 @@
-// Jellyfish: big translucent bells drawn as shaded tiles (cells with a background and a glyph), pulsing slowly and
-// rising on each squeeze, tilting as they drift. From the middle of each bell hang frilly oral arms; from its rim,
-// long thin tentacles that trail and curl behind it. Far ones are smaller and fainter. Plankton drift between them;
-// the pointer pushes the plankton, and a click makes the nearest jellyfish pulse hard.
 import { Grid } from "../grid.js";
 import { clamp, hash3 } from "../vendor/ascii-sharks/math.js";
 
 const HUES = [[86, 204, 184], [150, 126, 232], [96, 186, 228], [120, 214, 170]];
 const TILES = "o%tS8#@X";
 const TENTACLE_SEGMENTS = 22, ARM_SEGMENTS = 16;
-// They glow: drawn this much brighter than the page's dim, so they stand out the way the sharks' bulk does.
 const GLOW = 2.2;
 
 export class JellyfishScene {
@@ -28,7 +23,6 @@ export class JellyfishScene {
     const n = Math.max(3, Math.min(5, Math.round(width / 300)));
     this.jellies = [];
     for (let k = 0; k < n; k++) this.jellies.push(this.jelly(((k + 0.3 + Math.random() * 0.4) / n) * width, height * (0.15 + Math.random() * 0.85), k));
-    // Deeper ones first, so the near ones draw over them.
     this.jellies.sort((a, b) => a.depth - b.depth);
     this.plankton = [];
     for (let k = 0; k < Math.round((width * height) / 6000); k++) this.plankton.push({ x: Math.random() * width, y: Math.random() * height, vx: 0, vy: 0, b: 0.15 + Math.random() * 0.4 });
@@ -62,7 +56,6 @@ export class JellyfishScene {
     const { W, H } = this, p = this.pointer, t = this.time;
     for (const j of this.jellies) {
       j.phase += dt * j.rate * Math.PI * 2;
-      // A squeeze pushes the bell up; between squeezes it sinks back a little.
       const squeeze = Math.max(0, Math.sin(j.phase)) + j.kick;
       j.kick = Math.max(0, j.kick - dt * 1.2);
       j.vy += (-squeeze * 34 * (0.6 + 0.4 * j.depth) - j.vy * 1.2 + 4) * dt;
@@ -74,7 +67,6 @@ export class JellyfishScene {
         for (const c of [...j.tentacles, ...j.arms]) for (const q of c.pts) { q[0] = j.x; q[1] = j.y; }
       }
       const squash = 1 - Math.max(0, Math.sin(j.phase)) * 0.16;
-      // Each strand hangs from the rim (tentacles) or the middle (arms), every point following the one above it.
       const hang = (c, rootX, rootY, seg, sway) => {
         const pts = c.pts;
         pts[0][0] = rootX; pts[0][1] = rootY;
@@ -103,13 +95,11 @@ export class JellyfishScene {
     for (const q of this.plankton) g.put(g.at(q.x, q.y), "·", pal.mix(150, 200, 220, q.b * a));
     for (const j of this.jellies) {
       const [hr, hg, hb] = j.hue, da = Math.min(1, a * GLOW) * (0.35 + 0.65 * j.depth);
-      // Tentacles: thin, fading toward their ends.
       for (const c of j.tentacles) c.pts.forEach(([x, y], s) => {
         if (s === 0) return;
         const f = 1 - s / TENTACLE_SEGMENTS, i = g.at(x, y);
         if (i >= 0 && g.bg[i] === null) g.put(i, f > 0.6 ? ":" : f > 0.3 ? "'" : ".", pal.mix(hr, hg, hb, (0.25 + 0.6 * f) * da));
       });
-      // Oral arms: frilly ribbons two cells wide, tiled.
       for (const c of j.arms) c.pts.forEach(([x, y], s) => {
         const f = 1 - s / ARM_SEGMENTS, frill = Math.sin(t * 2 + c.phase + s * 1.3) * cw * 0.8;
         for (const off of [-cw * 0.5 + frill, cw * 0.5 + frill]) {
@@ -120,8 +110,6 @@ export class JellyfishScene {
           g.put(i, TILES[key % TILES.length], pal.mix(hr * 0.22, hg * 0.22, hb * 0.22, da));
         }
       });
-      // The bell: a dome over a scalloped rim, squashing wide and low on each squeeze. Lit from above, densest at the
-      // rim, with faint radial canals; each tile's glyph rides with the bell.
       const sq = Math.max(0, Math.sin(j.phase)) * 0.16, rx = j.R * 0.82 * (1 + sq * 0.5), ry = j.R * 0.86 * (1 - sq), rim = j.R * 0.1;
       const reach = Math.hypot(rx, ry) + Math.hypot(cw, ch);
       const c0 = Math.max(0, Math.floor((j.x - reach) / cw)), c1 = Math.min(cols - 1, Math.floor((j.x + reach) / cw));

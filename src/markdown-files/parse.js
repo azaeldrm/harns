@@ -1,11 +1,11 @@
-// Pure Markdown helpers (no herdr imports), so tests/markdown.mjs can load them in node.
-
 export const MARKDOWN = new Set(["md", "markdown", "mdown", "mkd", "mkdn"]);
 export const MERMAID = new Set(["mmd", "mermaid"]);
+/**
+ * The document as blocks: { kind: "text" | "code" | "diagram" | "front", text, lang? }, or a table.
+ * Fences follow CommonMark: ``` or ~~~, up to 3 spaces of indent, closed by the same
+ * character at least as long; an unclosed fence runs to the end.
+ */
 export function parse(text) {
-  // The document as blocks: { kind: "text" | "code" | "diagram" | "front", text, lang? }, or a table.
-  // Fences follow CommonMark: ``` or ~~~, up to 3 spaces of indent, closed by the same
-  // character at least as long; an unclosed fence runs to the end.
   const lines = text.replace(/\r\n?/g, "\n").split("\n"), out = [];
   let i = 0, prose = [];
   const flush = () => { for (const b of tables(prose)) out.push(b); prose = []; };
@@ -31,8 +31,8 @@ export function parse(text) {
 
 const SEP = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 
+/** A table row's cells: pipes split them, except escaped ones and those inside `code`. */
 function cells(line) {
-  // A table row's cells: pipes split them, except escaped ones and those inside `code`.
   const out = [], body = line.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "");
   let cell = "", code = false;
   for (let i = 0; i < body.length; i++) {
@@ -45,8 +45,8 @@ function cells(line) {
   return out;
 }
 
+/** Prose lines as text blocks, with GFM tables taken out as { kind: "table", head, align, rows }. */
 function tables(lines) {
-  // Prose lines as text blocks, with GFM tables taken out as { kind: "table", head, align, rows }.
   const out = []; let text = [];
   const flush = () => { for (const b of pictures(text)) out.push(b); text = []; };
   for (let i = 0; i < lines.length; i++) {
@@ -66,8 +66,6 @@ function tables(lines) {
   return out;
 }
 
-// ![alt](src "title"), the same wrapped in a link ([![alt](src)](href)), or an HTML <img>.
-// A data: URI may hold raw spaces (an inline SVG): not CommonMark, but written often enough.
 const SRC = String.raw`\(\s*(?:<([^>]*)>|(data:[^)]+?|[^\s)]+))(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)`;
 const PICTURE = new RegExp(String.raw`\[!\[([^\]]*)\]${SRC}\]\(\s*<?([^\s)>]+)>?[^)]*\)|!\[([^\]]*)\]${SRC}|<img\b[^>]*>`, "gi");
 
@@ -76,8 +74,8 @@ function attr(tag, name) {
   return m ? m[1] ?? m[2] ?? m[3] : null;
 }
 
+/** One match of PICTURE as { src, alt, href?, width?, height? }, or null for an <img> without a src. */
 function picture(m) {
-  // One match of PICTURE as { src, alt, href?, width?, height? }, or null for an <img> without a src.
   if (m[0][0] === "<") {
     const src = attr(m[0], "src");
     if (!src) return null;
@@ -88,16 +86,17 @@ function picture(m) {
   return { alt: m[5], src: m[6] ?? m[7] };
 }
 
+/**
+ * Prose lines as text blocks, with images taken out as rows of their own:
+ * { kind: "images", items }. Images on one line (a row of badges) share a row.
+ * Lines inside an indented code block or an inline `code` span are left alone.
+ */
 function pictures(lines) {
-  // Prose lines as text blocks, with images taken out as rows of their own:
-  // { kind: "images", items }. Images on one line (a row of badges) share a row.
-  // Lines inside an indented code block or an inline `code` span are left alone.
   const out = []; let text = [];
   const flush = () => { const t = text.join("\n"); if (t.trim()) out.push({ kind: "text", text: t }); text = []; };
   for (const line of lines) {
     if (/^( {4}|\t)/.test(line) || !/!\[|<img\b/i.test(line)) { text.push(line); continue; }
     const masked = line.replace(/`[^`]*`/g, s => " ".repeat(s.length));
-    // Masking only blanks code spans, so a match's groups are the line's own text.
     const items = [...masked.matchAll(PICTURE)].map(m => ({ at: m.index, end: m.index + m[0].length, item: picture(m) })).filter(f => f.item);
     if (!items.length) { text.push(line); continue; }
     let last = 0, row = [];
@@ -118,9 +117,11 @@ function pictures(lines) {
   return out;
 }
 
+/**
+ * Where an image's bytes come from: { web: url }, { data: uri }, { abs: path } (on the
+ * file's machine), or { rel: path } relative to the root; null when there's nothing to load.
+ */
 export function imageTarget(src, file) {
-  // Where an image's bytes come from: { web: url }, { data: uri }, { abs: path } (on the
-  // file's machine), or { rel: path } relative to the root; null when there's nothing to load.
   if (!src) return null;
   if (/^https?:\/\//i.test(src)) return { web: src };
   if (/^data:image\//i.test(src)) return { data: src };
@@ -132,9 +133,11 @@ export function imageTarget(src, file) {
   return { rel: resolveLink(file, path) };
 }
 
+/**
+ * A link in the file at `from` (relative to the root) as a root-relative path, or null for
+ * anything that isn't a file next to it (a web address, an anchor, an absolute path).
+ */
 export function resolveLink(from, url) {
-  // A link in the file at `from` (relative to the root) as a root-relative path, or null for
-  // anything that isn't a file next to it (a web address, an anchor, an absolute path).
   if (!url || url.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("/") || url.startsWith("\\")) return null;
   let path;
   try { path = decodeURIComponent(url.split(/[?#]/)[0]); } catch { path = url.split(/[?#]/)[0]; }

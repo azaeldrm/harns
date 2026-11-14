@@ -16,8 +16,8 @@ check("reported pixels convert back to design px", near(designPx(864, 0.9), 960)
 check("a row measured at zoom 0.9 gets its full slot back", near(designHeight({ width: 666, height: 1561.68 }, 740), 1735.2), true);
 check("at zoom 1 a row's height is unchanged", designHeight({ width: 740, height: 400 }, 740), 400);
 
+/** The text of each .on_size_change(...) call in source. */
 function handlers(source) {
-  // The text of each .on_size_change(...) call in source.
   const out = [];
   for (let i = source.indexOf(".on_size_change("); i !== -1; i = source.indexOf(".on_size_change(", i + 1)) {
     let depth = 0, j = i + ".on_size_change".length;
@@ -26,8 +26,8 @@ function handlers(source) {
   }
   return out;
 }
+/** Every .js file under dir except vendored code. */
 function files(dir) {
-  // Every .js file under dir except vendored code.
   return readdirSync(dir).flatMap(f => f === "vendor" ? [] : statSync(join(dir, f)).isDirectory() ? files(join(dir, f)) : f.endsWith(".js") ? [join(dir, f)] : []);
 }
 for (const path of files(MOD).filter(f => !f.endsWith("measure.js"))) {

@@ -3,15 +3,14 @@ import { h_flex } from "gpui-base";
 import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings } from "herdr";
 import { find } from "./layout.js";
 
-
 export default class Tabs extends View {
   init() {
     this.pressed = null;
     this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
   }
 
+  /** The side panel is remembered per space. */
   syncPanel(space, panel, body, enabled) {
-    // The side panel is remembered per space.
     if (!space || !panel) return;
     const now = panel.hidden ? null : body?.active ?? null;
     if (space.id !== this.space) {
@@ -67,7 +66,6 @@ export default class Tabs extends View {
       ? Math.max(10, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
       : 10;
     const panel = find(root, "panel"), body = find(root, "panel-body");
-    // The Simulator panel runs Android's emulator on Windows and Linux.
     const enabled = [...(shared("workspace.panels") ?? ["files", "changes"]), ...(["windows", "linux"].includes(w?.platform) && shared("harness.simulator") !== false ? ["simulator"] : [])];
     this.syncPanel(space, panel, body, enabled);
     const panelButton = (id, label, icon) => {

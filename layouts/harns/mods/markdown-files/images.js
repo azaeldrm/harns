@@ -1,7 +1,3 @@
-// Images in a Markdown file, copied into ~/.config/herdr-app/cache/markdown-files/images so that
-// herdr's image() can show them (it only reads paths under the app's own folder), the way
-// diagrams.js caches Pele's drawings. Sources: a file beside the document (on its machine),
-// an absolute path, or a data: URI. Web addresses are never fetched: markdown.js shows them as links.
 import { appHome, exec, window } from "herdr";
 import * as fs from "fs/promises";
 import { Buffer } from "buffer";
@@ -17,10 +13,12 @@ const onWindows = () => appHome().includes("\\");
 const cacheDir = () => onWindows() ? `${appHome()}\\cache\\markdown-files\\images` : `${appHome()}/${DIR}`;
 const reason = err => String(err?.message ?? err).split("\n")[0].slice(0, 160);
 
+/**
+ * The cached copy of an image ({ state: "loading" | "ready" | "failed", rel, width, height, error }),
+ * started the first time it's asked for. `target` comes from parse.js's imageTarget;
+ * `where` is { root, on }: the document's folder root and machine.
+ */
 export function imageFor(target, where) {
-  // The cached copy of an image ({ state: "loading" | "ready" | "failed", rel, width, height, error }),
-  // started the first time it's asked for. `target` comes from parse.js's imageTarget;
-  // `where` is { root, on }: the document's folder root and machine.
   if (!target || target.web) return { state: "failed", error: "Unsupported image address" };
   const key = JSON.stringify([target, target.data ? null : where.on ?? null, target.rel ? where.root : null]);
   let e = entries.get(key);
@@ -34,13 +32,13 @@ export function imageFor(target, where) {
   return e;
 }
 
+/** Drops what's known, so opening a document reads its images again (they may have changed). */
 export function forgetImages() {
-  // Drops what's known, so opening a document reads its images again (they may have changed).
   for (const [k, e] of entries) if (e.state !== "loading") entries.delete(k);
 }
 
+/** Whether an image finished (or failed) since the last call: the view redraws then. */
 export function takeChanged() {
-  // Whether an image finished (or failed) since the last call: the view redraws then.
   const was = changed; changed = false; return was;
 }
 
@@ -70,10 +68,12 @@ async function load(target, where) {
   return { rel: `${DIR}/${name}`, width: info.width || 400, height: info.height || 300 };
 }
 
+/**
+ * herdr's writeFile writes binary data as an empty file while reporting success (text comes out whole), so a copy
+ * only counts once it reads back whole. Otherwise it goes down as base64 text, decoded beside it by the system's
+ * own tools: PowerShell on Windows, Python 3 (else base64) elsewhere.
+ */
 async function save(dest, bytes) {
-  // herdr's writeFile writes binary data as an empty file while reporting success (text comes out whole), so a copy
-  // only counts once it reads back whole. Otherwise it goes down as base64 text, decoded beside it by the system's
-  // own tools: PowerShell on Windows, Python 3 (else base64) elsewhere.
   await fs.writeFile(dest, bytes).catch(() => {});
   if (((await readBytes(dest))?.length ?? -1) === bytes.length) return true;
   const text = `${dest}.b64`;
@@ -99,9 +99,6 @@ async function bytesOf(target, { root, on }) {
   }
   const path = target.abs ?? `${root}/${target.rel}`;
   if (!on) {
-    // fs reads only under the home folder (and refuses others by throwing, not rejecting);
-    // elsewhere (another drive) the shell reads it.
-    // A missing file reads as empty, not as an error: the shell then says which it is.
     const local = await readBytes(path);
     if (local?.length) return local;
   }
@@ -112,10 +109,10 @@ async function readBytes(path) {
   try { return await fs.readFile(path); } catch { return null; }
 }
 
+/** The file's bytes as base64 through a shell on its machine (exec's output is text). */
 async function shellBytes(path, on) {
-  // The file's bytes as base64 through a shell on its machine (exec's output is text).
+  /** A .NET exception doesn't end the script with an error code: check first, exit with ours. */
   const powershell = async () => {
-    // A .NET exception doesn't end the script with an error code: check first, exit with ours.
     const script = "& { param($p) if (-not [IO.File]::Exists($p)) { exit 2 }; if ((Get-Item -LiteralPath $p).Length -gt " + MAX_BYTES + ") { exit 3 }; [Convert]::ToBase64String([IO.File]::ReadAllBytes($p)) } '" + path.replace(/['‘’‚‛]/g, "$&$&") + "'";
     return exec("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], { on });
   };
@@ -134,7 +131,6 @@ async function shellBytes(path, on) {
   return fromBase64(r.stdout);
 }
 
-// herdr's Buffer decodes natively; a per-character loop over megabytes of base64 stalls its engine.
 function fromBase64(text) { return new Uint8Array(Buffer.from(text, "base64")); }
 
 function fromText(text) { return new Uint8Array(Buffer.from(text, "utf8")); }

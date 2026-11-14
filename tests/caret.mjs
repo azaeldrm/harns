@@ -15,8 +15,8 @@ check(lineMove("ab\n\ncd", 1, 1).at, 3, "an empty line in between");
 const emoji = "x😀y\nabc";
 check(lineMove(emoji, 6, -1).at, 1, "↑ to a column before an emoji");
 check(lineMove(emoji, 7, -1).at, 1, "never lands between an emoji's two halves (column 2 is inside it)");
+/** A stand-in textarea: text with a selection, which replace() types over. */
 const box = (text, start, end, failOnReplace = false) => {
-  // A stand-in textarea: text with a selection, which replace() types over.
   let value = text, sel = { start, end };
   return {
     value: () => value,

@@ -1,5 +1,3 @@
-// The stats and account probes, run the way each platform runs them: the Python probes on
-// Linux and macOS (the machines that use them), the PowerShell probes on Windows.
 import { linuxProbe, macosProbe, pythonAccountProbe, windowsProbe, windowsAccountProbe } from '../layouts/harns/mods/harns-status/probes.js';
 import { execFileSync, spawnSync } from 'child_process';
 import { chmodSync, mkdtempSync, writeFileSync } from 'fs';
@@ -10,7 +8,6 @@ let failed = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : `: ${detail}`}`); if (!ok) failed++; };
 const windows = process.platform === 'win32';
 
-// A stand-in for `codex app-server`, in Node so it runs anywhere this test does.
 const bin = mkdtempSync(join(tmpdir(), 'harness-codex-'));
 writeFileSync(join(bin, 'codex.mjs'), `
 import { createInterface } from 'readline';
@@ -34,14 +31,12 @@ const home = mkdtempSync(join(tmpdir(), 'harness-probe-'));
 
 let run;
 if (windows) {
-  // Only Windows' own folders on PATH, so a codex installed here isn't found.
   const root = process.env.SystemRoot || 'C:\\Windows';
   const system = [`${root}\\System32`, root, `${root}\\System32\\WindowsPowerShell\\v1.0`];
   run = (script, withCodex) => JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
     env: { SystemRoot: root, USERPROFILE: home, PATHEXT: '.COM;.EXE;.BAT;.CMD', PATH: [withCodex ? bin : null, ...system].filter(Boolean).join(';') },
     stdio: ['ignore', 'pipe', 'ignore'] }).toString());
 } else {
-  // Python 3 under whichever name this system gives it.
   const python = [['python3'], ['python'], ['py', '-3']].find(([exe, ...args]) =>
     spawnSync(exe, [...args, '-c', 'import sys; sys.exit(sys.version_info[0] != 3)']).status === 0);
   if (!python) { console.log('FAIL Python 3 is needed for these probes (python3, python or py -3)'); process.exit(1); }

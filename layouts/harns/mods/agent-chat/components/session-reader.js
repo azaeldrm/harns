@@ -16,8 +16,11 @@ const STALE_AFTER = 3000, CHECK_AFTER = 300, SILENT_AFTER = 5000;
 const PATHS_KEY = "herdr-chat.paths";
 
 let readerBase64 = null;
+/**
+ * The session reader as one script: readers/*.py joined in manifest order, so another machine runs it from one `python3
+ * -c`.
+ */
 async function readerSource() {
-  // The session reader as one script: readers/*.py joined in manifest order, so another machine runs it from one `python3 -c`.
   if (!readerBase64) {
     const dir = `${appHome()}/mods/agent-chat/readers`;
     const order = JSON.parse(await readFile(`${dir}/manifest.json`, "utf8"));
@@ -27,8 +30,8 @@ async function readerSource() {
 }
 
 let readerCompressed = null;
+/** The reader's source compressed by this computer's Python, once; null when that can't run. */
 async function compressedSource(folder) {
-  // The reader's source compressed by this computer's Python, once; null when that can't run.
   if (!readerCompressed) {
     const r = await python(["-c", compressProgram(folder)]).catch(() => null);
     if (r?.code === 0 && r.stdout.trim()) readerCompressed = r.stdout.trim();
@@ -36,8 +39,11 @@ async function compressedSource(folder) {
   return readerCompressed;
 }
 
+/**
+ * The reader for a Python run on `machine`. Windows' command line can't carry it whole: this computer reads the mod's
+ * folder, and other machines get it compressed.
+ */
 async function readerCode(machine) {
-  // The reader for a Python run on `machine`. Windows' command line can't carry it whole: this computer reads the mod's folder, and other machines get it compressed.
   if (!onWindows()) return embeddedReader(await readerSource());
   const folder = base64Utf8(`${appHome()}/mods/agent-chat/readers`);
   if (!machine) return readerFromFolder(folder);
@@ -52,8 +58,8 @@ async function runReader(t, at) {
   return (await python(["-c", boot, ...readerArgs(t, at)], t.machine ? { on: t.machine } : undefined)) ?? NO_PYTHON;
 }
 
+/** One request to the agent's daemon on its machine, through the reader: its answer, or { error }. */
 export async function askDaemon(t, request) {
-  // One request to the agent's daemon on its machine, through the reader: its answer, or { error }.
   const boot = readerProgram(await readerCode(t.machine));
   const r = await python(["-c", boot, "--app", t.harness.reader, "--daemon", JSON.stringify(request)], t.machine ? { on: t.machine } : undefined).catch(e => ({ code: 1, stdout: "", stderr: String(e) }));
   const line = (r?.stdout ?? "").split(/\r?\n/).find(l => l.startsWith("DAEMON|"));
@@ -61,8 +67,8 @@ export async function askDaemon(t, request) {
   try { return JSON.parse(decodeURIComponent(line.slice(7))); } catch { return { error: "an answer in an unknown form" }; }
 }
 
+/** The reader's list of an agent's skills, run on the agent's machine. */
 export async function readSkills(t, path) {
-  // The reader's list of an agent's skills, run on the agent's machine.
   const { user, project, skip } = t.harness.skills;
   const boot = readerProgram(await readerCode(t.machine));
   const args = ["--app", t.harness.reader, "--pid", String(t.pid), "--skills", JSON.stringify({ user, project, skip })];
@@ -71,21 +77,25 @@ export async function readSkills(t, path) {
   return python(["-c", boot, ...args], t.machine ? { on: t.machine } : undefined);
 }
 
+/** Reads several sessions on one machine (null: this one) in one Python run; each one's output, or null. */
 async function runReaders(machine, list) {
-  // Reads several sessions on one machine (null: this one) in one Python run; each one's output, or null.
   const program = batchProgram(await readerCode(machine));
   const r = await python(["-c", program, base64Utf8(JSON.stringify(list.map(([t, at]) => readerArgs(t, at))))], machine ? { on: machine } : undefined);
   return r?.code === 0 ? splitBatch(r.stdout) : null;
 }
 
+/** Other agents of the same program on the same machine (the reader tells sessions apart by them). */
 function peersOf(t, all = agentTargets()) {
-  // Other agents of the same program on the same machine (the reader tells sessions apart by them).
   return all.filter(a => a.app === t.app && a.address !== t.address && a.machine === t.machine).length;
 }
 
 export class SessionReader {
+  /**
+   * The shown conversation and the others kept in memory: read from the agents' logs, here and on other machines, and
+   * kept fresh. `host` is the view: its `card` (to read a question when the agent changes) and `list` (to follow new
+   * messages).
+   */
   constructor(host) {
-    // The shown conversation and the others kept in memory: read from the agents' logs, here and on other machines, and kept fresh. `host` is the view: its `card` (to read a question when the agent changes) and `list` (to follow new messages).
     this.host = host;
     this.session = blankSession();
     this.session.note = "Loading conversation…";
@@ -93,8 +103,8 @@ export class SessionReader {
     this.facts = null; this.dueReads = [];
   }
 
+  /** Reads what changed in herdr's agent list since the last look: the session on screen, others in the background. */
   noticeAgents(cx) {
-    // Reads what changed in herdr's agent list since the last look: the session on screen, others in the background.
     const all = agentTargets();
     const now = new Map(all.map(t => [chatKey(t), `${t.status}|${t.activity}|${t.turn}|${t.statusMs}`]));
     const first = !this.facts;
@@ -126,8 +136,8 @@ export class SessionReader {
     if (machines.size) this.warm(cx, machines);
   }
 
+  /** Shows another session: the one on screen kept, the new one restored (or started). */
   switchTo(t, key) {
-    // Shows another session: the one on screen kept, the new one restored (or started).
     this.shownChangedAt = Date.now();
     this.stash();
     this.key = key; this.lastId = ""; this.screenAskedAt = 0;
@@ -137,7 +147,6 @@ export class SessionReader {
     else {
       const known = t ? (shared(PATHS_KEY) ?? {})[sessionOf(t)] : null;
       this.session = blankSession(known?.path ?? "", known?.hint ?? "");
-      // An agent in a terminal just opened has no conversation yet: its welcome at once, not a load that finds none.
       this.session.note = !t ? `Select a ${supportedNames()} terminal to see it as a chat.`
         : !known?.path && justOpened(t.address) ? `Waiting for this ${t.label} conversation to start.`
         : `Opening this ${t.label} conversation…`;
@@ -145,23 +154,23 @@ export class SessionReader {
     this.needsFirstRead = Boolean(t);
   }
 
+  /** The session on screen kept in memory, to show at once when it is selected again. */
   stash() {
-    // The session on screen kept in memory, to show at once when it is selected again.
     if (!this.key || !this.session.path) return;
     this.sessions.delete(this.key);
     this.sessions.set(this.key, this.session);
     this.trimSessions();
   }
 
+  /** Down to SESSIONS_KEPT: sessions whose agent is gone go first, then the least recently shown. */
   trimSessions(live) {
-    // Down to SESSIONS_KEPT: sessions whose agent is gone go first, then the least recently shown.
     if (this.sessions.size <= SESSIONS_KEPT) return;
     if (live) for (const k of [...this.sessions.keys()]) if (this.sessions.size > SESSIONS_KEPT && !live.has(k) && k !== this.key) this.sessions.delete(k);
     while (this.sessions.size > SESSIONS_KEPT) this.sessions.delete(this.sessions.keys().next().value);
   }
 
+  /** Reads the session on screen from where it last stopped. */
   read(cx) {
-    // Reads the session on screen from where it last stopped.
     const t = target();
     if (!t || chatKey(t) !== this.key) return;
     const key = this.key;
@@ -206,14 +215,16 @@ export class SessionReader {
             else if (!this.session.path && this.key === key) this.dueReads.push({ key, at: Date.now() + WAIT_EVERY });
           }
         }
-        // A read that found nothing new leaves the view as it was (the timer's readCue check covers a read's slow cue).
         if (changed) cx.notify();
       }
     });
   }
 
+  /**
+   * Applies the reader's update to the session on screen and remembers its log, for the agent it was read from. Whether
+   * anything shown changed.
+   */
   merge(update, t) {
-    // Applies the reader's update to the session on screen and remembers its log, for the agent it was read from. Whether anything shown changed.
     const changed = applyRead(this.session, update);
     this.session.readAt = Date.now();
     this.rememberPath(sessionOf(t), this.session.path, this.session.hint, this.session.meta?.cwd);
@@ -223,8 +234,8 @@ export class SessionReader {
     return changed;
   }
 
+  /** Reads again whenever the log's folder changes (agents on this computer). */
   watch(cx, path) {
-    // Reads again whenever the log's folder changes (agents on this computer).
     if (!path || path === this.watchedPath) return;
     this.watchedPath = path;
     const token = this.watchToken = (this.watchToken ?? 0) + 1;
@@ -239,8 +250,11 @@ export class SessionReader {
     });
   }
 
+  /**
+   * Which log a session reads, kept across restarts (herdr's shared state), so it isn't searched for again; with the
+   * folder the session runs in, where its log says.
+   */
   rememberPath(id, path, hint, cwd) {
-    // Which log a session reads, kept across restarts (herdr's shared state), so it isn't searched for again; with the folder the session runs in, where its log says.
     if (!id || !path) return;
     const all = { ...(shared(PATHS_KEY) ?? {}) };
     if (all[id]?.path === path && all[id]?.hint === (hint || "") && (all[id]?.cwd ?? null) === (cwd || null)) return;
@@ -251,8 +265,11 @@ export class SessionReader {
     setShared(PATHS_KEY, all);
   }
 
+  /**
+   * Reads every other agent's session in the background (those on `machines`, or all), so switching to one shows it at
+   * once.
+   */
   warm(cx, machines) {
-    // Reads every other agent's session in the background (those on `machines`, or all), so switching to one shows it at once.
     if (this.warming) {
       this.warmNext = machines && this.warmNext !== 'all' ? new Set([...(this.warmNext ?? []), ...machines]) : 'all';
       return;
@@ -298,16 +315,16 @@ export class SessionReader {
     });
   }
 
+  /** The row under the conversation while a read is slow: "checking", "silent" (no answer), or "". */
   readCue() {
-    // The row under the conversation while a read is slow: "checking", "silent" (no answer), or "".
     if (!this.session.messages.length) return "";
     const since = this.readStartedAt ? Date.now() - this.readStartedAt : 0;
     if (this.readError || since > SILENT_AFTER) return "silent";
     return since > CHECK_AFTER && this.readStaleFor > STALE_AFTER ? "checking" : "";
   }
 
+  /** Retry on the "isn't answering" row: a new read, taking over from one that hangs. */
   retry(cx) {
-    // Retry on the "isn't answering" row: a new read, taking over from one that hangs.
     this.readError = ""; this.reading = null;
     this.read(cx);
     cx.notify();

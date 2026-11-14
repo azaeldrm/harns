@@ -30,7 +30,6 @@ assert.deepEqual(parts, [
 assert.equal(splitCode("plain"), null);
 console.log("copy rows: ok");
 
-// A turn's numbers: ticks become a "stats" row at the turn's end, which lands on the response's copy row.
 const { TurnClock } = await import("../layouts/herdr-chat/mods/agent-chat/model/session.js");
 const clock = new TurnClock(), rowsOut = [];
 for (const e of [{ at: 100, p: 1 }, { at: 102, id: "a", out: 10 }, { at: 104, id: "a", out: 40 }, { at: 110 }, { at: 111, id: "b", out: 20 }, { at: 113, id: "b", out: 20 }]) clock.tick(e);

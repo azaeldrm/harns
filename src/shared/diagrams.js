@@ -1,6 +1,3 @@
-// Mermaid diagrams drawn with Pele, themed from Herdr's theme: the Files panel's and the chat's (each mod carries its
-// own copy of this file and of vendor/pele, built in by scripts/package.py). A diagram is drawn once to an SVG in
-// cache/diagrams, keyed by its code and colors, so both mods reuse what either drew.
 import { appHome } from "herdr";
 import * as fs from "fs/promises";
 import { register, render } from "./vendor/pele/core.js";
@@ -28,20 +25,20 @@ const MONO = "'JetBrains Mono', 'Noto Sans Mono', 'Liberation Mono', 'DejaVu San
 
 const onWindows = () => appHome().includes("\\");
 
+/** Where drawn diagrams are kept, as this system writes paths. */
 export function diagramDir() {
-  // Where drawn diagrams are kept, as this system writes paths.
   return onWindows() ? `${appHome()}\\cache\\diagrams` : `${appHome()}/${DIR}`;
 }
 
+/** Pele's variables, as the theme fills them: its colors, and the font families. */
 function colorsOf(t) {
-  // Pele's variables, as the theme fills them: its colors, and the font families.
   const c = v => String(v ?? "").slice(0, 7);
   return { bg: c(t.background), fg: c(t.foreground), muted: c(t.muted), line: c(t.muted), surface: c(t.surface),
     "surface-alt": c(t.raised), border: c(t.border), accent: c(t.accent), font: SANS, "font-mono": MONO };
 }
 
+/** Pele's SVG with the colors written in (herdr's SVG renderer has no CSS variables). */
 export function bake(svg, colors) {
-  // Pele's SVG with the colors written in (herdr's SVG renderer has no CSS variables).
   const short = {};
   svg = svg.replace(/--(_[a-z]+):var\(--pele-([a-z-]+),([^)]*)\);?/g, (_all, name, pele, fallback) => {
     short[name] = colors[pele] || fallback; return "";
@@ -52,8 +49,8 @@ export function bake(svg, colors) {
     .replace(/font-family:var\(--pele-font,([^)]*)\)/g, (_all, fallback) => `font-family:${colors.font || fallback}`);
 }
 
+/** The diagram for `source` in this theme: queued for drawing the first time it's asked for. */
 export function diagramFor(source, t) {
-  // The diagram for `source` in this theme: queued for drawing the first time it's asked for.
   const colors = colorsOf(t);
   const key = hash(`${source}\u0000${JSON.stringify(colors)}`);
   let e = entries.get(key);
@@ -68,8 +65,8 @@ export function diagramFor(source, t) {
 
 export function hasQueuedDiagrams() { return queue.length > 0; }
 
+/** Draws queued diagrams with Pele, as many as fit in `budgetMs` (at least one). */
 export async function renderQueuedDiagrams(budgetMs = 40) {
-  // Draws queued diagrams with Pele, as many as fit in `budgetMs` (at least one).
   const start = Date.now(), done = [];
   while (queue.length && (done.length === 0 || Date.now() - start < budgetMs)) {
     const e = queue.shift();

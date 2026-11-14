@@ -1,12 +1,8 @@
-// Exercises the Simulator with herdr's APIs stubbed: specs merge and validation, checkShares surviving a share that
-// Stop removes mid-check and repairing an offline device, and (on Linux) finding herdr's ssh connection to a machine
-// and copying a virtual device.
 import { mkdirSync, writeFileSync, cpSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { pathToFileURL, fileURLToPath } from "url";
 
-// The mod is copied beside stub packages for gpui-kit, gpui-base and herdr, then imported.
 const modDir = fileURLToPath(new URL("../layouts/harns/mods/emulator", import.meta.url));
 const work = mkdtempSync(join(tmpdir(), "harns-simulator-test-"));
 const pkg = (name, src) => {
@@ -36,7 +32,6 @@ const check = (name, got, want) => {
   if (!ok) failed++;
 };
 
-// Specs: the mod's defaults under harness.json's `emulator`, per device too.
 globalThis.files = {
   "HOME\\mods\\emulator\\emulator.json": JSON.stringify({ default: { memory: 4096, cores: 4, gpu: "host" }, devices: { a: { gpu: "swiftshader_indirect" } } }),
   "HOME\\harness.json": JSON.stringify({ localMachineName: "pc", emulator: { default: { memory: 6144 }, devices: { a: { cores: 6 }, b: { memory: "4GB", gpu: "host gpu" } } } }),
@@ -53,14 +48,13 @@ globalThis.files = {};
 await s.loadSpecs();
 check("no settings files: no flags beyond the device, no tooltip text", [s.launchArgs("z"), s.specText("z")], [["-avd", "z", "-no-boot-anim"], ""]);
 
-// checkShares: Stop removes a share while its machine's adb devices answers; nothing throws, nothing else is touched.
 const calls = [];
 const sim = { shares: { a: { machine: "m", tunnel: 7, port: 15555, serial: "127.0.0.1:15555" }, b: { machine: "m", error: "no key", retryAt: 0 } } };
 sim.ready = () => true;
 sim.unshare = async avd => { calls.push(`unshare ${avd}`); delete sim.shares[avd]; };
 globalThis.execStub = async (cmd, args) => {
   calls.push(`${cmd} ${args.join(" ")}`);
-  if (args[0] === "devices") { delete sim.shares.a; return { code: 0, stdout: "List of devices attached\n" }; }   // Stop, mid-check
+  if (args[0] === "devices") { delete sim.shares.a; return { code: 0, stdout: "List of devices attached\n" }; }
   return { code: 0, stdout: "" };
 };
 let threw = null;
@@ -69,7 +63,6 @@ check("a share removed mid-check doesn't throw", threw, null);
 check("and nothing more is run for it", calls, ["adb devices"]);
 check("a share that never got a tunnel is left for tend()'s retry, error kept", sim.shares.b, { machine: "m", error: "no key", retryAt: 0 });
 
-// An offline device: disconnected first, then connected fresh.
 calls.length = 0;
 sim.shares = { a: { machine: "m", tunnel: 7, port: 15555, serial: "127.0.0.1:15555", error: "old" } };
 globalThis.execStub = async (cmd, args) => {
@@ -82,7 +75,6 @@ await P.checkShares.call(sim);
 check("an offline device is disconnected, then connected again", calls, ["adb devices", "adb disconnect 127.0.0.1:15555", "adb connect 127.0.0.1:15555"]);
 check("and its error clears", sim.shares.a.error, undefined);
 
-// Linux: a tunnel rides herdr-core's ssh connection to that machine, found from its clients' command lines.
 {
   const { herdrClient } = await import(pathToFileURL(join(work, "mod", "linux.js")).href);
   const line = (target, extra = "") => `ssh -S /run/user/1000/herdr-core/ssh-9b45c67090ef -o ControlMaster=no -o BatchMode=yes ${extra}-T ${target} sh -c 'p=$(command -v herdr-core)'`;
@@ -93,7 +85,6 @@ check("and its error clears", sim.shares.a.error, undefined);
   check("an ssh that isn't herdr's isn't used", herdrClient("ssh -S /tmp/mine -T box", "box"), null);
 }
 
-// Linux: a copy of a virtual device is its config.ini without its data, named for itself, beside an .ini pointing at it.
 if (process.platform !== "win32") {
   const { execFile } = await import("child_process");
   const { readFileSync } = await import("fs");

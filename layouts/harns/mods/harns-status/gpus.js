@@ -16,15 +16,15 @@ export const GPU_VENDORS = [
   { vendor: 'apple', commands: { windows: null, linux: null, macos: null }, parse: () => null },
 ];
 
+/** The GPU commands to run on a platform, as `{ vendor, argv }`. */
 export function gpuQueries(platform) {
-  // The GPU commands to run on a platform, as `{ vendor, argv }`.
   return GPU_VENDORS
     .filter(v => Array.isArray(v.commands[platform]))
     .map(v => ({ vendor: v.vendor, argv: v.commands[platform] }));
 }
 
+/** A probe's raw GPU output (`{ vendor: [lines] }`) as the `"id, load"` lines machine-metrics draws. */
 export function gpuLines(raw) {
-  // A probe's raw GPU output (`{ vendor: [lines] }`) as the `"id, load"` lines machine-metrics draws.
   const lines = [];
   for (const v of GPU_VENDORS) {
     for (const line of raw?.[v.vendor] ?? []) {

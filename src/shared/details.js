@@ -1,5 +1,3 @@
-// A machine's details for the agents list's hover card: what it is (OS, board, CPU and GPU models, memory and disks)
-// and how it's doing (temperatures, GPU load, memory, power), read on demand. CPU and RAM load come from machine.stats.
 import { platformOf, runOn } from './platforms.js';
 
 const NVIDIA = ['nvidia-smi', '--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit', '--format=csv,noheader,nounits'];
@@ -94,16 +92,19 @@ const COMMANDS = {
 
 const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 
+/**
+ * One nvidia-smi line (name, load %, VRAM used and total MiB, temp °C, power and its limit W) as a GPU; the name may
+ * hold commas.
+ */
 export function nvidiaGpu(line) {
-  // One nvidia-smi line (name, load %, VRAM used and total MiB, temp °C, power and its limit W) as a GPU; the name may hold commas.
   const parts = String(line).split(',').map(s => s.trim());
   if (parts.length < 7) return null;
   const [load, used, total, temp, power, limit] = parts.slice(-6).map(num);
   return { name: parts.slice(0, -6).join(', '), load, memUsed: used == null ? null : used * 1048576, memTotal: total == null ? null : total * 1048576, temp, power, powerLimit: limit };
 }
 
+/** A probe's output in one shape for every platform. */
 export function normalized(raw) {
-  // A probe's output in one shape for every platform.
   const gpus = (raw.nvidia ?? []).map(nvidiaGpu).filter(Boolean);
   const named = new Set(gpus.map(g => g.name.toLowerCase()));
   for (const name of raw.adapters ?? []) {
@@ -121,8 +122,8 @@ export function normalized(raw) {
   };
 }
 
+/** The details of a machine (null: this computer), or { error }. */
 export async function machineDetails(machine) {
-  // The details of a machine (null: this computer), or { error }.
   try {
     const platform = await platformOf(machine);
     const result = await runOn(machine, COMMANDS[platform]());

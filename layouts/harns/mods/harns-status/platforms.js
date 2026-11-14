@@ -22,8 +22,10 @@ export const PLATFORMS = {
 
 const known = {};
 
+/**
+ * The platform a machine runs (windows, linux or macos), asked once and remembered; throws while the machine can't say.
+ */
 export async function platformOf(machine) {
-  // The platform a machine runs (windows, linux or macos), asked once and remembered; throws while the machine can't say.
   if (machine === null) return PLATFORMS[appWindow().platform] ? appWindow().platform : 'linux';
   if (known[machine]) return known[machine];
   const unix = await exec('uname', ['-s'], { on: machine }).catch(() => null);
@@ -33,18 +35,18 @@ export async function platformOf(machine) {
   throw new Error(`${machine} can't say which system it runs`);
 }
 
+/** Forgets a machine's platform, so the next call asks again (after its probe stopped working). */
 export function forgetPlatform(machine) {
-  // Forgets a machine's platform, so the next call asks again (after its probe stopped working).
   delete known[machine];
 }
 
+/** Runs one of a platform's commands on a machine (null: this computer). */
 export function runOn(machine, [program, args]) {
-  // Runs one of a platform's commands on a machine (null: this computer).
   return exec(program, args, machine === null ? undefined : { on: machine });
 }
 
+/** This computer's name for the sidebar and status bar. */
 export async function localMachineName() {
-  // This computer's name for the sidebar and status bar.
   try {
     const text = await readTextFile(`${appHome()}/harness.json`);
     const name = text ? JSON.parse(text).localMachineName : null;

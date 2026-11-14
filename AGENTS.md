@@ -57,8 +57,10 @@ of the live app, set `git -c core.hooksPath=<empty folder>` for those commands.
 - Effects tied to an event (a ripple on landing) are driven from the view, one native `transition` per step.
 - Design choices are shown first, as a throwaway preview dialog in `~/.config/herdr-app/mods/`, then removed.
 - Screenshots use the demo `pantry` project; the folder and branch names of real sessions are blurred.
-- Comments explain purpose in full sentences, wrapped at about 120 columns. Logic lives in modules that take herdr's
-  functions as arguments, with tests.
+- No comments in code, only docstrings: a `/** */` block right above a function, method or class in JavaScript, its
+  docstring in Python, saying its purpose in full sentences wrapped at about 120 columns. What a docstring can't hold
+  goes in `RECIPE.md` or the commit message. Shebangs and markers code reads (`# harns: points adb` in `adb.sh`) stay.
+- Logic lives in modules that take herdr's functions as arguments, with tests.
 
 ## Herdr behaviors to design around
 

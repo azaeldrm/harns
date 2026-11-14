@@ -21,7 +21,7 @@ if state["fresh"]: emit("RESET")
 if state["clipped"]: emit("NOTE|" + esc("Showing the recent part of this session."))
 if state["fresh"] and not entries: emit("NOTE|" + esc("No messages in this session yet."))
 def recent(es):
-    # The newest MAX_ENTRIES entries, ticks (times) not counted.
+    """The newest MAX_ENTRIES entries, ticks (times) not counted."""
     n = 0
     for i in range(len(es) - 1, -1, -1):
         if es[i]["kind"] != "tick":

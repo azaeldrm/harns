@@ -16,25 +16,23 @@ REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / 'src'
 SHARED = SRC / 'shared'
 
-# Each share folder (a layout or a mod listing) and the mods it ships.
 LISTINGS = {
     'layouts/harns': ['harns-chrome', 'harns-tabs', 'harns-settings', 'markdown-files', 'emulator',
                       'machine-sidebar', 'harns-status', 'agent-chat'],
     'layouts/herdr-chat': ['agent-chat'],
-    # Mods listed on their own (herdr.dev/mods), for people's own layouts.
     'mods/agent-chat': ['agent-chat'],
     'mods/markdown-files': ['markdown-files'],
 }
 
-# Editor files and caches never ship.
 SKIP = shutil.ignore_patterns('__pycache__', '*.pyc', 'gpui-kit.d.ts', 'jsconfig.json', '*.error')
 
 ICONS = SHARED / 'icons'
 
 
 def write(path, text):
-    # Generated text gets the system's line endings, as the files copied from src/ have in a checkout, so a build on
-    # Windows leaves git seeing nothing changed.
+    """Generated text gets the system's line endings, as the files copied from src/ have in a checkout, so a build on
+    Windows leaves git seeing nothing changed.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding='utf-8')
 
@@ -104,8 +102,6 @@ def build_mod(name, dest):
     share_imports(dest)
     share_icons(name, dest)
     if name == 'machine-sidebar':
-        # It draws its machines' stats icons and rings from its own stats/ folder, and reads Claude's and Pi's context
-        # with the relay's own Python (context-relay.py's collect()), embedded as text.
         shutil.copytree(SHARED / 'rings', dest / 'stats' / 'rings')
         for icon in ('cpu.svg', 'ram.svg', 'gpu.svg', 'board.svg', 'usage.svg'):
             shutil.copy2(SHARED / icon, dest / 'stats' / icon)
@@ -121,13 +117,13 @@ def build(into):
 
 
 def files(folder):
-    # A built mod's files, without the editor files and caches `herdr-app check` and Python leave (gitignored).
+    """A built mod's files, without the editor files and caches `herdr-app check` and Python leave (gitignored)."""
     junk = lambda p: p.name in ('gpui-kit.d.ts', 'jsconfig.json') or p.suffix in ('.pyc', '.error') or '__pycache__' in p.parts
     return {p.relative_to(folder).as_posix(): p for p in folder.rglob('*') if p.is_file() and not junk(p)} if folder.is_dir() else {}
 
 
 def same(a, b):
-    # Compared as committed: text without the line endings a checkout may add; vendored copies byte for byte.
+    """Compared as committed: text without the line endings a checkout may add; vendored copies byte for byte."""
     x, y = a.read_bytes(), b.read_bytes()
     return x == y or (b'\0' not in x[:1024] and x.replace(b'\r\n', b'\n') == y.replace(b'\r\n', b'\n'))
 

@@ -1,7 +1,5 @@
-// Pure byte helpers (no herdr imports), so tests/markdown.mjs can load them in node.
-
+/** A short digest of bytes (djb2), naming a cached image by its content. */
 export function hashBytes(b) {
-  // A short digest of bytes (djb2), naming a cached image by its content.
   let h = 5381;
   for (let i = 0; i < b.length; i++) h = ((h << 5) + h + b[i]) | 0;
   return (h >>> 0).toString(36) + b.length.toString(36);
@@ -29,8 +27,8 @@ function svgSize(b) {
   return { type: "svg", width: w || 300, height: h || 150 };
 }
 
+/** An image's type and pixel size from its first bytes: png, jpg, gif, webp or svg; null otherwise. */
 export function sniff(b) {
-  // An image's type and pixel size from its first bytes: png, jpg, gif, webp or svg; null otherwise.
   if (!b || b.length < 12) return b?.length ? svgSize(b) : null;
   if (b[0] === 0x89 && ascii(b, 1, 3) === "PNG" && b.length >= 24) return { type: "png", width: be32(b, 16), height: be32(b, 20) };
   if (ascii(b, 0, 3) === "GIF") return { type: "gif", width: le16(b, 6), height: le16(b, 8) };
@@ -57,8 +55,6 @@ export function sniff(b) {
 }
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-// herdr's Buffer encodes bytes to base64 as an empty string, so this does it: three bytes to four characters,
-// joined a chunk at a time (one long concatenation is slow in herdr's engine).
 export function toBase64(bytes) {
   const n = bytes.length, chunks = [];
   let out = "";

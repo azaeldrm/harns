@@ -31,9 +31,7 @@ function inputHighlight(cx) {
   set_theme({ appearance: th.appearance, tokens: { colors: { ...th.colors, accent: want, selection: see }, spacing: th.spacing, radius: th.radius } });
 }
 
-// The backdrop's dim over an empty chat, and the dimmer one behind a conversation, so the messages stay easy to read.
 const BACKDROP_SCENE = "herdr-chat.backdrop", BACKDROP_DIM = 0.3, BACKDROP_CHAT_DIM = 0.12;
-// How often, at most, activity in the chat stirs the backdrop: well inside its REST_MS, so it never rests while in use.
 const STIR_MS = 5000;
 
 const SPARK = ["·", "✢", "✶", "✻", "✽", "✻", "✶", "✢"];
@@ -52,11 +50,6 @@ export default class HerdrChat extends View {
     this.card = new QuestionCard(this);
     this.composer = new Composer(this, cx);
     this.width = 900; this.zoom = 1; this.rootPx = 0;
-    // With props {backdrop: true} (harns sets it), an animated scene plays, dimmed, behind the whole chat: at full speed
-    // while it has no conversation to show (a new session's welcome, or no agent in view), and slower and dimmer behind
-    // a conversation. One backdrop for every conversation (this view stays as the chat switches, and so does the scene),
-    // and it stops whenever it isn't drawn. The button at the bottom right steps through its scenes; the one picked is
-    // kept in shared state.
     if (props()?.backdrop) this.backdrop = cx.new(BackdropView, { dim: BACKDROP_DIM, sceneKey: BACKDROP_SCENE });
     this.stirAt = 0;
     this.visit = shared("herdr-chat.visit");
@@ -87,9 +80,11 @@ export default class HerdrChat extends View {
     });
   }
 
+  /**
+   * Looking at a finished agent in Chat counts as seeing it, as showing its terminal does: herdr calls an agent done
+   * while its terminal's herdr.seen label is below its turn, and only the terminal's pane being shown raises it.
+   */
   markSeen(t) {
-    // Looking at a finished agent in Chat counts as seeing it, as showing its terminal does: herdr calls an agent done
-    // while its terminal's herdr.seen label is below its turn, and only the terminal's pane being shown raises it.
     if (!t || t.status !== "done" || !Number.isFinite(t.turn) || appWindow()?.active === false) return;
     const mark = `${t.address}:${t.turn}`;
     if (this.seenMark === mark) return;
@@ -103,8 +98,8 @@ export default class HerdrChat extends View {
   get note() { return this.reader?.session.note ?? ""; }
   set note(text) { if (this.reader) this.reader.session.note = text; }
 
+  /** Switches to the selected agent's session and reads it, and its screen for a question. */
   refresh(cx) {
-    // Switches to the selected agent's session and reads it, and its screen for a question.
     const t = target();
     const key = chatKey(t);
     if (key !== this.key) { this.switchSession(t, key); cx.notify(); }
@@ -115,8 +110,8 @@ export default class HerdrChat extends View {
     if (switched) { this.reader.read(cx); this.card.read(cx, t); }
   }
 
+  /** Shows another session: its draft swapped in once read, the reader on it, the list and card reset. */
   switchSession(t, key) {
-    // Shows another session: its draft swapped in once read, the reader on it, the list and card reset.
     if (!this.composer.pendingDraft) this.composer.pendingDraft = { from: this.key };
     this.reader.switchTo(t, key);
     this.list.reset();
@@ -131,9 +126,12 @@ export default class HerdrChat extends View {
     showView(t ? preferredView(sessionOf(t)) : "terminal");
   }
 
+  /**
+   * The stack switched by something other than the chat (Alt+Left/Right, the sidebar's terminals): adopt it as the
+   * mode. Only on a change, and only when it differs from the mode, so the chat's own switches (which set the mode
+   * first) pass.
+   */
   noticeStack() {
-    // The stack switched by something other than the chat (Alt+Left/Right, the sidebar's terminals): adopt it as the mode.
-    // Only on a change, and only when it differs from the mode, so the chat's own switches (which set the mode first) pass.
     const shown = shownView(), was = this.lastStack;
     if (shown === was) return;
     this.lastStack = shown;
@@ -144,17 +142,16 @@ export default class HerdrChat extends View {
     adoptView(shown, t ? sessionOf(t) : "");
   }
 
+  /** On a switch to Chat: back to the newest message, hidden until it lands if anything changed. */
   noticeVisit() {
-    // On a switch to Chat: back to the newest message, hidden until it lands if anything changed.
     const visit = shared("herdr-chat.visit");
     if (visit === this.visit) return;
     this.visit = visit;
     this.list.revisit();
   }
 
-
+  /** Stops the working agent (its own stop key, through hc interrupt). */
   stop(cx) {
-    // Stops the working agent (its own stop key, through hc interrupt).
     const t = target();
     if (!t || t.status !== "working" || this.stopping) return;
     this.stopping = true; cx.notify();
@@ -174,15 +171,13 @@ export default class HerdrChat extends View {
     });
   }
 
-
-
+  /** Whether the agent's conversation hasn't started: no log yet, rather than loading or failing. */
   fresh(active) {
-    // Whether the agent's conversation hasn't started: no log yet, rather than loading or failing.
     return Boolean(active) && !this.reader.session.path && !this.reader.readError && /hasn't written|Waiting for this/.test(this.note || "");
   }
 
+  /** The empty chat for a conversation that hasn't started: the agent's logo and an invitation to write. */
   welcome(t, active) {
-    // The empty chat for a conversation that hasn't started: the agent's logo and an invitation to write.
     const logo = programIcon(active.program, 44, t.foreground) ?? image("frame/welcome/herdr.png").size(44).rounded(10).flex_none();
     return v_flex().flex_1().min_h(0).items_center().justify_center().gap(12).px(24)
       .child(logo)
@@ -190,13 +185,12 @@ export default class HerdrChat extends View {
       .child(div().max_w(420).text_center().text_size(13).text_color(t.muted).child(`Send a message to start this conversation with ${active.label}.`));
   }
 
+  /** The scene's name, at the bottom right over the backdrop; a click shows the next one. */
   backdropButton(t) {
-    // The scene's name, at the bottom right over the backdrop; a click shows the next one.
     return h_flex().id("backdrop-scene").absolute().bottom(12).right(14).h(26).px(10).gap(6).items_center().rounded(13)
       .border_1().border_color(t.border).bg(t.background).cursor_pointer()
       .text_size(11.5).text_color(t.muted).hover(s => s.text_color(t.foreground).bg(t.hover))
       .tooltip("Next background animation")
-      // The backdrop watches the shared value and switches on its next tick; this view redraws for the new name.
       .on_click((_e, cx) => { setShared(BACKDROP_SCENE, nextScene(shared(BACKDROP_SCENE)).id); cx.notify(); })
       .child(icon("layers", 12, t.dim))
       .child(sceneFor(shared(BACKDROP_SCENE)).label);
@@ -214,10 +208,12 @@ export default class HerdrChat extends View {
       .when(chatOn(), el => el.child(viewToggle(t, "chat", "view", () => {}, () => switchTo("terminal", active ? sessionOf(active) : ""))));
   }
 
+  /**
+   * The line over the reply box, set like the line under it (the footer's 11.5 px in a 24 px row: the spark or dot
+   * centred where the model's 12 px icon is, 10 px in, and the text 5 px after it, where the model's name starts): what
+   * the agent is doing, a machine that isn't answering, or reading new messages.
+   */
   status(t, active) {
-    // The line over the reply box, set like the line under it (the footer's 11.5 px in a 24 px row: the spark or dot centred where the model's 12 px icon is, 10 px in, and the text
-    // 5 px after it, where the model's name starts): what
-    // the agent is doing, a machine that isn't answering, or reading new messages.
     const card = this.card.render(t, active);
     if (card) return card;
     const cue = this.reader.readCue();
@@ -243,8 +239,8 @@ export default class HerdrChat extends View {
     return null;
   }
 
+  /** Grey stand-ins for a conversation being read for the first time, in the shape of one. */
   placeholder(t) {
-    // Grey stand-ins for a conversation being read for the first time, in the shape of one.
     const line = (w, op) => div().h(12).w(w).rounded(6).bg(t.raised).opacity(op);
     return v_flex().flex_1().min_h(0).justify_end().items_center().px(24).pb(8)
       .loop("opacity", { from: 0.45, to: 1, period: 1400 })
@@ -255,17 +251,18 @@ export default class HerdrChat extends View {
         .child(v_flex().w_full().gap(10).child(line(480, 1)).child(line(380, 1))));
   }
 
-
   render(cx) {
     if (this.initError) return div().p(20).text_color(theme().blocked).child(`herdr-chat init error: ${this.initError}`);
     try { return this.renderInner(cx); }
     catch (e) { return div().p(20).text_color(theme().blocked).child(`herdr-chat render error: ${e?.stack ?? e}`); }
   }
 
+  /**
+   * Presses the harness's key for the next mode or effort (switching.nextMode / nextEffort), then reads the new one off
+   * the screen (switching.screenMode / screenEffort: a pattern whose first group is the value, `names` for its display
+   * name, `none` for when it isn't shown). The log records these only with a message, so the screen is what's current.
+   */
   cycle(what, active, logged, cx) {
-    // Presses the harness's key for the next mode or effort (switching.nextMode / nextEffort), then reads the new one off
-    // the screen (switching.screenMode / screenEffort: a pattern whose first group is the value, `names` for its display
-    // name, `none` for when it isn't shown). The log records these only with a message, so the screen is what's current.
     const key = this.key, sw = active.harness.switching, read = what === "mode" ? sw.screenMode : sw.screenEffort;
     this.screenSeen ??= {};
     cx.spawn(async cx => {
@@ -282,28 +279,30 @@ export default class HerdrChat extends View {
     });
   }
 
+  /** The mode or effort read off the screen after a click, while the log still has what it had then. */
   seenOnScreen(what, logged) {
-    // The mode or effort read off the screen after a click, while the log still has what it had then.
     const s = this.screenSeen?.[what];
     return s && s.key === this.key && s.logged === logged ? s.text : null;
   }
 
+  /** The message just sent from the chat, shown at once until the log has it (withPending). */
   showPending(key, text) {
-    // The message just sent from the chat, shown at once until the log has it (withPending).
     const after = [...this.reader.session.messages].reverse().find(m => m.kind === "message" && m.role === "user") ?? null;
     this.pending = { key, text, after, at: Date.now() };
     this.list.follow();
   }
 
+  /** The send failed: the message goes back to the box, so it leaves the conversation. */
   dropPending(key, text) {
-    // The send failed: the message goes back to the box, so it leaves the conversation.
     if (this.pending?.key === key && this.pending.text === text) this.pending = null;
   }
 
+  /**
+   * The messages with the one just sent from the chat at the end, drawn as the person's message, until the log has a
+   * newer message of theirs than it had at sending (or a minute passes). The same array while nothing changes, so the
+   * rows built from it are reused.
+   */
   withPending(messages) {
-    // The messages with the one just sent from the chat at the end, drawn as the person's message, until the log has a
-    // newer message of theirs than it had at sending (or a minute passes). The same array while nothing changes, so the
-    // rows built from it are reused.
     const p = this.pending;
     if (!p || p.key !== this.key) return messages;
     const last = [...messages].reverse().find(m => m.kind === "message" && m.role === "user") ?? null;
@@ -315,9 +314,11 @@ export default class HerdrChat extends View {
     return rows;
   }
 
+  /**
+   * The messages as rows (copy rows added, diagrams and code blocks split out), rebuilt only when the messages change:
+   * a read with nothing new keeps the same array, so most redraws reuse the last rows and their row objects.
+   */
   splitRows(messages, working) {
-    // The messages as rows (copy rows added, diagrams and code blocks split out), rebuilt only when the messages change:
-    // a read with nothing new keeps the same array, so most redraws reuse the last rows and their row objects.
     const c = this.rowCache;
     if (c && c.messages === messages && c.working === working) return c.rows;
     const rows = withCopyRows(messages, working).flatMap(m => {
@@ -332,8 +333,10 @@ export default class HerdrChat extends View {
     return rows;
   }
 
+  /**
+   * Which of a diagram's two buttons is at `x` (design px across the list): they sit at the left of the reply's column.
+   */
   diagramButtonAt(x) {
-    // Which of a diagram's two buttons is at `x` (design px across the list): they sit at the left of the reply's column.
     if (!Number.isFinite(x)) return null;
     const column = Math.min(COLUMN, Math.max(280, Math.floor(this.width) - 48)), left = (this.width - column) / 2;
     if (x >= left && x <= left + TOOL_BUTTON) return "image";
@@ -341,8 +344,8 @@ export default class HerdrChat extends View {
     return null;
   }
 
+  /** Copy code: the diagram's mermaid source. Copy image: the drawn diagram as a PNG, on the theme's background. */
   diagramTool(key, row, which, cx) {
-    // Copy code: the diagram's mermaid source. Copy image: the drawn diagram as a PNG, on the theme's background.
     if (!which) return;
     const done = mark => { this.copied = mark; cx.notify(); cx.timer.after(1500, cx => { if (this.copied === mark) { this.copied = null; cx.notify(); } }); };
     if (which === "code") { cx.write_to_clipboard(row.text); done(`${key}:code`); return; }
@@ -356,9 +359,11 @@ export default class HerdrChat extends View {
     });
   }
 
+  /**
+   * A trigger with its menu above it (open while this.menu === id): rows of { key, text, note?, on }, picked with a
+   * click, closed by a press anywhere else.
+   */
   menuButton(t, id, open, trigger, items, onPick, width = 200) {
-    // A trigger with its menu above it (open while this.menu === id): rows of { key, text, note?, on }, picked with a click,
-    // closed by a press anywhere else.
     return Popup.new(`menu-${id}`, trigger).anchor("bottom_left")
       .when(open, pop => pop.content(v_flex().id(`menu-list-${id}`).w(width).mb(12).p(4).gap(1).rounded(10).border_1().border_color(t.border)
         .bg(t.popover ?? t.raised).shadow_md().text_size(12.5)
@@ -371,24 +376,29 @@ export default class HerdrChat extends View {
           .when(Boolean(item.note), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(item.note)))))));
   }
 
+  /**
+   * Its button opens the menu, or closes it. Pressing the button while it's open is a press outside the menu, which
+   * closes it first; that same press's click then lands here and would open it again, so a menu just closed that way
+   * stays shut.
+   */
   toggleMenu(id, cx) {
-    // Its button opens the menu, or closes it. Pressing the button while it's open is a press outside the menu, which closes
-    // it first; that same press's click then lands here and would open it again, so a menu just closed that way stays shut.
     const justClosed = this.menuClosed?.id === id && Date.now() - this.menuClosed.at < 400;
     this.menuClosed = null;
     this.menu = this.menu === id || justClosed ? null : id;
     cx.notify();
   }
 
+  /** Types a switch (/model, /effort) into the agent, as the person would. */
   switchTo(active, line, cx) {
-    // Types a switch (/model, /effort) into the agent, as the person would.
     if (!line) return;
     sendMessage(active, line).catch(e => { this.note = String(e?.message ?? e); cx.notify(); });
   }
 
+  /**
+   * First on the line under the message box: the agent's icon and model, as the line's other items; a click lists the
+   * models to switch to.
+   */
   modelChip(t, active) {
-    // First on the line under the message box: the agent's icon and model, as the line's other items; a click lists the
-    // models to switch to.
     const look = active ? runsWith(this.reader.session.meta, active.harness) : null;
     if (!look?.model) return null;
     const canSwitch = look.models.length > 0 && Boolean(active.harness?.switching?.model);
@@ -405,14 +415,15 @@ export default class HerdrChat extends View {
       (item, cx) => this.switchTo(active, switchCommand(active.harness, "model", { model: item.switchTo }), cx));
   }
 
+  /**
+   * Under the message box: the effort (a menu) and the permission mode (a click moves to the next) at the left, each
+   * with its icon; the context used as a gauge and a bar at the right.
+   */
   sessionLine(t, active, chip = null) {
-    // Under the message box: the effort (a menu) and the permission mode (a click moves to the next) at the left, each with
-    // its icon; the context used as a gauge and a bar at the right.
     const look = active ? runsWith(this.reader.session.meta, active.harness) : null;
     if (!look || (!chip && !look.effort && !look.mode && !look.context)) return null;
     const item = (id, glyph, text, tip) => h_flex().id(id).h(22).px(6).gap(5).items_center().rounded(6).text_size(11.5).text_color(t.muted)
       .tooltip(tip).child(icon(glyph, 12, t.dim)).child(text);
-    // Effort: a menu where the harness switches it by command, a click for the next where it cycles by key (Pi's Shift+Tab).
     const sw = active.harness?.switching ?? {};
     const switchEffort = look.efforts.length > 0 && Boolean(sw.effort);
     const clickable = el => el.cursor_pointer().hover(s => s.bg(t.hover).text_color(t.foreground));
@@ -480,10 +491,7 @@ export default class HerdrChat extends View {
     keyRows(rows);
     rows.splice(0, rows.length, ...rows.flatMap(r => r.kind === "tools" && this.reader.session.open[r.key] ? [r, ...stepRows(r)] : [r]));
     const inner = Math.min(COLUMN, Math.max(280, Math.floor(this.width) - 50));
-    // What the composer and the list ask to make themselves see-through: whether the backdrop is behind them now.
     this.backdropShown = Boolean(this.backdrop) && shared("herdr-chat.animation") !== false;
-    // Its pace and dim follow whether there's a conversation, handed over after this render: set_props repaints it, which
-    // a render can't do.
     if (this.backdropShown && this.backdropSlow !== !empty) {
       this.backdropSlow = !empty;
       cx.timer.after(0, () => this.backdrop.set_props(this.backdropProps()));
@@ -516,7 +524,6 @@ export default class HerdrChat extends View {
     return v_flex().id("herdr-chat-root").relative().size_full().min_h(0).rounded(10).border_1().border_color(t.border)
       .bg(t.background).text_color(t.foreground)
       .when(this.backdropShown, el => el.child(this.backdrop))
-      // The scene's button only over an empty chat: behind a conversation, its corner is the context meter's.
       .when(this.backdropShown && empty, el => el.child(this.backdropButton(t)))
       .on_mouse_move(() => this.stirBackdrop())
       .on_size_change((size, cx) => { this.rootPx = size.width; const w = designPx(size.width, this.zoom); if (w >= 200 && Math.abs(w - this.width) > 8) { this.width = w; cx.notify(); } })
@@ -531,15 +538,10 @@ export default class HerdrChat extends View {
         .child(div().max_w(420).text_center().text_size(14).text_color(t.muted).child(this.note))))
       .when(!empty, el => el.child(body))
       .when(Boolean(measure), el => el.child(measure))
-      // The line over the reply box (the working line, a question, a read problem) sits as close to it as the line under it
-      // (the composer's 6 px).
       .child(v_flex().w_full().flex_none().items_center().px(24).pt(12).pb(14).gap(6)
-        // The status line's room is always kept, so "Working…" coming and going (just after a send, at a turn's end)
-        // doesn't resize the list above and shift every message, and the welcome's box sits where the conversation's will.
         .when(Boolean(status), el => el.child(status))
         .when(!status, el => el.child(div().w_full().h(24).flex_none()))
         .child(this.composer.render(t, active, this.sessionLine(t, active, this.modelChip(t, active)))));
   }
 }
-
 
