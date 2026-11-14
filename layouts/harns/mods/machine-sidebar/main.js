@@ -129,8 +129,9 @@ function haloed(src, size, color, ring) {
 
 function agentPic(t, p, size, color, ring, sub = false, hop = false, tint = null, corner = null) {
   // The agent icon (a sub-agent's: the same bot without its antenna), with its program's icon small at its bottom right
-  // on a halo of the row's color (badgeOf). `hop` (working; its own place in its hops, { n, up, go }, from hopFor): that logo hops in amber
-  // from side to side over the bot, its halo masking the bot as it passes, a ripple spreading where it lands.
+  // on a halo of the row's color (badgeOf). `hop` (working; its own place in its hops, { n, up, go }, from hopFor): that
+  // logo hops in amber from side to side over the bot, its halo masking the bot as it passes, a ripple spreading where
+  // it lands.
   const bot = svg(`mods/machine-sidebar/icons/${sub ? "bot-small" : "bot"}.svg`).size(size).flex_none().text_color(color);
   // The logo's color: amber while it hops (working), else `tint` (amber, still: it needs you mid-task), else the row's.
   const badge = badgeOf(p, Math.round(size * 0.65), hop ? t.working : tint ?? color, ring);
