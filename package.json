@@ -11,6 +11,7 @@
     "test": "node scripts/test.mjs",
     "vendor:pele": "node scripts/vendor-pele.mjs",
     "check:pele": "node scripts/vendor-pele.mjs --check",
-    "package": "python scripts/package.py"
+    "package": "python scripts/package.py",
+    "previews": "node scripts/scene-previews.mjs"
   }
 }

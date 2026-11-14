@@ -2,6 +2,8 @@ import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { theme, shared, setShared, window, props, closeOverlay, layout, run } from "herdr";
 import { find } from "./layout.js";
+import { SCENE_NAMES } from "./backdrop-scenes.js";
+import { SCENE_PREVIEWS } from "./scene-previews.js";
 
 const SECTIONS = [
   { id: "general", title: "General", icon: "mods/harns-settings/icons/laptop.svg" },
@@ -15,6 +17,11 @@ const STYLES = [
   { id: "classic", name: "Classic", about: "Each machine boxed with its agents and stats." },
   { id: "tree", name: "Tree", about: "Agents hang from their machine on lines." },
 ];
+
+// The chat's backgrounds: its animated scenes. A card's picture is PREVIEW_W × PREVIEW_H inside its border (a card is
+// 168 wide with 6 px of padding, its picture box 92 tall).
+const PREVIEW_W = 154, PREVIEW_H = 90;
+const BACKGROUNDS = SCENE_NAMES.map(s => ({ id: s.id, name: s.label, about: `${s.about} Dimmed, and slower behind a conversation.` }));
 
 const CONTEXT_BARS = [
   { id: "fill", name: "Fill", about: "Fills up as a session uses its context window: gray, amber past 75%, red past 90%." },
@@ -75,24 +82,25 @@ export default class HarnessSettings extends View {
           .child(Input.new(this.name).h_full().text_size(13).text_color(t.foreground))));
   }
 
-  card(t, id, name, chosen, preview, onClick) {
+  card(t, id, name, chosen, preview, onClick, bleed = false) {
     // One option as Herdr's settings show layouts: a picture of it, its name under it with a check when it's the one in
-    // use, the chosen card outlined in amber.
+    // use, the chosen card outlined in amber. With `bleed` the picture fills its box to the edges.
     return v_flex().id(id).w(168).p(6).gap(8).rounded(10).border_1().border_color(chosen ? t.accent : "#00000000")
       .cursor_pointer().hover(s => s.bg(t.raised)).on_click(onClick)
-      .child(div().w_full().h(92).p(10).flex().flex_col().justify_center().rounded(7).bg(t.surface ?? t.background).border_1().border_color(t.border).overflow_hidden()
+      .child(div().relative().w_full().h(92).flex().flex_col().justify_center().rounded(7).bg(bleed ? t.background : t.surface ?? t.background).border_1().border_color(t.border).overflow_hidden()
+        .when(!bleed, el => el.p(10))
         .child(preview))
       .child(h_flex().px(2).gap(6).items_center()
         .child(div().text_size(13.5).text_color(chosen ? t.foreground : t.muted).child(name))
         .when(chosen, el => el.child(svg("mods/harns-settings/icons/check.svg").size(13).text_color(t.accent))));
   }
 
-  cards(t, options, chosen, preview, choose) {
+  cards(t, options, chosen, preview, choose, bleed = false) {
     // A choice between options, drawn as cards, and what the chosen one does under them.
     const now = options.find(o => o.id === chosen);
     return v_flex().w_full().gap(10).pb(18).border_b(1).border_color(t.border)
       .child(h_flex().gap(10).flex_wrap()
-        .children(options.map(o => this.card(t, `card-${o.id}`, o.name, o.id === chosen, preview(o.id), () => choose(o.id)))))
+        .children(options.map(o => this.card(t, `card-${o.id}`, o.name, o.id === chosen, preview(o.id), () => choose(o.id), bleed))))
       .when(Boolean(now?.about), el => el.child(div().px(2).text_size(12.5).line_height("18px").text_color(t.dim).child(now.about)));
   }
 
@@ -127,6 +135,24 @@ export default class HarnessSettings extends View {
           .child(div().h_full().rounded_full().w(Math.round(96 * share / 100)).bg(color)))));
   }
 
+  backgroundPreview(t, id) {
+    // A frame of the scene itself (scene-previews.js), its 13 px cells shrunk to fill the card's picture, in the chat's
+    // mono font; its colours are tints that sit on the theme's background.
+    const p = SCENE_PREVIEWS[id];
+    if (!p) return div();
+    const cw = PREVIEW_W / p.cols, ch = PREVIEW_H / p.rows;
+    const runs = [];
+    p.runs.forEach((row, r) => row.forEach(([col, text, fg, bg]) => {
+      let el = div().absolute().left(col * cw).top(r * ch).w(text.length * cw).h(ch).overflow_hidden().whitespace_nowrap().child(text);
+      if (fg) el = el.text_color(fg);
+      if (bg) el = el.bg(bg);
+      runs.push(el);
+    }));
+    return div().absolute().inset_0().overflow_hidden()
+      .font_family("JetBrains Mono").text_size(cw / 0.6).line_height(`${ch}px`)
+      .children(runs);
+  }
+
   sidebar(t) {
     // The sidebar's look (one of the styles) and how its agents' context bars read, each a row of picture cards.
     const style = ["classic", "contained"].includes(shared("harness.sidebar")) ? "classic" : "tree";
@@ -140,12 +166,22 @@ export default class HarnessSettings extends View {
   }
 
   chat(t) {
-    // agent-chat's switches (its settings keys keep their herdr-chat. names): agents as a chat, and the animation behind it.
+    // agent-chat's settings (its keys keep their herdr-chat. names): agents as a chat, and the background behind the
+    // chat: on unless `herdr-chat.animation` is false, playing one of its scenes (`herdr-chat.backdrop`). Picking a
+    // scene while it's off turns it on.
+    const scene = SCENE_NAMES.some(s => s.id === shared("herdr-chat.backdrop")) ? shared("herdr-chat.backdrop") : SCENE_NAMES[0].id;
     return v_flex().w_full()
       .child(this.heading(t, "Chat"))
       .child(this.flag(t, "herdr-chat.chat", "Open agents as a chat", "Off: agents' tabs show their terminal, without the Chat and Terminal switch.",
         on => { if (!on && find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" }); }))
-      .child(this.flag(t, "herdr-chat.animation", "Chat animation", "A dimmed scene behind the chat, slower behind a conversation: sharks, jellyfish, a night sky or rain."));
+      .child(div().h(18))
+      .child(this.heading(t, "Background"))
+      .child(this.flag(t, "herdr-chat.animation", "Animated background", "A dimmed scene behind the chat. Off: the plain page."))
+      .child(div().h(12))
+      .child(this.cards(t, BACKGROUNDS, scene, id => this.backgroundPreview(t, id), id => {
+        setShared("herdr-chat.animation", true);
+        setShared("herdr-chat.backdrop", id);
+      }, true));
   }
 
   status(t) {

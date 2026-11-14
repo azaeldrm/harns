@@ -61,7 +61,8 @@ Claude Code and Codex quota left.
 
 **Settings of its own.** The harns logo in the sidebar's footer opens harns's Settings: this computer's name, the
 sidebar's style (Tree, agents hanging from their machine on lines, or Classic, each machine boxed with its agents and
-stats), whether agents open as a chat and the chat's animation, what the status bar shows, and whether the tab bar
+stats), whether agents open as a chat, the chat's animated background (on or off, and which scene, each card showing
+a frame of it), what the status bar shows, and whether the tab bar
 offers the Simulator. Drag a machine's band to reorder the machines in the sidebar.
 
 ## Install

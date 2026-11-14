@@ -49,10 +49,13 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
     harns's Settings (the logo, a 760 px dialog from `harns-settings`: General, Sidebar, Chat, Status bar, Simulator,
     which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `herdr-chat.chat`, `herdr-chat.animation`,
-    `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and `harness.simulator`).
-    A choice between options (the sidebar's style, its context bars) is a row of picture cards, as Herdr's settings
-    show layouts: each a small live drawing of what it gives, the chosen one outlined in amber with a check, and what it
-    does under them. On/off settings are switches.
+    `herdr-chat.backdrop`, `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and
+    `harness.simulator`). A choice between options (the sidebar's style, its context bars, the chat's background) is a
+    row of picture cards, as Herdr's settings show layouts: each a small live drawing of what it gives, the chosen one
+    outlined in amber with a check, and what it does under them. On/off settings are switches. The chat's background is
+    a switch (Animated background) over a card per scene; each card's picture is a real frame of the scene, saved by
+    `scripts/scene-previews.mjs` (`npm run previews`) into `harns-settings/scene-previews.js`, and the scenes' names come
+    from `src/shared/backdrop-scenes.js`, which agent-chat plays from too. Picking a scene turns the background on.
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, Simulator (Windows and Linux), and the window buttons on Windows and Linux.
