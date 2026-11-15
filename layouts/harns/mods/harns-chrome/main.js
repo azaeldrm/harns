@@ -1,7 +1,9 @@
 import { View, div, image, svg } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { h_flex, v_flex, Popup } from "gpui-base";
 import { theme, run, props, window, shared, setShared, updates, layout, agents, openOverlay } from "herdr";
 import { find, narrow } from "./layout.js";
+import { usageDays, usagePlace } from "./token-usage.js";
+import { usageDetails, usageSpark } from "./usage-card.js";
 
 const logoSrc = () => agents().some(a => a.status === "working")
   ? "mods/harns-chrome/harness-logo-fade.webp"
@@ -24,6 +26,26 @@ export default class WorkspaceChrome extends View {
       .when(Boolean(tip), el => el.tooltip(tip))
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).on_click(action).child(label);
   }
+  /**
+   * Usage in the footer, at its right end, from the sidebar's shared reading: seven days of columns and today's tokens.
+   * Resting on it a moment hangs the two-week card beside the sidebar, `edge` px away (the footer's padding), level
+   * with it.
+   */
+  usage(t, edge) {
+    const state = shared("usage.tokens");
+    const days = (this.usageMemo = usageDays(state, this.usageMemo)).days;
+    return div().id("usage-footer").relative().flex_none()
+      .on_hover((on, cx) => {
+        this.usageTimer?.cancel();
+        if (on) this.usageTimer = cx.timer.after(450, cx => { this.usageOpen = true; cx.notify(); });
+        else if (this.usageOpen) { this.usageOpen = false; cx.notify(); }
+      })
+      .child(usageSpark(t, days, { icon: "mods/harns-chrome/icons/coins.svg" }))
+      .child(Popup.new("usage-footer-card", div()).absolute().top(-1).right(-1).size(1)
+        .when(Boolean(this.usageOpen), pop => pop.content(div().pl(edge)
+          .child(usageDetails(t, days, { icon: "mods/harns-chrome/icons/coins.svg", errors: state?.errors })))));
+  }
+
   render() {
     const t = theme();
     const collapsed = narrow();
@@ -40,7 +62,8 @@ export default class WorkspaceChrome extends View {
         () => openOverlay({ mod: "harns-settings", kind: "dialog", width: 760 }));
       if (collapsed) return h_flex().size_full().bg(t.surface).items_center().justify_center().gap(2)
         .child(gear.w(22)).child(machine.w(22));
-      return h_flex().size_full().bg(t.surface).items_center().gap(2).px(12).child(gear).child(machine).child(harns);
+      return h_flex().size_full().bg(t.surface).items_center().gap(2).px(12).child(gear).child(machine).child(harns)
+        .when(usagePlace(shared("harness.usage")) === "footer", el => el.child(div().flex_1()).child(this.usage(t, 12)));
     }
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 12).pr(10).gap(4).items_center().text_size(13.5)
       .when(collapsed, el => el.pl(0).pr(0).justify_center().child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Expand sidebar").cursor_pointer()))

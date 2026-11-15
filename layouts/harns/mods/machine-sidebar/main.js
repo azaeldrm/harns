@@ -1,6 +1,6 @@
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, Popup, ScrollHandle } from "gpui-base";
-import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, nextCommand, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder } from "herdr";
+import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, nextCommand, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder, exec } from "herdr";
 
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
@@ -10,6 +10,8 @@ import { look, changedHosts, machinesChanged } from "./turns.js";
 import { agentFolder } from "./sessions.js";
 import { NewMenu } from "./new-menu.js";
 import { find, narrow } from "./layout.js";
+import { collectUsage, readMachineUsage, usageDays, usageDue, usagePlace } from "./token-usage.js";
+import { usageDetails, usageRailMark, usageStrip } from "./usage-card.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
 const statsFor = (machine, t) => machineMetrics(machine, false, t);
@@ -210,6 +212,7 @@ export default class Agents extends View {
       this.noticeOs(cx);
       this.noticeTurns(cx);
       if (this.detailsWanted && Date.now() < this.detailsWanted.until) this.readDetails(this.detailsWanted.name, cx);
+      this.readUsage(cx);
       cx.notify();
     });
     this.noticeTurns(cx);
@@ -221,6 +224,39 @@ export default class Agents extends View {
         else if (c === "prev-machine") this.jumpMachine(-1);
       }
     });
+  }
+
+  /**
+   * Reads every connected machine's token usage into shared `usage.tokens` when it's due (see `usageDue`), one reading
+   * at a time.
+   */
+  readUsage(cx) {
+    if (this.usageBusy) return;
+    const state = shared("usage.tokens");
+    const list = machines();
+    if (!usageDue(state, list)) return;
+    this.usageBusy = true;
+    cx.spawn(async cx => {
+      try { setShared("usage.tokens", await collectUsage(list, host => readMachineUsage(exec, host), state)); }
+      finally { this.usageBusy = false; cx.notify(); }
+    });
+  }
+
+  /**
+   * Usage at the bottom of the sidebar: open, the Strip (today's tokens over two weeks of columns) when harns's settings
+   * put it here; on the rail, always, as five small columns over today's tokens, since the rail's footer has no room.
+   * Resting on either hangs the two-week card right against the sidebar, as a machine's band does.
+   */
+  usageRow(t, collapsed) {
+    const key = "usage";
+    const state = shared("usage.tokens");
+    const days = (this.usageMemo = usageDays(state, this.usageMemo)).days;
+    return div().id("usage-trig").relative().w_full().flex_none().pt(4).pb(6)
+      .when(collapsed, el => el.flex().justify_center())
+      .when(!collapsed, el => el.px(8))
+      .on_hover((on, cx) => { if (on) this.detailsEnter(key, cx); else { if (this.muted === key) this.muted = null; this.detailsLeave(key, cx); } })
+      .child((collapsed ? usageRailMark : usageStrip)(t, days, { icon: "mods/machine-sidebar/icons/coins.svg" }))
+      .child(this.hang(key, usageDetails(t, days, { icon: "mods/machine-sidebar/icons/coins.svg", errors: state?.errors }), 0));
   }
 
   /**
@@ -1186,7 +1222,8 @@ export default class Agents extends View {
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
       )
-      .child(this.scrollArea(t, collapsed, rows));
+      .child(this.scrollArea(t, collapsed, rows))
+      .when(collapsed || usagePlace(shared("harness.usage")) === "strip", el => el.child(this.usageRow(t, collapsed)));
   }
 
   /**

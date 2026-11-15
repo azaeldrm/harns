@@ -6,7 +6,7 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const python = [['python3'], ['python'], ['py', '-3']].find(([exe, ...args]) =>
   spawnSync(exe, [...args, '-c', 'import sys; sys.exit(sys.version_info[0] != 3)']).status === 0);
 
-const node = ['usage', 'turns', 'probes', 'snapshots', 'markdown', 'simulator', 'os-icons', 'assets',
+const node = ['usage', 'token-usage', 'turns', 'probes', 'snapshots', 'markdown', 'simulator', 'os-icons', 'assets',
   'sweep', 'backdrop', 'diagrams', 'copy', 'caret', 'retracted', 'runs-with', 'codex-daemon', 'previews', 'skills', 'sessions',
   'read-cue', 'fold', 'measure', 'drafts', 'focus', 'prompts', 'harnesses', 'structure'];
 const scripts = ['steering', 'codex-logs', 'opencode', 'session-pick', 'images', 'reader_names', 'process-tree',
