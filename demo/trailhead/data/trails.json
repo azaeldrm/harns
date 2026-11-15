@@ -1,0 +1,6 @@
+[
+  { "name": "Cedar Ridge Loop", "km": 8.4, "climb": 420, "elevations": [210, 260, 340, 480, 630, 560, 400, 230] },
+  { "name": "Falls Overlook", "km": 3.1, "climb": 140, "elevations": [120, 150, 190, 260, 240, 180] },
+  { "name": "Granite Saddle", "km": 12.7, "climb": 910, "elevations": [300, 420, 610, 850, 1120, 1210, 980, 640, 330] },
+  { "name": "Meadow Creek", "km": 5.6, "climb": 95, "elevations": [80, 95, 110, 130, 120, 100, 85] }
+]
