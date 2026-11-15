@@ -58,9 +58,11 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     Codex `#8b9cf7`, OpenCode `#6cc4a1`, Pi `#d4b85c`) with its fresh and cached tokens, then the totals, the daily
     average, and any machine that couldn't be read. On the rail, with either setting, the bottom of the list shows the
     token icon and today's tokens in gray on top, as the Strip's, over five columns as tall as the Strip's (24 px)
-    across the rail, centred on the icon axis, with the same card. `machine-sidebar` reads every connected machine every
-    5 minutes, and at once when one connects unread, into shared `usage.tokens` (`token-usage.js`); a machine that fails
-    or goes away keeps its last reading. The footer draws from the same reading.
+    across the rail, centred on the icon axis, with the same card. The folded footer is one gear (with the update dot)
+    opening a 210 px menu beside the rail, level with it: Settings, Add machine and harns settings; a pick, a press
+    outside or Escape closes it (`Popover`). `machine-sidebar` reads every connected machine every 5 minutes, and at
+    once when one connects unread, into shared `usage.tokens` (`token-usage.js`); a machine that fails or goes away
+    keeps its last reading. The footer draws from the same reading.
   - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
     harns's Settings (the logo, a 760 px dialog from `harns-settings`: General, Sidebar, Chat, Status bar, Simulator,
     which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `harness.usage`,
