@@ -4,6 +4,7 @@ import { theme, shared, setShared, window, props, closeOverlay, layout, run } fr
 import { find } from "./layout.js";
 import { SCENE_NAMES } from "./backdrop-scenes.js";
 import { SCENE_PREVIEWS } from "./scene-previews.js";
+import { usagePlace } from "./token-usage.js";
 
 const SECTIONS = [
   { id: "general", title: "General", icon: "mods/harns-settings/icons/laptop.svg" },
@@ -24,6 +25,11 @@ const BACKGROUNDS = SCENE_NAMES.map(s => ({ id: s.id, name: s.label, about: `${s
 const CONTEXT_BARS = [
   { id: "fill", name: "Fill", about: "Fills up as a session uses its context window: gray, amber past 75%, red past 90%." },
   { id: "health", name: "Health bar", about: "Drains as a session uses its context window: green, amber below 45% left, red below 25%." },
+];
+
+const USAGE = [
+  { id: "strip", name: "Strip", about: "Under the agents: today's tokens over two weeks of columns. Rest on it for each day by harness." },
+  { id: "footer", name: "Footer", about: "Beside the settings icons: a week of small columns and today's tokens. Rest on it for each day by harness." },
 ];
 
 export default class HarnessSettings extends View {
@@ -134,6 +140,20 @@ export default class HarnessSettings extends View {
           .child(div().h_full().rounded_full().w(Math.round(96 * share / 100)).bg(color)))));
   }
 
+  /** The bottom of the sidebar drawn small, with usage where an option puts it: a strip of columns, or in the footer. */
+  usagePreview(t, id) {
+    const heights = [3, 5, 2, 8, 6, 2, 10, 7, 3, 12, 9, 4, 11, 6];
+    const cols = (list, w) => h_flex().gap(2).items_end().h(14)
+      .children(list.map((h, i) => div().w(w).flex_none().h(h).rounded(1).bg(i === list.length - 1 ? t.accent : t.muted).opacity(i === list.length - 1 ? 1 : 0.5)));
+    const footer = h_flex().gap(5).items_center()
+      .children([0, 1, 2].map(() => div().size(7).rounded(2).bg(t.dim)))
+      .when(id === "footer", el => el.child(div().flex_1()).child(cols(heights.slice(-7), 3)));
+    return v_flex().w_full().gap(8)
+      .child(v_flex().gap(5).opacity(0.5).child(div().h(3).w(90).rounded_full().bg(t.dim)).child(div().h(3).w(70).rounded_full().bg(t.dim)))
+      .child(id === "strip" ? cols(heights, 6) : div().h(14))
+      .child(footer);
+  }
+
   /**
    * A frame of the scene itself (scene-previews.js), its 13 px cells shrunk to fill the card's picture, in the chat's
    * mono font; its colours are tints that sit on the theme's background.
@@ -154,7 +174,10 @@ export default class HarnessSettings extends View {
       .children(runs);
   }
 
-  /** The sidebar's look (one of the styles) and how its agents' context bars read, each a row of picture cards. */
+  /**
+   * The sidebar's look (one of the styles), how its agents' context bars read, and where it shows token usage, each a
+   * row of picture cards.
+   */
   sidebar(t) {
     const style = ["classic", "contained"].includes(shared("harness.sidebar")) ? "classic" : "tree";
     const bar = shared("harness.context-bar") === "health" ? "health" : "fill";
@@ -163,7 +186,10 @@ export default class HarnessSettings extends View {
       .child(this.cards(t, STYLES, style, id => this.stylePreview(t, id), id => setShared("harness.sidebar", id)))
       .child(div().h(18))
       .child(this.heading(t, "Context bar"))
-      .child(this.cards(t, CONTEXT_BARS, bar, id => this.barPreview(t, id), id => setShared("harness.context-bar", id)));
+      .child(this.cards(t, CONTEXT_BARS, bar, id => this.barPreview(t, id), id => setShared("harness.context-bar", id)))
+      .child(div().h(18))
+      .child(this.heading(t, "Token usage"))
+      .child(this.cards(t, USAGE, usagePlace(shared("harness.usage")), id => this.usagePreview(t, id), id => setShared("harness.usage", id)));
   }
 
   /**

@@ -49,16 +49,29 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     drawn before it, so a hovered band covers both and only the icon stays. The icon's centre is where the rail centres
     it, so it doesn't move as the sidebar folds. In both, machines can be dragged into an order by their bands (kept in
     the mod's localStorage, `machines.order`).
+  - **Token usage** (shared `harness.usage`, Settings → Sidebar → Token usage): every harness's tokens on every machine,
+    by day, in the time zone the app runs in. Fresh tokens (input, output, cache writes) make the numbers and columns;
+    tokens read from the cache are in the card only. `strip` (the default): a row under the list, "Usage" with the token
+    icon (coins) and today's tokens in gray over 14 columns, today's in the accent at the right. `footer`: no row; seven
+    4 px columns, the token icon and today's tokens in gray at the footer's right end. Resting on either hangs a 320 px
+    card right against the sidebar: the last 14 days, newest first, each a bar split by harness (Claude Code `#d97757`,
+    Codex `#8b9cf7`, OpenCode `#6cc4a1`, Pi `#d4b85c`) with its fresh and cached tokens, then the totals, the daily
+    average, and any machine that couldn't be read. On the rail, with either setting, the bottom of the list shows the
+    token icon and today's tokens in gray on top, as the Strip's, over five columns as tall as the Strip's (24 px)
+    across the rail, centred on the icon axis, with the same card. `machine-sidebar` reads every connected machine every
+    5 minutes, and at once when one connects unread, into shared `usage.tokens` (`token-usage.js`); a machine that fails
+    or goes away keeps its last reading. The footer draws from the same reading.
   - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
     harns's Settings (the logo, a 760 px dialog from `harns-settings`: General, Sidebar, Chat, Status bar, Simulator,
-    which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `herdr-chat.chat`, `herdr-chat.animation`,
-    `herdr-chat.backdrop`, `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and
-    `harness.simulator`). A choice between options (the sidebar's style, its context bars, the chat's background) is a
-    row of picture cards, as Herdr's settings show layouts: each a small live drawing of what it gives, the chosen one
-    outlined in amber with a check, and what it does under them. On/off settings are switches. The chat's background is
-    a switch (Animated background) over a card per scene; each card's picture is a real frame of the scene, saved by
-    `scripts/scene-previews.mjs` (`npm run previews`) into `harns-settings/scene-previews.js`, and the scenes' names come
-    from `src/shared/backdrop-scenes.js`, which agent-chat plays from too. Picking a scene turns the background on.
+    which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `harness.usage`,
+    `herdr-chat.chat`, `herdr-chat.animation`, `herdr-chat.backdrop`, `harness.status`, `harness.quota.claude`,
+    `harness.quota.codex`, `harness.commands-hint` and `harness.simulator`). A choice between options (the sidebar's
+    style, its context bars, where token usage shows, the chat's background) is a row of picture cards, as Herdr's
+    settings show layouts: each a small live drawing of what it gives, the chosen one outlined in amber with a check,
+    and what it does under them. On/off settings are switches. The chat's background is a switch (Animated background)
+    over a card per scene; each card's picture is a real frame of the scene, saved by `scripts/scene-previews.mjs` (`npm
+    run previews`) into `harns-settings/scene-previews.js`, and the scenes' names come from
+    `src/shared/backdrop-scenes.js`, which agent-chat plays from too. Picking a scene turns the background on.
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, Simulator (Windows and Linux), and the window buttons on Windows and Linux.
@@ -223,7 +236,12 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   `nvidia-smi`, `uname -s` and `hostname`. Context bars read the relays' snapshots after
   turns end: this computer's directly (no process, as the relays write them), another
   machine's with `scripts/context-relay.py`'s collect() there; and Codex's logs (a small
-  Python read of each one's newest `token_count`), else their footers with `hc read`.
+  Python read of each one's newest `token_count`), else their footers with `hc read`. Token usage runs `TOKEN_PROBE`
+  (`token-usage.js`, Python 3, `python3` then `python`) on each machine: Claude Code's `projects/**/*.jsonl` (each
+  reply's `usage` once per message and request, `CLAUDE_CONFIG_DIR` honored), Codex's `sessions/*/*/*/*.jsonl` (the
+  growth of `total_token_usage`, `CODEX_HOME` honored), OpenCode's `opencode.db` `message` table and Pi's
+  `~/.pi/agent/sessions`, over the last 15 days, into quarter-hour UTC slots the app splits into local days. What it
+  read is kept in `~/.cache/harns/token-usage.json` by file size and time, so later runs read only changed logs.
 - **Art:** `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources) in `harns-chrome`; monochrome SVG icons
   (Lucide, and harns's own: the bots, ripple, question mark, padded spinner) in each mod's `icons/`, from the
   repository's one set in `src/shared/icons`; the stats icons and rings in `machine-sidebar/stats`; system icons in `machine-sidebar/os` (Simple Icons, CC0; see its
