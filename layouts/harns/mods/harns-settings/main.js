@@ -32,6 +32,11 @@ const USAGE = [
   { id: "footer", name: "Footer", about: "Beside the settings icons: a week of small columns and today's tokens. Rest on it for each day by harness." },
 ];
 
+const VIEWS = [
+  { id: "chat", name: "Chat", about: "A new agent session starts as a chat, with the Chat and Terminal switch in its header. Each session keeps the view you last left it in." },
+  { id: "terminal", name: "Terminal", about: "A new agent session starts on its terminal. Each session keeps the view you last left it in." },
+];
+
 export default class HarnessSettings extends View {
   init(_props, cx) {
     this.section = SECTIONS.some(s => s.id === props()?.section) ? props().section : "general";
@@ -87,11 +92,13 @@ export default class HarnessSettings extends View {
 
   /**
    * One option as Herdr's settings show layouts: a picture of it, its name under it with a check when it's the one in
-   * use, the chosen card outlined in amber. With `bleed` the picture fills its box to the edges.
+   * use, the chosen card outlined in amber. With `bleed` the picture fills its box to the edges. `disabled` greys it
+   * and takes away its click, for a choice that does nothing while the chat is off.
    */
-  card(t, id, name, chosen, preview, onClick, bleed = false) {
+  card(t, id, name, chosen, preview, onClick, bleed = false, disabled = false) {
     return v_flex().id(id).w(168).p(6).gap(8).rounded(10).border_1().border_color(chosen ? t.accent : "#00000000")
-      .cursor_pointer().hover(s => s.bg(t.raised)).on_click(onClick)
+      .when(disabled, el => el.opacity(0.45))
+      .when(!disabled, el => el.cursor_pointer().hover(s => s.bg(t.raised)).on_click(onClick))
       .child(div().relative().w_full().h(92).flex().flex_col().justify_center().rounded(7).bg(bleed ? t.background : t.surface ?? t.background).border_1().border_color(t.border).overflow_hidden()
         .when(!bleed, el => el.p(10))
         .child(preview))
@@ -100,13 +107,13 @@ export default class HarnessSettings extends View {
         .when(chosen, el => el.child(svg("mods/harns-settings/icons/check.svg").size(13).text_color(t.accent))));
   }
 
-  /** A choice between options, drawn as cards, and what the chosen one does under them. */
-  cards(t, options, chosen, preview, choose, bleed = false) {
+  /** A choice between options, drawn as cards, and what the chosen one does under them; `disabled` greys them. */
+  cards(t, options, chosen, preview, choose, bleed = false, disabled = false) {
     const now = options.find(o => o.id === chosen);
     return v_flex().w_full().gap(10).pb(18).border_b(1).border_color(t.border)
       .child(h_flex().gap(10).flex_wrap()
-        .children(options.map(o => this.card(t, `card-${o.id}`, o.name, o.id === chosen, preview(o.id), () => choose(o.id), bleed))))
-      .when(Boolean(now?.about), el => el.child(div().px(2).text_size(12.5).line_height("18px").text_color(t.dim).child(now.about)));
+        .children(options.map(o => this.card(t, `card-${o.id}`, o.name, o.id === chosen, preview(o.id), () => choose(o.id), bleed, disabled))))
+      .when(Boolean(now?.about) && !disabled, el => el.child(div().px(2).text_size(12.5).line_height("18px").text_color(t.dim).child(now.about)));
   }
 
   /** A machine with three agents, drawn small in a style: Classic boxed with its rings, Tree hanging from lines. */
@@ -174,6 +181,27 @@ export default class HarnessSettings extends View {
       .children(runs);
   }
 
+  /** A new agent session's view drawn small: its message bubbles, or its terminal's prompt and output. */
+  viewPreview(t, id) {
+    const line = (w, c, opacity = 1) => div().h(4).w(w).flex_none().rounded_full().bg(c).opacity(opacity);
+    const title = h_flex().items_center().gap(4)
+      .child(div().size(5).flex_none().rounded(1.5).bg(t.muted))
+      .child(line(34, t.dim, 0.6));
+    if (id === "terminal") return v_flex().w_full().gap(7)
+      .child(title)
+      .child(v_flex().gap(5).rounded(5).border_1().border_color(t.border).bg(t.background).px(6).py(6)
+        .child(h_flex().items_center().gap(4).child(div().w(3).h(3).flex_none().bg(t.accent)).child(line(48, t.muted, 0.7)))
+        .child(line(92, t.dim, 0.5))
+        .child(line(66, t.dim, 0.5))
+        .child(h_flex().items_center().gap(4).child(div().w(3).h(3).flex_none().bg(t.accent)).child(line(28, t.muted, 0.7))));
+    return v_flex().w_full().gap(6)
+      .child(title)
+      .child(h_flex().justify_end().child(div().h(10).w(62).rounded(5).bg(t.raised)))
+      .child(h_flex().justify_start().child(div().h(10).w(92).rounded(5).bg(t.surface).border_1().border_color(t.border)))
+      .child(h_flex().justify_start().child(div().h(10).w(58).rounded(5).bg(t.surface).border_1().border_color(t.border)))
+      .child(div().h(10).w_full().rounded(5).bg(t.surface).border_1().border_color(t.border));
+  }
+
   /**
    * The sidebar's look (one of the styles), how its agents' context bars read, and where it shows token usage, each a
    * row of picture cards.
@@ -193,16 +221,23 @@ export default class HarnessSettings extends View {
   }
 
   /**
-   * agent-chat's settings (its keys keep their herdr-chat. names): agents as a chat, and the background behind the
-   * chat: on unless `herdr-chat.animation` is false, playing one of its scenes (`herdr-chat.backdrop`). Picking a
-   * scene while it's off turns it on.
+   * agent-chat's settings (its keys keep their herdr-chat. names): agents as a chat, where a new session starts
+   * (`herdr-chat.default-view`), and the background behind the chat: on unless `herdr-chat.animation` is false, playing
+   * one of its scenes (`herdr-chat.backdrop`). Picking a scene while it's off turns it on.
    */
   chat(t) {
     const scene = SCENE_NAMES.some(s => s.id === shared("herdr-chat.backdrop")) ? shared("herdr-chat.backdrop") : SCENE_NAMES[0].id;
+    const chat = shared("herdr-chat.chat") !== false;
+    const view = shared("herdr-chat.default-view") === "terminal" ? "terminal" : "chat";
     return v_flex().w_full()
       .child(this.heading(t, "Chat"))
       .child(this.flag(t, "herdr-chat.chat", "Open agents as a chat", "Off: agents' tabs show their terminal, without the Chat and Terminal switch.",
         on => { if (!on && find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" }); }))
+      .child(div().h(18))
+      .child(this.heading(t, "New sessions"))
+      .when(!chat, el => el.child(div().px(2).pb(10).text_size(12.5).line_height("18px").text_color(t.dim)
+        .child("No effect while Open agents as a chat is off: every agent tab opens on its terminal.")))
+      .child(this.cards(t, VIEWS, view, id => this.viewPreview(t, id), id => setShared("herdr-chat.default-view", id), false, !chat))
       .child(div().h(18))
       .child(this.heading(t, "Background"))
       .child(this.flag(t, "herdr-chat.animation", "Animated background", "A dimmed scene behind the chat. Off: the plain page."))

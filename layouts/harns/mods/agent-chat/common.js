@@ -29,8 +29,15 @@ export function chatOn() {
   return shared("herdr-chat.chat") !== false;
 }
 
+/**
+ * Which view a session opens on: the one it was left in (herdr-chat.views), else the default new sessions get
+ * (herdr-chat.default-view: "terminal", or "chat" unless set). Off for every tab when herdr-chat.chat is false.
+ */
 export function preferredView(key) {
-  return !chatOn() || (shared(VIEWS_KEY) ?? {})[key] === "terminal" ? "terminal" : "chat";
+  if (!chatOn()) return "terminal";
+  const seen = (shared(VIEWS_KEY) ?? {})[key];
+  if (seen === "chat" || seen === "terminal") return seen;
+  return shared("herdr-chat.default-view") === "terminal" ? "terminal" : "chat";
 }
 
 function remember(key, mode) {

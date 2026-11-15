@@ -58,8 +58,9 @@ Colours come from the active theme; icons are the mod's own SVGs in the theme's 
 
 - **Agents:** a terminal gets the toggle when its program has an adapter in `harnesses/` (see
   Adding an agent below). Every other tab shows its terminal.
-- **View:** a new agent session opens on Chat. Each session keeps the view it was left in, across
-  restarts (the latest 200, shared key `herdr-chat.views`). Shared `herdr-chat.chat` false (harns's Settings sets
+- **View:** a new agent session opens on Chat, unless shared `herdr-chat.default-view` names Terminal (harns's
+  Settings sets it). Each session keeps the view it was left in, across restarts (the latest 200, shared key
+  `herdr-chat.views`). Shared `herdr-chat.chat` false (harns's Settings sets
   it) keeps every tab on its terminal, without the toggle.
 - **Session logs:** the log each session reads is kept across restarts (the latest 200, shared key
   `herdr-chat.paths`, by address and start: `{ path, hint, cwd }`). `cwd` is the folder a Pi or Codex
@@ -200,8 +201,8 @@ the terminal itself belongs to the layout. The same mod runs twice: as the chat
 - `herdr-app check ~/.config/herdr-app/mods/agent-chat` passes and `herdr-app status` shows no
   errors on the `herdr-chat` layout.
 - `npm test` passes on Linux or macOS.
-- A new tab for each supported agent opens on its chat, with the toggle in the header;
-  Terminal brings the terminal back, and each session keeps its view after a restart.
+- A new tab for each supported agent opens on its chat, unless the default view is Terminal, with the toggle in the
+  header; Terminal brings the terminal back, and each session keeps its view after a restart.
 - A message sent from the chat reaches the terminal as plain text, and the reply appears as it's
   written.
 - An agent on another machine shows its conversation the same way.
