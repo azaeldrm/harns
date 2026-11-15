@@ -25,6 +25,7 @@ what it is.
   icon it loads from `mods/<itself>/icons/`.
 - `scripts/install.py`: installs the harns listing into `~/.config/herdr-app`.
 - `tests/`: Node and Python tests, run against the built mods.
+- `demo/`: trailhead, the demo project for screenshots, as files; `scripts/demo.py` builds it as a git checkout.
 
 ## Commands
 
@@ -33,6 +34,7 @@ python scripts/package.py                        # build the listings from src/
 npm test                                         # checks the listings are current, then runs every test
 herdr-app check layouts/harns/mods/<mod>         # load a mod once
 python scripts/install.py --no-switch --no-relays   # install into the live app
+python scripts/demo.py [--on <machine>] [--branch <b>]   # build the demo project in ~/.cache/harns-demo
 herdr-app status                                 # what the app shows, and errors
 npm install && npm run vendor:pele               # update the vendored Pele (mermaid)
 ```
@@ -56,7 +58,8 @@ of the live app, set `git -c core.hooksPath=<empty folder>` for those commands.
 - Sizes from `on_size_change` are zoomed pixels: convert with `designPx`.
 - Effects tied to an event (a ripple on landing) are driven from the view, one native `transition` per step.
 - Design choices are shown first, as a throwaway preview dialog in `~/.config/herdr-app/mods/`, then removed.
-- Screenshots use the demo `pantry` project; the folder and branch names of real sessions are blurred.
+- Screenshots use the demo project trailhead (`demo/`, built with `scripts/demo.py`); the folder and branch names of
+  real sessions are blurred.
 - No comments in code, only docstrings: a `/** */` block right above a function, method or class in JavaScript, its
   docstring in Python, saying its purpose in full sentences wrapped at about 120 columns. What a docstring can't hold
   goes in `RECIPE.md` or the commit message. Shebangs and markers code reads (`# harns: points adb` in `adb.sh`) stay.

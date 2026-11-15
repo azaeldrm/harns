@@ -17,6 +17,8 @@
 # by scripts/package.py; the rest of each folder (RECIPE.md, preview.png, layouts/, themes/...) is edited here.
 !/layouts/
 !/mods/
+# trailhead, the demo project for screenshots, as files; scripts/demo.py builds it as a git checkout.
+!/demo/
 
 gpui-kit.d.ts
 jsconfig.json
