@@ -1,5 +1,5 @@
 import { View, div, image, svg } from "gpui-kit";
-import { h_flex, v_flex, Popup } from "gpui-base";
+import { h_flex, v_flex, Popup, Popover } from "gpui-base";
 import { theme, run, props, window, shared, setShared, updates, layout, agents, openOverlay } from "herdr";
 import { find, narrow } from "./layout.js";
 import { usageDays, usagePlace } from "./token-usage.js";
@@ -46,6 +46,34 @@ export default class WorkspaceChrome extends View {
           .child(usageDetails(t, days, { icon: "mods/harns-chrome/icons/coins.svg", errors: state?.errors })))));
   }
 
+  /**
+   * The folded footer: one gear (with the update dot when an update is ready) that opens a small menu beside the rail
+   * with what the open footer shows side by side: Settings, Add machine and harns's Settings. A pick, a press outside
+   * or Escape closes it.
+   */
+  railMenu(t, ready, actions) {
+    const item = (id, icon, name, action, extra = null) => h_flex().id(`rail-menu-${id}`).h(30).px(8).gap(10).items_center().rounded(6)
+      .cursor_pointer().hover(s => s.bg(t.hover))
+      .on_click((e, cx) => { this.menuOpen = false; cx.notify(); action(e, cx); })
+      .child(svg(`mods/harns-chrome/icons/${icon}.svg`).size(15).flex_none().text_color(t.muted))
+      .child(div().flex_1().text_size(13).text_color(t.foreground).child(name))
+      .when(Boolean(extra), el => el.child(extra));
+    const gear = div().id("rail-gear").relative().size(28).flex().items_center().justify_center().rounded(7).cursor_pointer()
+      .bg(this.menuOpen ? t.hover : "#00000000").text_color(this.menuOpen ? t.foreground : t.muted)
+      .hover(s => s.bg(t.hover).text_color(t.foreground)).tooltip(ready ? "Settings · update ready" : "Settings")
+      .child(svg("mods/harns-chrome/icons/settings.svg").size(15))
+      .when(ready, el => el.child(div().absolute().top(3).right(3).size(6).rounded_full().bg(t.accent)));
+    return Popover.new("rail-menu").open(Boolean(this.menuOpen)).anchor("bottom_left")
+      .on_open_change((open, cx) => { this.menuOpen = open; cx.notify(); })
+      .trigger(gear)
+      .content(v_flex().w(210).ml(40).mb(-34).p(5).gap(1).rounded(9).border_1().border_color(t.border).bg(t.popover ?? t.raised).shadow_md()
+        .child(item("settings", "settings", "Settings", actions.settings, ready
+          ? h_flex().gap(5).items_center().child(div().size(6).rounded_full().bg(t.accent)).child(div().text_size(11).text_color(t.dim).child("update"))
+          : null))
+        .child(item("machine", "server", "Add machine", actions.machine))
+        .child(item("harns", "harness-logo-mono", "harns settings", actions.harns)));
+  }
+
   render() {
     const t = theme();
     const collapsed = narrow();
@@ -56,12 +84,15 @@ export default class WorkspaceChrome extends View {
         .on_click(action).child(svg(`mods/harns-chrome/icons/${name}.svg`).size(15))
         .when(dot, el => el.child(div().absolute().top(3).right(3).size(6).rounded_full().bg(t.accent)));
       const ready = Boolean(updates().app.ready);
-      const gear = icon("settings", "settings", ready ? "Settings · update ready" : "Settings", () => run("app.settings"), ready);
-      const machine = icon("machine", "server", "Add machine", () => run("mod.open", { name: "machine-add" }));
-      const harns = icon("harns-settings", "harness-logo-mono", "harns settings",
-        () => openOverlay({ mod: "harns-settings", kind: "dialog", width: 760 }));
-      if (collapsed) return h_flex().size_full().bg(t.surface).items_center().justify_center().gap(2)
-        .child(gear.w(22)).child(machine.w(22));
+      const actions = {
+        settings: () => run("app.settings"),
+        machine: () => run("mod.open", { name: "machine-add" }),
+        harns: () => openOverlay({ mod: "harns-settings", kind: "dialog", width: 760 }),
+      };
+      if (collapsed) return h_flex().size_full().bg(t.surface).items_center().justify_center().child(this.railMenu(t, ready, actions));
+      const gear = icon("settings", "settings", ready ? "Settings · update ready" : "Settings", actions.settings, ready);
+      const machine = icon("machine", "server", "Add machine", actions.machine);
+      const harns = icon("harns-settings", "harness-logo-mono", "harns settings", actions.harns);
       return h_flex().size_full().bg(t.surface).items_center().gap(2).px(12).child(gear).child(machine).child(harns)
         .when(usagePlace(shared("harness.usage")) === "footer", el => el.child(div().flex_1()).child(this.usage(t, 12)));
     }
