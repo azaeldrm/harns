@@ -66,20 +66,22 @@ Left to right: a sidebar, then the work column. There's no system title bar.
   - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
     harns's Settings (the logo, a 760 px dialog from `harns-settings`: General, Sidebar, Chat, Status bar, Simulator,
     which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `harness.usage`,
-    `herdr-chat.chat`, `herdr-chat.animation`, `herdr-chat.backdrop`, `harness.status`, `harness.quota.claude`,
-    `harness.quota.codex`, `harness.commands-hint` and `harness.simulator`). A choice between options (the sidebar's
-    style, its context bars, where token usage shows, the chat's background) is a row of picture cards, as Herdr's
+    `herdr-chat.chat`, `herdr-chat.default-view`, `herdr-chat.animation`, `herdr-chat.backdrop`,
+    `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and
+    `harness.simulator`). A choice between options (the sidebar's style, its context bars, where token usage
+    shows, where a new agent session starts, the chat's background) is a row of picture cards, as Herdr's
     settings show layouts: each a small live drawing of what it gives, the chosen one outlined in amber with a check,
-    and what it does under them. On/off settings are switches. The chat's background is a switch (Animated background)
+    and what it does under them. Where a new agent session starts is grayed, its cards unclickable, while Open
+    agents as a chat is off. On/off settings are switches. The chat's background is a switch (Animated background)
     over a card per scene; each card's picture is a real frame of the scene, saved by `scripts/scene-previews.mjs` (`npm
     run previews`) into `harns-settings/scene-previews.js`, and the scenes' names come from
     `src/shared/backdrop-scenes.js`, which agent-chat plays from too. Picking a scene turns the background on.
 - **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
   with the program icon, the active one underlined in amber (2 px) with a close button;
   then +, Files, Changes, Simulator (Windows and Linux), and the window buttons on Windows and Linux.
-- **Work area** (12 px padding): the shown tab, as a chat (where a new agent session starts) or as terminal cards (10 px
-  radius, 1 px `border`, a 42 px header with the Chat / Terminal toggle). Files,
-  Changes or Simulator open in a 368 px panel on the right.
+- **Work area** (12 px padding): the shown tab, as a chat (where a new agent session starts unless its default
+  view is Terminal) or as terminal cards (10 px radius, 1 px `border`, a 42 px header with the Chat / Terminal
+  toggle). Files, Changes or Simulator open in a 368 px panel on the right.
 - **Status bar** (42 px, `surface`): the shown space's machine, the focused pane's folder and its branch, that
   branch's open pull request (an amber PR icon, `#number` and its title, cut short), "N needs you" when agents on
   that machine are blocked, then Claude Code and Codex quota bars (44 × 4 px)
@@ -374,6 +376,7 @@ and the other `harness-*` are `harns-*`), then removes the old copies (one anoth
 - Folding the sidebar leaves icons, rings and statuses centered in the rail, each level with its row in the open list.
 - The status bar names the focused pane's machine, folder and branch, links the branch's open PR, and fills the quota
   bars.
-- A new Claude Code tab opens on its chat and toggles to Terminal from its header.
+- A new Claude Code tab opens on its chat, unless the default view is Terminal, and toggles to Terminal from its
+  header.
 - Running the installer installs agent-chat with the rest and removes the retired mods; running it again leaves no
   layout backup behind.
