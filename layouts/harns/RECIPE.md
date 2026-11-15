@@ -93,9 +93,12 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
   blocked is a "Needs you" badge (a "!" in the rail); done is a green check (the theme's
   `ansi2`); idle shows nothing open (the card's bar under the icon shows its context) and, on the rail, the same
-  14 × 3 px context bar. It fills with the share used (gray, amber above 75%, red `#d88179` above 90%), or, with
-  shared `harness.context-bar` `health` (Settings → Sidebar → Context bar), drains like a health bar to the share left
-  (green, amber below 45% left, red below 25%); hovering it gives the percentage either way. On the
+  14 × 3 px context bar. It fills with the share used (gray, amber above 75%, red `#d88179` above 90%), or, with shared
+  `harness.context-bar` `health` (Settings → Sidebar → Context bar), drains like a health bar to the share left (green,
+  amber below 45% left, red below 25%); hovering it gives the percentage either way. The chat's context meter under the
+  reply box follows the same choice (`context-bar.js`, shared by both): with the health bar it shows a pixel heart
+  (`heart-pixel.svg`, 7 × 6 squares) in the bar's color and "N% left", and drains in those colors, its tooltip keeping
+  the tokens in use; with the fill, tokens used of the window, filling (accent, orange from 80%, red from 95%). On the
   rail the mark sits on the row's second line, under the icon.
   With the Health bar (Tree), the program logo carries the status instead: working, it hops in amber from side to side
   over the bot in a round arc (even pace across, easing up and down), an amber ripple ring spreading where it lands

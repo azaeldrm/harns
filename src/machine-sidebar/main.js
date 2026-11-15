@@ -12,6 +12,7 @@ import { NewMenu } from "./new-menu.js";
 import { find, narrow } from "./layout.js";
 import { collectUsage, readMachineUsage, usageDays, usageDue, usagePlace } from "./token-usage.js";
 import { usageDetails, usageRailMark, usageStrip } from "./usage-card.js";
+import { contextText, healthBars, healthFill } from "./context-bar.js";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
 const statsFor = (machine, t) => machineMetrics(machine, false, t);
@@ -45,16 +46,12 @@ const underMachine = (t, rows, last, elbowAt) => {
     .children(treeLines(t, 18, elbowAt, !last, i === 0, 0, 10)));
 };
 
-const healthBars = () => shared("harness.context-bar") === "health";
-const contextText = used => healthBars() ? `${Math.round(100 - used)}% left` : `${Math.round(used)}% used`;
-
 /**
  * The context window as harns's Settings chose: filling with what's used (gray, amber past 75%, red past 90%), or
- * as a health bar draining to what's left (green, amber below 45% left, red below 25%).
+ * as the health bar draining to what's left (`healthFill`, shared with the chat's meter).
  */
 function contextBar(t, used, width, height = 3) {
-  const health = healthBars(), share = health ? 100 - used : used;
-  const color = health ? (share < 25 ? "#d88179" : share < 45 ? t.working : t.ansi2 ?? t.done) : (share > 90 ? "#d88179" : share > 75 ? t.working : t.muted);
+  const { share, color } = healthFill(t, used) ?? { share: used, color: used > 90 ? "#d88179" : used > 75 ? t.working : t.muted };
   return div().w(width).h(height).flex_none().rounded_full().bg(t.border)
     .when(share > 0, el => el.child(div().h_full().rounded_full().w(Math.max(2, Math.round(width * share / 100))).bg(color)));
 }
