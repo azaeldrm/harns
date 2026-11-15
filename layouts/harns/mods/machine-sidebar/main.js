@@ -170,18 +170,6 @@ function hopParts(t, badge, box, top, [a, b], scale, hop) {
   ];
 }
 
-/**
- * A working sub-agent's logo hopping at the right end of its row, where an agent's status sits: the hop it would make
- * over its 14 px bot (agentPic's height and 5 px swing), without the bot, the swing centred in a 22 px slot.
- */
-function hopSpot(t, p, ring, hop) {
-  const size = 14, slot = 22, badge = badgeOf(p, Math.round(size * 0.65), t.working, ring);
-  if (!badge) return null;
-  const box = Math.round(size * 0.65) + 2, left = (slot - box - 5) / 2;
-  return div().relative().w(slot).h(size).flex_none()
-    .children(hopParts(t, badge, box, size + 6 - box, [left, left + 5], size / 16, hop));
-}
-
 const READ_AFTER = [1000, 4000];
 
 export default class Agents extends View {
@@ -318,8 +306,8 @@ export default class Agents extends View {
   }
 
   /**
-   * A working logo's place in its own hops ({ n, up, go, ripple } for agentPic and hopSpot): counted from the beat it
-   * was first drawn working on, rising on its even beats (each landing starts a hop) and falling on its odd ones.
+   * A working logo's place in its own hops ({ n, up, go, ripple } for agentPic): counted from the beat it was first
+   * drawn working on, rising on its even beats (each landing starts a hop) and falling on its odd ones.
    * `ripple` names its latest landing's ring: its address, so two logos landing on one beat don't share a ring, and
    * the shared beat of that landing, since its own count starts again at 0 each time it starts working.
    */
@@ -787,7 +775,6 @@ export default class Agents extends View {
     const ring = this.hoveredSub === k.address ? t.hover : on ? t.raised : t.surface;
     if (hops) this.hopping = true;
     const pic = classic() ? icon(k.program, 14, color)
-      : hops && !compact ? agentPic(t, null, 14, color, ring, true)
       : agentPic(t, k.program, 14, color, ring, true, hops ? this.hopFor(k.address) : null);
     const name = k.name || k.template || k.program?.name || k.address;
     const box = h_flex().id(`sub-${k.address}`).relative().h(26).flex_none().items_center().rounded(8)
@@ -799,16 +786,16 @@ export default class Agents extends View {
       .on_click(() => this.peek(k.address));
     if (compact) return box.justify_center().tooltip(name).child(pic ?? this.status(t, { status: st }, true));
     return box
-      .pl(classic() ? 17 * s.lines.length + 17 : 23 * s.lines.length + 11)
+      .pl(classic() ? 17 * s.lines.length + 17 : 23 * s.lines.length + 9)
       .pr(8)
       .text_size(12.5)
       .children(classic()
         ? s.lines.flatMap((l, j) => l ? [div().absolute().left(17 + 17 * j).top(0).w(1).bg(mix(t.dim, t.surface, 0.4))
           .when(l === "└", el => el.h(13)).when(l !== "└", el => el.bottom(0))] : [])
-        : s.lines.flatMap((l, j) => treeLines(t, 17 + 23 * j, 13, l === "│" || l === "├", l === "├" || l === "└")))
-      .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
+        : s.lines.flatMap((l, j) => treeLines(t, 15 + 23 * j, 13, l === "│" || l === "├", l === "├" || l === "└")))
+      .when(Boolean(pic), el => el.child(div().mr(classic() ? 8 : 10).child(pic)))
       .child(div().flex_1().truncate().text_color(bright ? t.foreground : t.muted).child(name))
-      .child(hops ? hopSpot(t, k.program, ring, this.hopFor(k.address)) : this.status(t, { status: st }));
+      .child(hops ? div().size(14).flex_none() : this.status(t, { status: st }));
   }
 
   /** The machine's panes that aren't agents: a shell, a dev server, lazygit. */
@@ -1034,7 +1021,7 @@ export default class Agents extends View {
       }
       return card.px(8)
         .child(h_flex().w_full().gap(8).items_center()
-          .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`)
+          .when(Boolean(pic), el => el.child(div().id(`agent-fold-${a.address}`).ml(-2).mr(2)
             .when(subs.length > 0, el => el.on_click((_e, cx) => {
               cx.stop_propagation();
               this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
@@ -1044,7 +1031,7 @@ export default class Agents extends View {
           .when(subs.length > 0, el => el.child(fold(a, subs)))
           .child(this.hovered === a.address ? pin : hops || finished || asks ? div().size(14).flex_none() : this.status(t, a)))
         .child(h_flex().w_full().gap(8).items_center().text_size(11.5).text_color(t.dim)
-          .when(Boolean(pic), el => el.child(h_flex().w(16).flex_none().justify_center().when(Boolean(bar), c => c.child(bar))))
+          .when(Boolean(pic), el => el.child(h_flex().w(16).flex_none().ml(-2).mr(2).justify_center().when(Boolean(bar), c => c.child(bar))))
           .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
             .children(where.map(([text, glyph]) => h_flex().gap(4).items_center()
               .when(glyph === "folder", el => el.flex_none()).when(glyph !== "folder", el => el.min_w(0))
