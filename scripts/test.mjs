@@ -10,7 +10,7 @@ const node = ['usage', 'token-usage', 'turns', 'probes', 'snapshots', 'markdown'
   'sweep', 'backdrop', 'diagrams', 'copy', 'caret', 'retracted', 'runs-with', 'codex-daemon', 'previews', 'skills', 'sessions',
   'read-cue', 'fold', 'measure', 'drafts', 'focus', 'prompts', 'harnesses', 'structure'];
 const scripts = ['steering', 'codex-logs', 'opencode', 'session-pick', 'images', 'reader_names', 'process-tree',
-  'claude-config-dir', 'codex-daemon', 'skills', 'step-row', 'prompt-keys'];
+  'claude-config-dir', 'codex-daemon', 'skills', 'step-row', 'prompt-keys', 'demo'];
 
 const unixOnly = new Set(['steering.py', 'images.py', 'codex-daemon.py', 'skills.py', 'step-row.py', 'sessions.mjs']);
 const here = name => process.platform !== 'win32' || !unixOnly.has(name);
