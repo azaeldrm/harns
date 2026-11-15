@@ -4,9 +4,19 @@ import { ICONS } from "../common.js";
 import { COLUMN } from "../ui/primitives.js";
 import { designPx, designHeight } from "../measure.js";
 
-const TAIL = 20;
+const FADE = 32;
+const TAIL = FADE;
 const MEASURE_AT_ONCE = 12;
-const FADE = 20;
+
+/**
+ * A fade as tall as FADE from clear to the page's `color`, towards the bottom edge (`down`) or the top one: a step per
+ * pixel, so it reads as smooth over the backdrop (herdr's `bg` takes flat colors only, no gradient).
+ */
+function fade(color, down) {
+  const STEPS = FADE;
+  return v_flex().absolute().left(0).right(0).h(FADE).when(down, el => el.bottom(0)).when(!down, el => el.top(0))
+    .children(Array.from({ length: STEPS }, (_, i) => div().w_full().flex_1().bg(color).opacity(down ? (i + 1) / STEPS : (STEPS - i) / STEPS)));
+}
 const TURN_GAP = 32;
 const gapBefore = m => m.turnGap ? TURN_GAP : m.kind === "copy" || m.kind === "diagram-tools" ? 4 : m.kind === "step" ? 0 : 10;
 
@@ -14,7 +24,7 @@ export class ChatList {
   /** The conversation's scrolling list: row heights, measuring, and staying at the newest message. */
   constructor() {
     this.scroll = VirtualListScrollHandle.new();
-    this.following = true; this.visibleEnd = 0; this.rowCount = 0;
+    this.following = true; this.visibleStart = 0; this.visibleEnd = 0; this.rowCount = 0; this.above = false;
     this.needsScroll = true; this.scrollAskedAt = Date.now(); this.lastAsk = Date.now(); this.laidOut = 0;
     this.pendingCount = -1; this.settling = true; this.isEmpty = true;
     this.heights = {}; this.changedAt = {}; this.lastHeight = {}; this.measuredAt = "";
@@ -41,7 +51,8 @@ export class ChatList {
   }
 
   /**
-   * The scrolling part of the view's timer: lands a pending scroll, then keeps `following` true to what's on screen.
+   * The scrolling part of the view's timer: lands a pending scroll, then keeps `following` (at the newest message) and
+   * `above` (messages out of sight above) true to what's on screen.
    */
   tick(cx) {
     if (this.following && this.needsScroll) {
@@ -57,11 +68,12 @@ export class ChatList {
     }
     if (this.settling) { if (!this.isEmpty) this.follow(); return; }
     const atBottom = this.isEmpty || this.rowCount === 0 || this.visibleEnd >= this.rowCount;
-    if (atBottom !== this.following) { this.following = atBottom; cx.notify(); }
+    const above = !this.isEmpty && this.visibleStart > 0;
+    if (atBottom !== this.following || above !== this.above) { this.following = atBottom; this.above = above; cx.notify(); }
   }
 
   /** The list's body and its off-screen measurer (null when nothing needs measuring). */
-  render(cx, { rows, empty, t, inner, zoom, heightKey, waitsFor, row, onItemClick, canJump, beforeScroll, seeThrough }) {
+  render(cx, { rows, empty, t, inner, zoom, heightKey, waitsFor, row, onItemClick, canJump, beforeScroll }) {
     this.isEmpty = empty;
     const measuredAt = `${inner}@${window.rem_size()}`;
     if (measuredAt !== this.measuredAt) { this.heights = {}; this.changedAt = {}; this.lastHeight = {}; this.measuredAt = measuredAt; }
@@ -94,7 +106,7 @@ export class ChatList {
       .on_size_change(size => { this.listH = designPx(size.height, zoom); })
       .on_mouse_move(e => { this.pointerX = designPx(e.local_position.x, zoom); })
       .child(v_virtual_list("herdr-chat-messages", rows.length + 1, [...sizes, TAIL], i => i < rows.length ? rows[i].key : "end-of-chat", range => {
-        this.visibleEnd = range.end;
+        this.visibleStart = range.start; this.visibleEnd = range.end;
         this.laidOut = Date.now();
         const out = [];
         for (let i = range.start; i < range.end; i++)
@@ -103,8 +115,8 @@ export class ChatList {
             : div().w_full().h(TAIL));
         return out;
       }).track_scroll(this.scroll).on_item_click(onItemClick).size_full())
-      .when(!seeThrough, el => el.child(v_flex().absolute().bottom(0).left(0).right(0).h(FADE)
-        .children(Array.from({ length: 8 }, (_, i) => div().w_full().flex_1().bg(t.background).opacity((i + 1) / 8)))))
+      .when(this.above, el => el.child(fade(t.background, false)))
+      .child(fade(t.background, true))
       .when(!this.following && !this.needsScroll && canJump, el => el.child(h_flex().absolute().bottom(12).left(0).right(0).justify_center()
         .child(div().id("jump-bottom").size(34).flex().items_center().justify_center().rounded(17).cursor_pointer()
           .bg(t.popover ?? t.surface).border_1().border_color(t.border).shadow_md().text_color(t.foreground)

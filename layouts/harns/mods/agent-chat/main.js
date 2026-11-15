@@ -497,7 +497,7 @@ export default class HerdrChat extends View {
       cx.timer.after(0, () => this.backdrop.set_props(this.backdropProps()));
     }
     const { body, measure } = this.list.render(cx, {
-      rows, empty, t, inner, zoom: this.zoom, beforeScroll: () => this.noticeVisit(), seeThrough: this.backdropShown,
+      rows, empty, t, inner, zoom: this.zoom, beforeScroll: () => this.noticeVisit(),
       heightKey: m => `${m.key}${this.reader.session.open[m.key] ? ":open" : ""}${m.kind === "diagram" ? `:${diagramFor(m.text, t).state}` : ""}`,
       waitsFor: m => m.kind === "diagram" && diagramFor(m.text, t).state === "queued",
       row: m => row(m, { t, open: this.reader.session.open, width: this.width, sent: this.composer.sent, machine: target()?.machine, copied: this.copied }),
@@ -529,7 +529,7 @@ export default class HerdrChat extends View {
       .on_size_change((size, cx) => { this.rootPx = size.width; const w = designPx(size.width, this.zoom); if (w >= 200 && Math.abs(w - this.width) > 8) { this.width = w; cx.notify(); } })
       .child(zoomProbe((zoom, cx) => { if (Math.abs(zoom - this.zoom) > 0.001) { this.zoom = zoom; if (this.rootPx) this.width = designPx(this.rootPx, zoom); cx.notify(); } }))
       .on_drop((e, cx) => this.composer.dropFiles(e.paths ?? [], cx))
-      .child(this.header(t, active))
+      .child(this.header(t, active).when(this.backdropShown && !empty, el => el.bg(t.background).rounded_t(10)))
       .when(empty && /^Opening/.test(this.note || ""), el => el.child(this.placeholder(t)))
       .when(empty && this.fresh(active), el => el.child(this.welcome(t, active)))
       .when(empty && !/^Opening/.test(this.note || "") && !this.fresh(active), el => el.child(v_flex().flex_1().min_h(0).items_center().justify_center().gap(14).px(24)
@@ -539,6 +539,7 @@ export default class HerdrChat extends View {
       .when(!empty, el => el.child(body))
       .when(Boolean(measure), el => el.child(measure))
       .child(v_flex().w_full().flex_none().items_center().px(24).pt(12).pb(14).gap(6)
+        .when(this.backdropShown && !empty, el => el.bg(t.background).rounded_b(10))
         .when(Boolean(status), el => el.child(status))
         .when(!status, el => el.child(div().w_full().h(24).flex_none()))
         .child(this.composer.render(t, active, this.sessionLine(t, active, this.modelChip(t, active)))));
