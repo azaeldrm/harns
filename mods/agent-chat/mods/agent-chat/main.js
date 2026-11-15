@@ -32,7 +32,7 @@ function inputHighlight(cx) {
   set_theme({ appearance: th.appearance, tokens: { colors: { ...th.colors, accent: want, selection: see }, spacing: th.spacing, radius: th.radius } });
 }
 
-const BACKDROP_SCENE = "herdr-chat.backdrop", BACKDROP_DIM = 0.3, BACKDROP_CHAT_DIM = 0.12;
+const BACKDROP_SCENE = "herdr-chat.backdrop", BACKDROP_DIM = 0.3, BACKDROP_CHAT_DIM = 0.07;
 const STIR_MS = 5000;
 
 const SPARK = ["·", "✢", "✶", "✻", "✽", "✻", "✶", "✢"];
