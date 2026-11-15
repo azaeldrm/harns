@@ -20,6 +20,7 @@ import { isDiagramViewer, openDiagram, DiagramViewer } from "./components/diagra
 import { BackdropView } from "./backdrop/view.js";
 import { sceneFor, nextScene } from "./backdrop/scenes/index.js";
 import { noticeTerminals } from "./opened.js";
+import { contextText, healthFill } from "./context-bar.js";
 
 function inputHighlight(cx) {
   const t = theme(), th = cx.theme();
@@ -417,7 +418,9 @@ export default class HerdrChat extends View {
 
   /**
    * Under the message box: the effort (a menu) and the permission mode (a click moves to the next) at the left, each
-   * with its icon; the context used as a gauge and a bar at the right.
+   * with its icon; the context at the right: a gauge with the tokens used of the window and a filling bar, or with
+   * harns's health bar chosen, a pixel heart in the bar's color with the share left ("62% left") and a bar draining as
+   * the sidebar's does.
    */
   sessionLine(t, active, chip = null) {
     const look = active ? runsWith(this.reader.session.meta, active.harness) : null;
@@ -435,13 +438,14 @@ export default class HerdrChat extends View {
     const mode = modeText ? item("session-mode", "shield", modeText, sw.nextMode ? "Mode · click for the next one" : "Mode")
       .when(Boolean(sw.nextMode), el => clickable(el).on_click((_e, cx) => this.cycle("mode", active, look.mode?.key, cx))) : null;
     const c = look.context;
-    const level = c?.share == null ? t.muted : c.share >= 95 ? "#d88179" : c.share >= 80 ? "#e8823a" : t.accent;
+    const health = c?.share == null ? null : healthFill(t, c.share);
+    const bar = c?.share == null ? null : health ?? { share: c.share, color: c.share >= 95 ? "#d88179" : c.share >= 80 ? "#e8823a" : t.accent };
     const gauge = c ? h_flex().id("session-context").gap(6).items_center().text_size(11.5).text_color(t.muted)
       .tooltip(c.window ? `${c.used.toLocaleString()} of ${c.window.toLocaleString()} tokens of context in use` : `${c.used.toLocaleString()} tokens of context in use`)
-      .child(icon("gauge", 12, t.dim))
-      .child(c.window ? `${tokens(c.used)} / ${tokens(c.window)}` : tokens(c.used))
-      .when(c.share != null, el => el.child(div().w(96).h(4).flex_none().rounded_full().bg(t.border)
-        .child(div().h_full().rounded_full().w(Math.max(2, Math.round(96 * c.share / 100))).bg(level)))) : null;
+      .child(health ? icon("heart-pixel", 13, bar.color) : icon("gauge", 12, t.dim))
+      .child(health ? contextText(c.share) : c.window ? `${tokens(c.used)} / ${tokens(c.window)}` : tokens(c.used))
+      .when(Boolean(bar), el => el.child(div().w(96).h(4).flex_none().rounded_full().bg(t.border)
+        .when(bar.share > 0, b => b.child(div().h_full().rounded_full().w(Math.max(2, Math.round(96 * bar.share / 100))).bg(bar.color))))) : null;
     return h_flex().w_full().h(24).px(4).items_center()
       .child(h_flex().flex_1().min_w(0).gap(2).items_center()
         .when(Boolean(chip), el => el.child(chip))

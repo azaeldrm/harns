@@ -24,7 +24,7 @@ const BACKGROUNDS = SCENE_NAMES.map(s => ({ id: s.id, name: s.label, about: `${s
 
 const CONTEXT_BARS = [
   { id: "fill", name: "Fill", about: "Fills up as a session uses its context window: gray, amber past 75%, red past 90%." },
-  { id: "health", name: "Health bar", about: "Drains as a session uses its context window: green, amber below 45% left, red below 25%." },
+  { id: "health", name: "Health bar", about: "Drains as a session uses its context window: green, amber below 45% left, red below 25%. The chat's context meter drains with it and says how much is left." },
 ];
 
 const USAGE = [
