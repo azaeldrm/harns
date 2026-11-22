@@ -1,0 +1,28 @@
+import { stage } from "./stage.mjs";
+const s = stage();
+const { MessageQueue, TURN_START } = await s.load("model/queue.js");
+let failed = 0;
+const check = (got, want, what) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  console.log(`${ok ? "PASS" : "FAIL"} ${what}${ok ? "" : `: got ${JSON.stringify(got)}`}`);
+  if (!ok) failed++;
+};
+const msg = text => ({ text, attachments: [] });
+const q = new MessageQueue();
+q.add("a", msg("first")); q.add("a", msg("second")); q.add("b", msg("other"));
+check(q.list("a").map(m => m.text), ["first", "second"], "messages wait in the order written, per session");
+check([q.take("a", "working", 0), q.take("a", "blocked", 0)], [null, null], "nothing is sent while the agent works or asks something");
+check(q.take("a", "done", 1000)?.text, "first", "the oldest goes once the turn is done");
+check(q.take("a", "done", 2000), null, "the next waits while the turn it started hasn't begun");
+check(q.take("a", "working", 3000), null, "and while that turn runs");
+check(q.take("a", "idle", 4000)?.text, "second", "then goes when that turn ends");
+check(q.list("a"), [], "the session's queue is empty");
+check(q.owners(), ["b"], "other sessions keep theirs");
+q.take("b", "idle", 0);
+q.add("b", msg("later"));
+check(q.take("b", "idle", TURN_START + 1)?.text, "later", "an agent that never showed working doesn't hold the queue forever");
+q.add("c", msg("x")); q.add("c", msg("y")); q.remove("c", 0);
+check(q.list("c").map(m => m.text), ["y"], "a queued message can be removed");
+q.remove("c", 0);
+check(q.owners(), [], "removing the last one forgets the session");
+process.exit(failed ? 1 : 0);

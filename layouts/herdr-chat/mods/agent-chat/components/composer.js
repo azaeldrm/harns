@@ -3,7 +3,8 @@ import { v_flex, h_flex, Textarea, TextareaState } from "gpui-base";
 import { shared, hc, exec } from "herdr";
 import { ICONS, sessionOf, chatKey } from "../common.js";
 import { onWindows, modFile, removeFiles, pruneOld } from "../platform.js";
-import { target, sendMessage, pressKeys, inputBox } from "../terminal.js";
+import { target, agentTargets, sendMessage, pressKeys, inputBox } from "../terminal.js";
+import { MessageQueue } from "../model/queue.js";
 import { imageStyle, canMirror, withImages, draftPastes, textOfBox, readBack, viaDaemon } from "../harnesses/index.js";
 import { savedDraft, storeDraft, keptImages } from "../draft.js";
 import { IMAGE_FILE, attachDir, attachName, ATTACH_DIR, keepSent, sentNames, fetchSent, previewName, previewFile, staleSent, dropSent } from "../images.js";
@@ -28,7 +29,7 @@ export class Composer {
     this.input = TextareaState.new({ placeholder: "Reply…", rows: 1 });
     this.input.set_soft_wrap(true);
     this.input.set_auto_grow(1, 4);
-    this.input.on("submit", (e, cx) => { if (!e?.shift) this.enter(cx); });
+    this.input.on("submit", (e, cx) => { if (!e?.shift && Date.now() - (this.queuedAt ?? 0) > 400) this.enter(cx); });
     this.input.on("change", (_e, cx) => {
       if (Date.now() - (this.enterAt ?? 0) < 400) {
         const v = this.input.value(), s = v.replace(/\r?\n$/, "");
@@ -47,6 +48,8 @@ export class Composer {
     this.sent = new Set(); this.fetching = new Set();
     cx.spawn(async cx => { for (const n of await sentNames()) this.sent.add(n); this.sentReady = true; await this.pruneSent(); cx.notify(); });
     cx.timer.every(SENT_PRUNE_EVERY, () => { this.pruneSent(); });
+    this.queued = new MessageQueue();
+    cx.timer.every(500, cx => this.drainQueue(cx));
   }
 
   /** Whether the box holds nothing to send. */
@@ -287,16 +290,63 @@ export class Composer {
     this.send(cx);
   }
 
-  send(cx) {
-    const t = target(), typed = this.input.value().trim(), attached = this.attachments.slice();
-    if (!t || (!typed && !attached.length) || this.host.sending) return;
-    this.host.sending = true;
+  /** Takes the box's text and images out of it, for sending or queueing: null when it holds nothing. */
+  takeBox(cx) {
+    const typed = this.input.value().trim(), attached = this.attachments.slice();
+    if (!typed && !attached.length) return null;
     this.input.set_value("");
     this.attachments = this.attachments.filter(a => !attached.includes(a));
     this.keepDraft(cx);
     cx.notify();
-    const owner = this.host.key;
-    if (typed && t.status !== "blocked" && !typed.startsWith("/")) this.host.showPending(owner, typed);
+    return { text: typed, attachments: attached };
+  }
+
+  /** Sends what's in the box to the shown agent. */
+  send(cx) {
+    const t = target();
+    if (!t || this.blank() || this.host.sending) return;
+    const { text, attachments } = this.takeBox(cx);
+    this.deliver(t, this.host.key, text, attachments, cx);
+  }
+
+  /**
+   * Alt+Enter: while the agent works, the box's message waits under it (queued) until the turn ends, rather than
+   * reaching the agent mid-turn; otherwise it's sent at once.
+   */
+  queue(cx) {
+    this.enterAt = this.queuedAt = Date.now();
+    const t = target();
+    if (!t || this.blank()) return;
+    if (t.status !== "working") { this.send(cx); return; }
+    this.queued.add(this.host.key, this.takeBox(cx));
+    cx.notify();
+  }
+
+  /**
+   * Sends the next queued message of each session whose agent finished its turn (MessageQueue.take), shown or not; a
+   * message that fails goes back to its session's draft with a note.
+   */
+  drainQueue(cx) {
+    if (this.host.sending) return;
+    const targets = agentTargets();
+    for (const owner of this.queued.owners()) {
+      const t = targets.find(a => chatKey(a) === owner);
+      if (!t) continue;
+      const next = this.queued.take(owner, t.status, Date.now());
+      if (!next) continue;
+      this.deliver(t, owner, next.text, next.attachments, cx);
+      cx.notify();
+      return;
+    }
+  }
+
+  /**
+   * Sends `typed` and `attached` to the agent `t` for the session `owner`; on failure they go back to that session's
+   * draft (the box, when it's shown) and the note says why.
+   */
+  deliver(t, owner, typed, attached, cx) {
+    this.host.sending = true;
+    if (typed && t.status !== "blocked" && !typed.startsWith("/") && owner === this.host.key) this.host.showPending(owner, typed);
     const restore = () => {
       this.host.dropPending(owner, typed);
       if (this.host.key !== owner) {
@@ -316,7 +366,7 @@ export class Composer {
           await this.mirrorChain;
           if (this.mirror?.session === sessionOf(t) && this.mirror.foreign)
             throw new Error(`${t.label}'s input box has an image pasted in the terminal. Send that draft from the terminal, or clear it there, first.`);
-          if ((await inputBox("set", t, "[]")).ok) this.mirror = null;
+          if ((await inputBox("set", t, "[]")).ok && this.shown(t)) this.mirror = null;
         }
         const placed = await this.placeImages(t, attached);
         const thread = this.daemonThread(t, typed);
@@ -334,7 +384,7 @@ export class Composer {
             const k = await pressKeys(t, ["enter"]);
             if (k.code !== 0) throw new Error(k.stderr || "Send failed");
             this.keepSent(attached, placed, t, cx);
-            this.host.list.follow();
+            if (this.shown(t)) this.host.list.follow();
             return;
           }
         }
@@ -348,18 +398,46 @@ export class Composer {
   }
 
   /**
-   * After a message reaches the agent: its box starts empty, its images are kept for the conversation, and the list
-   * follows it.
+   * After a message reaches the agent: its images are kept for the conversation and, when its chat is the one shown,
+   * its box starts empty and the list follows it.
    */
   delivered(t, attached, placed, cx) {
-    this.mirror = { session: sessionOf(t), sig: "\u0000", images: [], paths: [], pasted: "", textBox: "", box: "", foreign: false };
     this.keepSent(attached, placed, t, cx);
+    if (!this.shown(t)) return;
+    this.mirror = { session: sessionOf(t), sig: "\u0000", images: [], paths: [], pasted: "", textBox: "", box: "", foreign: false };
     this.host.list.follow();
+  }
+
+  /** Whether the agent `t` is the one whose chat is shown. */
+  shown(t) {
+    return chatKey(t) === this.host.key;
   }
 
   /** The conversation to send `typed` to through the agent's daemon, or "" to type it into the terminal. */
   daemonThread(t, typed) {
     return viaDaemon(t.harness, t.status, typed) && chatKey(t) === this.host.key ? t.harness.daemon.thread(this.host.sessionPath) : "";
+  }
+
+  /**
+   * The shown session's queued messages (Alt+Enter), above the reply box: each a line with its text, sent when the
+   * agent's turn ends, with × to drop it.
+   */
+  queuedStrip(t) {
+    const owner = this.host.key, items = this.queued.list(owner);
+    if (!items.length) return null;
+    return v_flex().w_full().gap(4).children(items.map((m, i) => {
+      const images = m.attachments.length ? `${m.attachments.length} image${m.attachments.length > 1 ? "s" : ""}` : "";
+      return h_flex().id(`queued-${i}`).w_full().h(30).pl(14).pr(6).gap(8).items_center().rounded(12).border_1().border_color(t.border)
+        .bg(this.host.backdropShown ? `${t.surface.slice(0, 7)}a6` : t.surface).tooltip("Sends when the agent's turn ends")
+        .child(icon("clock", 13, t.dim))
+        .child(div().flex_none().text_size(12).text_color(t.dim).child("Queued"))
+        .child(div().flex_1().min_w(0).truncate().text_size(13).text_color(t.muted).child(m.text.replace(/\s+/g, " ") || images))
+        .when(Boolean(m.text && images), el => el.child(div().flex_none().text_size(12).text_color(t.dim).child(images)))
+        .child(div().id(`queued-drop-${i}`).size(20).flex_none().flex().items_center().justify_center().rounded(5).cursor_pointer()
+          .hover(s => s.bg(t.raised)).tooltip("Don't send it")
+          .on_click((_e, cx) => { this.queued.remove(owner, i); cx.notify(); })
+          .child(icon("x", 12, t.muted)));
+    }));
   }
 
   /**
@@ -369,9 +447,10 @@ export class Composer {
   render(t, active, footer = null) {
     const ready = (Boolean(this.input.value().trim()) || this.attachments.length > 0) && !this.host.sending && Boolean(active);
     const stopping = active?.status === "working" && !this.input.value().trim() && !this.attachments.length;
-    const menu = this.menu.render(t, active);
+    const menu = this.menu.render(t, active), queued = this.queuedStrip(t);
     return v_flex().w_full().max_w(COLUMN).gap(6).relative()
       .when(Boolean(menu), el => el.child(menu))
+      .when(Boolean(queued), el => el.child(queued))
       .child(h_flex().id("composer-box").w_full().pl(16).pr(8).py(8).gap(8).items_end().rounded(18).border_1().border_color(t.input)
         .bg(this.host.backdropShown ? `${t.surface.slice(0, 7)}a6` : t.surface)
         .child(v_flex().flex_1().min_w(0)
@@ -386,9 +465,9 @@ export class Composer {
             const paste = e.key === "v" && (e.modifiers.control || e.modifiers.platform) && !e.modifiers.alt;
             if (paste && cx.read_from_clipboard() === undefined) { cx.stop_propagation(); this.imagePasteAt = Date.now(); this.pasteImage(cx); return; }
             if (e.key === "tab" && !e.modifiers.shift && this.menu.accept(target(), cx)) { cx.stop_propagation(); return; }
-            if (e.key !== "enter" || e.modifiers.shift || e.modifiers.alt) return;
+            if (e.key !== "enter" || e.modifiers.shift) return;
             cx.stop_propagation();
-            this.enter(cx);
+            if (e.modifiers.alt) this.queue(cx); else this.enter(cx);
           })
           .child(Textarea.new(this.input).w_full().text_size(15).text_color(t.foreground))))
         .child(stopping
@@ -399,6 +478,7 @@ export class Composer {
           : div().id("send").size(32).flex_none().flex().items_center().justify_center().rounded(16)
             .bg(ready ? t.accent : t.raised).text_color(ready ? t.accent_foreground : t.dim)
             .when(ready, el => el.cursor_pointer().hover(s => s.opacity(0.88)).on_click((_e, cx) => this.send(cx)))
+            .when(ready && active?.status === "working", el => el.tooltip("Send now (Enter) · after this turn (Alt+Enter)"))
             .child(svg(`${ICONS}/arrow-up.svg`).size(16))))
       .child(footer ?? h_flex().w_full().h(24).px(4).items_center().justify_center().text_size(11.5).text_color(t.dim)
         .child(active ? `Sends to the live ${active.label} terminal · drop or paste an image to attach it` : ""));
