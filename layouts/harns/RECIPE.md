@@ -236,8 +236,6 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
     fps and dimmer. The header and the area around the reply box are solid `background`, and the list fades into them
     over 32 px, a step of `background` per pixel (herdr's `bg` takes flat colors only): at the bottom always, at the top
     while messages are out of sight above. The list's end leaves the fade's 32 px empty, so the newest line clears it.
-    After 45 s with no activity (the pointer over the chat, typing, a message, the agent's status changing) it rests on
-    its last frame.
   - Shipped: the `changes` block; `picker`, `machine-add`, `new-menu`, `menu` and
     `worktree` as overlays; icons from `pane`, `files` and `changes`.
 - **Programs it runs** through `exec(..., {on: machine})`: per platform

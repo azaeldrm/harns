@@ -3,7 +3,7 @@ import { theme, shared, window as appWindow } from "herdr";
 import { Palette } from "./palette.js";
 import { frameRuns } from "./runs.js";
 import { sceneFor } from "./scenes/index.js";
-import { FPS, SLOW_FPS, IDLE_MS, REST_MS, cellSize } from "./config.js";
+import { FPS, SLOW_FPS, IDLE_MS, cellSize } from "./config.js";
 import { designPx, zoomFrom, PROBE_PX } from "../measure.js";
 
 export class BackdropView extends View {
@@ -18,15 +18,13 @@ export class BackdropView extends View {
     this.rows = [];
     this.drawn = true;
     this.mode = null;
-    this.stirred = Date.now();
     this.speed("fast", cx);
   }
 
-  /** A new dim, pace or stir from the parent. The pace and a wake from resting take effect at the next tick (within a
-   *  second while resting), which has the context to restart the timer. */
+  /** A new dim or pace from the parent. The pace takes effect at the next tick, which has the context to restart the
+   *  timer. */
   update(props) {
     this.slow = Boolean(props?.slow);
-    if (props?.stir !== undefined && props.stir !== this.stir) { this.stir = props.stir; this.stirred = Date.now(); }
     const dim = props?.dim ?? 1;
     if (dim !== this.dim) { this.dim = dim; if (this.size) this.scene.setDim(dim); }
   }
@@ -41,7 +39,6 @@ export class BackdropView extends View {
     this.scene = entry.make();
     this.rows = [];
     this.size = null;
-    this.stirred = Date.now();
     this.layout();
   }
 
@@ -55,16 +52,14 @@ export class BackdropView extends View {
   }
 
   /**
-   * One step of the animation: a frame while it's drawn and the window is in front, else a slow look (idle) or none
-   * (resting). render() sets `drawn`, so a tick that finds it unset since the last one knows nothing drew the view.
+   * One step of the animation: a frame while it's drawn and the window is in front, else a slow look (idle). render()
+   * sets `drawn`, so a tick that finds it unset since the last one knows nothing drew the view.
    */
   tick(cx) {
     const drawn = this.drawn;
     this.drawn = false;
     if (this.wanted() !== this.sceneId) { this.show(this.wanted()); this.speed("fast", cx); }
     if (!drawn || !appWindow()?.active || !this.size) { this.speed("idle", cx); cx.notify(); return; }
-    if (this.mode === "idle") this.stirred = Date.now();
-    if (Date.now() - this.stirred > REST_MS) { this.speed("rest", cx); cx.notify(); return; }
     this.speed("fast", cx);
     this.scene.frame(1 / FPS, this.palette());
     this.rows = frameRuns(this.scene.grid);
@@ -93,11 +88,9 @@ export class BackdropView extends View {
   /**
    * Where the pointer is, for the scene to react to (e.local_position: in the view, zoomed px). Whether it was there.
    */
-  pointer(e, active, cx) {
+  pointer(e, active) {
     const at = e.local_position;
     if (!this.size || !at) return false;
-    this.stirred = Date.now();
-    if (this.mode === "rest") this.speed("fast", cx);
     const p = this.scene.pointer;
     p.x = designPx(at.x, this.zoom);
     p.y = designPx(at.y, this.zoom);
@@ -125,9 +118,9 @@ export class BackdropView extends View {
     return div().id("backdrop").absolute().inset_0().overflow_hidden()
       .font_family("JetBrains Mono").text_size(font).line_height(`${ch}px`)
       .on_size_change((size, cx) => { this.px = size; if (designPx(size.width, this.zoom) > 0) this.layout(); cx.notify(); })
-      .on_mouse_move((e, cx) => this.pointer(e, true, cx))
+      .on_mouse_move(e => this.pointer(e, true))
       .on_hover((hovered, cx) => { if (!hovered) this.scene.pointer.active = false; })
-      .on_mouse_down("left", (e, cx) => { if (this.pointer(e, true, cx)) this.scene.splash(this.scene.pointer.x, this.scene.pointer.y); })
+      .on_mouse_down("left", (e, cx) => { if (this.pointer(e, true)) this.scene.splash(this.scene.pointer.x, this.scene.pointer.y); })
       .child(div().id("backdrop-zoom").absolute().top(0).left(-30000).w(PROBE_PX).h(PROBE_PX)
         .on_size_change((size, cx) => { const z = zoomFrom(size); if (Math.abs(z - this.zoom) > 0.001) { this.zoom = z; this.layout(); cx.notify(); } }))
       .children(runs);
