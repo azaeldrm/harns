@@ -1,10 +1,10 @@
 import { run, shared, setShared, terminals, layout } from "herdr";
+import { Kept } from "./kept.js";
 
 export { SUPPORTED } from "./harnesses/index.js";
 export const ICONS = "mods/agent-chat/icons";
 
-const VIEWS_KEY = "herdr-chat.views";
-const VIEWS_KEPT = 200;
+const views = new Kept("views", 200);
 
 /** A session: one program's run in a terminal (an address is reused once its terminal ends). */
 export function sessionOf(t) {
@@ -35,19 +35,13 @@ export function chatOn() {
  */
 export function preferredView(key) {
   if (!chatOn()) return "terminal";
-  const seen = (shared(VIEWS_KEY) ?? {})[key];
+  const seen = views.get(key);
   if (seen === "chat" || seen === "terminal") return seen;
   return shared("herdr-chat.default-view") === "terminal" ? "terminal" : "chat";
 }
 
 function remember(key, mode) {
-  if (!key) return;
-  const views = { ...(shared(VIEWS_KEY) ?? {}) };
-  delete views[key];
-  views[key] = mode;
-  const keys = Object.keys(views);
-  for (const k of keys.slice(0, Math.max(0, keys.length - VIEWS_KEPT))) delete views[k];
-  setShared(VIEWS_KEY, views);
+  views.set(key, mode);
 }
 
 export function switchTo(mode, key) {

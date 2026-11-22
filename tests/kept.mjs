@@ -1,0 +1,26 @@
+import { stage } from "./stage.mjs";
+const s = stage();
+const { Kept, memory } = await s.load("kept.js");
+let failed = 0;
+const check = (got, want, what) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  console.log(`${ok ? "PASS" : "FAIL"} ${what}${ok ? "" : `: got ${JSON.stringify(got)}`}`);
+  if (!ok) failed++;
+};
+let writes = 0;
+const backing = memory(), save = backing.save;
+backing.save = (key, value) => { writes++; save(key, value); };
+const k = new Kept("things", 2, backing);
+k.set("a", 1); k.set("b", { x: 1 });
+check([k.get("a"), new Kept("things", 2, backing).get("b")], [1, { x: 1 }], "what's kept comes back, from another store on the same backing");
+check(backing.load("herdr-chat.things"), { a: 1, b: { x: 1 } }, "it's kept under herdr-chat.<name>");
+k.set("b", { x: 1 });
+check(writes, 2, "keeping what's already kept writes nothing");
+k.set("a", 2); k.set("c", 3);
+check(k.all(), { a: 2, c: 3 }, "a changed entry becomes the newest, and past the limit the oldest go");
+k.set("a", null);
+check(k.all(), { c: 3 }, "null forgets an entry");
+k.set("", 4);
+check(k.all(), { c: 3 }, "an entry needs an id");
+s.cleanup();
+process.exit(failed ? 1 : 0);
