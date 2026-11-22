@@ -80,8 +80,8 @@ Colours come from the active theme; icons are the mod's own SVGs in the theme's 
 - **Queueing:** Alt+Enter while the agent works holds the message (and its images) above the reply box instead of
   sending it into the running turn. When the agent is idle or done (not while it asks something), the oldest goes
   through the same send as Enter, one per turn, whichever chat is shown; one that can't be delivered goes back to its
-  session's box. With the agent idle, Alt+Enter sends at once. The queue lives in memory: a restart drops it
-  (`model/queue.js`).
+  session's box. With the agent idle, Alt+Enter sends at once. The queue is kept in shared state
+  (`herdr-chat.queue`), so a reload of the chat or a restart keeps it (`model/queue.js`).
 - **Layout keys:** Alt+Shift+Up and Alt+Shift+Down, which the reply box's text input would otherwise take,
   run what `keys.json` binds them to for the shown layout, else globally (`keys.js`).
 - **Stop:** while the agent works, the send button stops it (also Esc). A message the agent hands

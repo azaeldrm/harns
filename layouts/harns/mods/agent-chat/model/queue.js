@@ -1,34 +1,53 @@
 export const TURN_START = 20000;
 
+/** A store that lives as long as the queue does, for a queue nothing needs to outlive. */
+function memoryStore() {
+  let all = {};
+  return { load: () => all, save: next => { all = next; } };
+}
+
 /**
  * Messages written with Alt+Enter while an agent works, held per session (the chat's key) until its turn ends, then sent
- * one per turn, oldest first. Each is { text, attachments }.
+ * one per turn, oldest first. Each is { text, attachments }. `store` keeps them as { session: [message] } through
+ * `load()` and `save(all)`, read afresh each time, so a store in shared state keeps them across a reload of the chat.
  */
 export class MessageQueue {
-  constructor() {
-    this.items = new Map();
+  constructor(store = memoryStore()) {
+    this.store = store;
     this.sentAt = new Map();
+  }
+
+  /** Every session's messages, as the store has them. */
+  all() {
+    return this.store.load() ?? {};
+  }
+
+  /** Keeps `messages` as the session's queue, forgetting the session when it's empty. */
+  put(owner, messages) {
+    const all = { ...this.all() };
+    delete all[owner];
+    if (messages.length) all[owner] = messages;
+    this.store.save(all);
   }
 
   /** Holds a message for the session `owner`. */
   add(owner, message) {
-    this.items.set(owner, [...this.list(owner), message]);
+    this.put(owner, [...this.list(owner), message]);
   }
 
   /** The session's queued messages, oldest first. */
   list(owner) {
-    return this.items.get(owner) ?? [];
+    return this.all()[owner] ?? [];
   }
 
   /** Drops the session's message at `index`. */
   remove(owner, index) {
-    const left = this.list(owner).filter((_m, i) => i !== index);
-    if (left.length) this.items.set(owner, left); else this.items.delete(owner);
+    this.put(owner, this.list(owner).filter((_m, i) => i !== index));
   }
 
   /** The sessions with messages waiting. */
   owners() {
-    return [...this.items.keys()];
+    return Object.keys(this.all());
   }
 
   /**
@@ -45,7 +64,7 @@ export class MessageQueue {
     if (status !== "idle" && status !== "done") return null;
     const [next, ...rest] = this.list(owner);
     if (!next) return null;
-    if (rest.length) this.items.set(owner, rest); else this.items.delete(owner);
+    this.put(owner, rest);
     this.sentAt.set(owner, now);
     return next;
   }
