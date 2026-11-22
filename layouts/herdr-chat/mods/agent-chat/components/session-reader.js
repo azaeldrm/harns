@@ -1,10 +1,11 @@
-import { appHome, shared, setShared, watchFolder } from "herdr";
+import { appHome, watchFolder } from "herdr";
 import { readFile } from "fs/promises";
 import { sessionOf, chatKey } from "../common.js";
 import { base64Utf8, onWindows, python } from "../platform.js";
 import { target, agentTargets, readScreen } from "../terminal.js";
 import { supportedNames } from "../harnesses/index.js";
 import { justOpened } from "../opened.js";
+import { Kept } from "../kept.js";
 import { blankSession, parseReaderInSlices, applyRead, readerArgs, embeddedReader, readerFromFolder, compressProgram, compressedReader, readerProgram, batchProgram, splitBatch } from "../model/session.js";
 
 const SESSIONS_KEPT = 32;
@@ -13,7 +14,7 @@ const QUIET_EVERY = 1500;
 const WAIT_EVERY = 3000;
 const RETRY_AFTER = 5000;
 const STALE_AFTER = 3000, CHECK_AFTER = 300, SILENT_AFTER = 5000;
-const PATHS_KEY = "herdr-chat.paths";
+const paths = new Kept("paths", 200);
 
 let readerBase64 = null;
 /**
@@ -145,7 +146,7 @@ export class SessionReader {
     const kept = key ? this.sessions.get(key) : null;
     if (kept) this.session = kept;
     else {
-      const known = t ? (shared(PATHS_KEY) ?? {})[sessionOf(t)] : null;
+      const known = t ? paths.get(sessionOf(t)) : null;
       this.session = blankSession(known?.path ?? "", known?.hint ?? "");
       this.session.note = !t ? `Select a ${supportedNames()} terminal to see it as a chat.`
         : !known?.path && justOpened(t.address) ? `Waiting for this ${t.label} conversation to start.`
@@ -256,13 +257,7 @@ export class SessionReader {
    */
   rememberPath(id, path, hint, cwd) {
     if (!id || !path) return;
-    const all = { ...(shared(PATHS_KEY) ?? {}) };
-    if (all[id]?.path === path && all[id]?.hint === (hint || "") && (all[id]?.cwd ?? null) === (cwd || null)) return;
-    delete all[id];
-    all[id] = { path, hint: hint || "", ...(cwd ? { cwd } : {}) };
-    const ids = Object.keys(all);
-    for (const old of ids.slice(0, Math.max(0, ids.length - 200))) delete all[old];
-    setShared(PATHS_KEY, all);
+    paths.set(id, { path, hint: hint || "", ...(cwd ? { cwd } : {}) });
   }
 
   /**
@@ -283,7 +278,7 @@ export class SessionReader {
           live.add(key);
           if (key === this.key || !t.pid || (machines && !machines.has(t.machine))) continue;
           const s = this.sessions.get(key);
-          const known = s ? null : (shared(PATHS_KEY) ?? {})[sessionOf(t)];
+          const known = s ? null : paths.get(sessionOf(t));
           const at = s ? { path: s.path, hint: s.hint, offset: s.offset, leaf: s.leaf } : { path: known?.path ?? "", hint: known?.hint ?? "", offset: 0, leaf: "" };
           at.peers = peersOf(t, all);
           const group = groups.get(t.machine) ?? [];

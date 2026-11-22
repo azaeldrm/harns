@@ -1,33 +1,24 @@
 export const TURN_START = 20000;
 
-/** A store that lives as long as the queue does, for a queue nothing needs to outlive. */
-function memoryStore() {
-  let all = {};
-  return { load: () => all, save: next => { all = next; } };
-}
-
 /**
  * Messages written with Alt+Enter while an agent works, held per session (the chat's key) until its turn ends, then sent
- * one per turn, oldest first. Each is { text, attachments }. `store` keeps them as { session: [message] } through
- * `load()` and `save(all)`, read afresh each time, so a store in shared state keeps them across a reload of the chat.
+ * one per turn, oldest first. Each is { text, attachments }. `store` (a Kept: `all()` and `set(id, value)`) holds them
+ * as { session: [message] }, read afresh each time, so one in shared state keeps them across a reload of the chat.
  */
 export class MessageQueue {
-  constructor(store = memoryStore()) {
+  constructor(store) {
     this.store = store;
     this.sentAt = new Map();
   }
 
   /** Every session's messages, as the store has them. */
   all() {
-    return this.store.load() ?? {};
+    return this.store.all();
   }
 
   /** Keeps `messages` as the session's queue, forgetting the session when it's empty. */
   put(owner, messages) {
-    const all = { ...this.all() };
-    delete all[owner];
-    if (messages.length) all[owner] = messages;
-    this.store.save(all);
+    this.store.set(owner, messages.length ? messages : null);
   }
 
   /** Holds a message for the session `owner`. */

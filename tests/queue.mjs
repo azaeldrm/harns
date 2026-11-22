@@ -1,6 +1,7 @@
 import { stage } from "./stage.mjs";
 const s = stage();
 const { MessageQueue, TURN_START } = await s.load("model/queue.js");
+const { Kept, memory } = await s.load("kept.js");
 let failed = 0;
 const check = (got, want, what) => {
   const ok = JSON.stringify(got) === JSON.stringify(want);
@@ -8,7 +9,7 @@ const check = (got, want, what) => {
   if (!ok) failed++;
 };
 const msg = text => ({ text, attachments: [] });
-const q = new MessageQueue();
+const q = new MessageQueue(new Kept("queue", 50, memory()));
 q.add("a", msg("first")); q.add("a", msg("second")); q.add("b", msg("other"));
 check(q.list("a").map(m => m.text), ["first", "second"], "messages wait in the order written, per session");
 check([q.take("a", "working", 0), q.take("a", "blocked", 0)], [null, null], "nothing is sent while the agent works or asks something");
@@ -25,9 +26,8 @@ q.add("c", msg("x")); q.add("c", msg("y")); q.remove("c", 0);
 check(q.list("c").map(m => m.text), ["y"], "a queued message can be removed");
 q.remove("c", 0);
 check(q.owners(), [], "removing the last one forgets the session");
-let kept = {};
-const store = { load: () => kept, save: all => { kept = JSON.parse(JSON.stringify(all)); } };
+const store = new Kept("queue", 50, memory());
 new MessageQueue(store).add("d", msg("survives"));
 check(new MessageQueue(store).list("d").map(m => m.text), ["survives"], "a queue on a store outlives the queue that wrote it");
-check(new MessageQueue(store).take("d", "idle", 0)?.text === "survives" && kept, {}, "and taking the last one empties the store");
+check(new MessageQueue(store).take("d", "idle", 0)?.text === "survives" && store.all(), {}, "and taking the last one empties the store");
 process.exit(failed ? 1 : 0);

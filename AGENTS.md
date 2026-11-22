@@ -64,6 +64,8 @@ of the live app, set `git -c core.hooksPath=<empty folder>` for those commands.
   docstring in Python, saying its purpose in full sentences wrapped at about 120 columns. What a docstring can't hold
   goes in `RECIPE.md` or the commit message. Shebangs and markers code reads (`# harns: points adb` in `adb.sh`) stay.
 - Logic lives in modules that take herdr's functions as arguments, with tests.
+- What the person makes or chooses is kept in shared state (agent-chat's `Kept`), not on a view: a reload starts views
+  over.
 
 ## Herdr behaviors to design around
 
