@@ -1,11 +1,12 @@
 import { View, div, image } from "gpui-kit";
 import { set_theme, v_flex, h_flex, Popup } from "gpui-base";
-import { panes, focused, props, hc, theme, shared, setShared, window as appWindow } from "herdr";
+import { panes, focused, props, hc, theme, shared, setShared, appHome, openOverlay, window as appWindow } from "herdr";
+import { exists } from "fs/promises";
 import { switchTo, showView, shownView, adoptView, preferredView, sessionOf, chatKey, chatOn } from "./common.js";
 import { target, inputBox, interruptAgent, sendMessage, pressKeys, readScreen } from "./terminal.js";
 import { keyRows, splitCode, withCopyRows, stepRows, stepText, withoutRetracted } from "./model/transcript.js";
 import { runsWith, switchCommand, tokens } from "./model/runs-with.js";
-import { row, TOOL_BUTTON, TOOL_GAP } from "./ui/rows.js";
+import { row, TOOL_BUTTON, TOOL_GAP, COPY_BUTTON, COPY_GAP, CHIP_GAP, chipWidth } from "./ui/rows.js";
 import { COLUMN, programIcon, paneButtons, statusBadge, viewToggle, clock, icon } from "./ui/primitives.js";
 import { diagramFor, renderQueuedDiagrams, hasQueuedDiagrams } from "./diagrams.js";
 import { splitDiagrams, copyDiagramImage } from "./diagram-copy.js";
@@ -21,6 +22,7 @@ import { BackdropView } from "./backdrop/view.js";
 import { sceneFor, nextScene } from "./backdrop/scenes/index.js";
 import { noticeTerminals } from "./opened.js";
 import { contextText, healthFill } from "./context-bar.js";
+import { fileLink, fileLinks } from "./links.js";
 
 function inputHighlight(cx) {
   const t = theme(), th = cx.theme();
@@ -316,13 +318,18 @@ export default class HerdrChat extends View {
   }
 
   /**
-   * The messages as rows (copy rows added, diagrams and code blocks split out), rebuilt only when the messages change:
-   * a read with nothing new keeps the same array, so most redraws reuse the last rows and their row objects.
+   * The messages as rows (copy rows added, diagrams and code blocks split out, a response's file links on its copy row),
+   * rebuilt only when the messages change: a read with nothing new keeps the same array, so most redraws reuse the last
+   * rows and their row objects.
    */
   splitRows(messages, working) {
     const c = this.rowCache;
     if (c && c.messages === messages && c.working === working) return c.rows;
     const rows = withCopyRows(messages, working).flatMap(m => {
+      if (m.kind === "copy" && !m.prompt) {
+        const files = fileLinks(m.text);
+        return [files.length ? { ...m, files } : m];
+      }
       const parts = m.kind === "message" && m.role !== "user" && m.text?.includes("```mermaid") ? splitDiagrams(m.text) : null;
       const pieces = parts ? parts.flatMap(p => p.kind === "diagram" ? [{ kind: "diagram", text: p.text }, { kind: "diagram-tools", text: p.text }] : [{ ...m, text: p.text }]) : [m];
       return pieces.flatMap(r => {
@@ -334,14 +341,34 @@ export default class HerdrChat extends View {
     return rows;
   }
 
+  /** Where the reply's column starts (design px across the list), for placing a click on a row's buttons. */
+  columnLeft() {
+    return (this.width - Math.min(COLUMN, Math.max(280, Math.floor(this.width) - 48))) / 2;
+  }
+
   /**
    * Which of a diagram's two buttons is at `x` (design px across the list): they sit at the left of the reply's column.
    */
   diagramButtonAt(x) {
     if (!Number.isFinite(x)) return null;
-    const column = Math.min(COLUMN, Math.max(280, Math.floor(this.width) - 48)), left = (this.width - column) / 2;
+    const left = this.columnLeft();
     if (x >= left && x <= left + TOOL_BUTTON) return "image";
     if (x >= left + TOOL_BUTTON + TOOL_GAP && x <= left + 2 * TOOL_BUTTON + TOOL_GAP) return "code";
+    return null;
+  }
+
+  /**
+   * Which of a response's file chips is at `x` (design px across the list): they follow its copy button at the left of
+   * the reply's column, each as wide as chipWidth says.
+   */
+  fileChipAt(x, files) {
+    if (!Number.isFinite(x) || !files?.length) return null;
+    let left = this.columnLeft() + COPY_BUTTON + COPY_GAP;
+    for (const f of files) {
+      const w = chipWidth(f.name);
+      if (x >= left && x <= left + w) return f;
+      left += w + CHIP_GAP;
+    }
     return null;
   }
 
@@ -387,6 +414,20 @@ export default class HerdrChat extends View {
     this.menuClosed = null;
     this.menu = this.menu === id || justClosed ? null : id;
     cx.notify();
+  }
+
+  /**
+   * A file chip's link (an agent's `</srv/notes/BACKLOG.md:188>`, or a path in its folder) opens in the Markdown window
+   * the Files tab opens, on the agent's machine. Without the markdown-files mod installed it does nothing. Links in the
+   * text itself can't be clicked: a virtual list's rows take no handlers.
+   */
+  openLink(url) {
+    const active = target(), file = fileLink(url, active?.cwd);
+    if (!file) return;
+    exists(`${appHome()}/mods/markdown-files/mod.json`).then(ok => {
+      if (ok) openOverlay({ mod: "markdown-files", kind: "window", key: "markdown-files-doc", width: 0.6, height: 0.82,
+        props: { file, on: active?.machine ?? null } });
+    }).catch(() => {});
   }
 
   /** Types a switch (/model, /effort) into the agent, as the person would. */
@@ -507,6 +548,8 @@ export default class HerdrChat extends View {
       row: m => row(m, { t, open: this.reader.session.open, width: this.width, sent: this.composer.sent, machine: target()?.machine, copied: this.copied }),
       onItemClick: (key, cx) => {
         const row = rows.find(r => r.key === key);
+        const file = row?.kind === "copy" ? this.fileChipAt(this.list.pointerX, row.files) : null;
+        if (file) { this.openLink(file.url); return; }
         if (row?.kind === "code" || row?.kind === "copy") {
           cx.write_to_clipboard(row.text);
           this.copied = key; cx.notify();

@@ -5,6 +5,7 @@ import { tokens } from "../model/runs-with.js";
 import { SENT_DIR, previewFile } from "../images.js";
 import { KINDS, STEP, summary, stepText } from "../model/transcript.js";
 import { diagramFor } from "../diagrams.js";
+import { fileLink } from "../links.js";
 
 /**
  * A code block in a box titled with its language; with `copied` set (true once copied), a copy icon sits at the top
@@ -36,24 +37,46 @@ function toolButton(t, id, glyph, done, busy, tip, bordered = true, size = 28) {
     .child(icon(done ? "check" : glyph, size === 28 ? 14 : 13, done || busy ? t.foreground : t.muted));
 }
 
+export const COPY_BUTTON = 24, COPY_GAP = 12, CHIP_GAP = 4;
+
 /**
  * The copy button under an agent's response, at the left, or under one of the person's messages, at the right
  * (`prompt`): clicking the row copies it (see onItemClick in main.js). Always shown: a list row can't react to hovering
  * the message above it (no per-row hover in the list yet), so a hover-only bar would only show over its own strip. A
- * response's turn numbers (m.stats) follow its button, each with its icon: time, output tokens, tokens per second. A
- * caption of its message (24 px, right under it: see gapBefore in chat-list.js), not a row of its own.
+ * response's files (m.files, the ones it links to) follow its button as chips, then its turn numbers (m.stats), each
+ * with its icon: time, output tokens, tokens per second. A caption of its message (24 px, right under it: see gapBefore
+ * in chat-list.js), not a row of its own.
  */
 function copyRow(m, { t, copied }) {
   const done = copied === m.key, s = m.stats;
   const stat = (glyph, text, tip) => h_flex().id(`st-${glyph}-${m.key}`).gap(5).items_center().tooltip(tip)
     .child(icon(glyph, 12, t.dim)).child(div().text_size(11.5).text_color(t.dim).child(text));
-  return h_flex().id(`copy-row-${m.key}`).w_full().h(24).gap(12).items_center().when(m.prompt, el => el.justify_end()).when(!m.prompt, el => el.justify_start())
-    .child(toolButton(t, `copy-${m.key}`, "copy", done, false, m.prompt ? "Copy your message" : "Copy the response", false, 24))
+  return h_flex().id(`copy-row-${m.key}`).w_full().h(24).gap(COPY_GAP).items_center().when(m.prompt, el => el.justify_end()).when(!m.prompt, el => el.justify_start())
+    .child(toolButton(t, `copy-${m.key}`, "copy", done, false, m.prompt ? "Copy your message" : "Copy the response", false, COPY_BUTTON))
+    .when(Boolean(m.files?.length), el => el.child(h_flex().flex_none().gap(CHIP_GAP).items_center()
+      .children(m.files.map((f, i) => fileChip(t, `fc-${m.key}-${i}`, f)))))
     .when(Boolean(s && !m.prompt), el => el
-      .child(div().text_size(11.5).text_color(t.dim).child("•"))
       .when(s?.secs != null, e => e.child(stat("clock", duration(s.secs), "How long the turn took")))
       .when(Boolean(s?.out), e => e.child(stat("coins", `${tokens(s?.out ?? 0)} tokens`, "Tokens the agent wrote this turn (thinking included)")))
       .when(s?.tps != null, e => e.child(stat("circle-gauge", `${Math.round(s.tps)}tk/s`, "Tokens per second while the agent was writing (tool time left out)"))));
+}
+
+/**
+ * A file chip's width, set rather than left to its text, so a click can be placed on a chip by its x alone
+ * (fileChipAt in main.js): about 8 px a capital or digit and 6.5 px another character, at most 180, the name cut short
+ * past that.
+ */
+export function chipWidth(name) {
+  const text = String(name), wide = (text.match(/[A-Z0-9]/g) ?? []).length;
+  return Math.min(180, 38 + Math.ceil(wide * 8 + (text.length - wide) * 6.5));
+}
+
+/** A file a response links to, in its copy row: icon and name, the path in its tooltip; a click opens it. */
+function fileChip(t, id, f) {
+  return h_flex().id(id).w(chipWidth(f.name)).h(24).flex_none().px(8).gap(6).items_center().rounded(6).hover(s => s.bg(t.raised))
+    .tooltip(`Open ${fileLink(f.url, ".") ?? f.name}`)
+    .child(icon("file-text", 13, t.muted))
+    .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(f.name));
 }
 
 /** "8s", "42s", "3m 05s", "1h 02m". */

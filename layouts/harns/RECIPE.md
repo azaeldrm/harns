@@ -357,7 +357,7 @@ and the other `harness-*` are `harns-*`), then removes the old copies (one anoth
   Markdown or `.mmd` file in the tree opens it as that viewer in a floating window (`openOverlay`
   `kind: "window"`, key `markdown-files-doc`: one at a time, reopened where it was dropped), headed
   by the file's name with Preview/Source and ×; the panel stays on its folder. Other files preview
-  in the panel, with ← back.
+  in the panel, with ← back. A file a chat reply links to (`agent-chat`, its file chips) opens in the same window.
 - Sizes are read from the `sidebar` node's width: below 160 px every sidebar mod draws
   its rail. `machine-sidebar` draws the rail from the same rows as the open list, each in its open box with
   its icon alone and centred, so every row stays level as the sidebar folds, in either style: a machine's header icon as
