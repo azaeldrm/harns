@@ -92,7 +92,9 @@ Colours come from the active theme; icons are the mod's own SVGs in the theme's 
   as the plain path. Images in the conversation show as thumbnails, fetched from the agent's
   machine.
 - **Questions:** when an agent asks a question with choices, the card lists them: ↑↓ move, Enter
-  or a click answers, multi-select questions tick rows, multi-step questions step through, and
+  or a click answers, multi-select questions tick rows, multi-step questions step through (the step
+  row marks the current one, read from the terminal's colours; Windows can't read those, so there it's the first
+  unanswered step, moved by the card's ← and →), and
   Claude Code's previews show beside the options. A typed answer's box wraps and grows to 3 lines, then scrolls, and
   the options grow with it; Enter sends it (Shift+Enter is a new line), as in the reply box. The card folds to one
   line. Each key is sent

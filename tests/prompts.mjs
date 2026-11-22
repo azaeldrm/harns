@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { parseChoices, parsePrompt, keysFor, looksLikePrompt, typedAnswer, previewKey, fullPreview } from "../layouts/herdr-chat/mods/agent-chat/model/prompts.js";
+import { parseChoices, parsePrompt, keysFor, looksLikePrompt, typedAnswer, previewKey, fullPreview, guessStep, stepName } from "../layouts/herdr-chat/mods/agent-chat/model/prompts.js";
 import claudeCode from "../layouts/herdr-chat/mods/agent-chat/harnesses/claude-code.js";
 import codex from "../layouts/herdr-chat/mods/agent-chat/harnesses/codex.js";
 import pi from "../layouts/herdr-chat/mods/agent-chat/harnesses/pi.js";
@@ -170,5 +170,11 @@ const codexPerm = read(codex, "codex-perm");
 check("Codex: a permission prompt keeps its command", codexPerm?.options.length === 3 && codexPerm.question.some(l => l.includes("touch perm-test.txt")));
 check("a footer with unreadable choices still looks like a prompt", read(claudeCode, "claude-trust") === null && looksLikePrompt(screen("claude-trust")));
 check("an agent's idle screen is no prompt", !looksLikePrompt("› Ask Codex to do anything\n\n  GPT · medium\n  ? for shortcuts"));
+
+const tabs = [{ label: "Ask Mur", done: true }, { label: "Saved/Offline", done: true }, { label: "Samples", done: false }, { label: "Round 2", done: false }, { label: "Submit", done: false }];
+check("a step guessed on Windows is the first one not answered", guessStep(tabs, "", null) === "Samples");
+check("after ← or → it's next to the one it was on", guessStep(tabs, "Samples", "left") === "Saved/Offline" && guessStep(tabs, "Round 2", "right") === "Submit" && guessStep(tabs, "Submit", "right") === "Submit");
+check("with every step answered it's Submit", guessStep(tabs.map(s => ({ ...s, done: s.label !== "Submit" })), "", null) === "Submit");
+check("a label with punctuation matches the colour reader's", stepName("Saved/Offline") === "SavedOffline");
 
 process.exit(failed ? 1 : 0);
