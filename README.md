@@ -49,7 +49,8 @@ behind a new conversation's welcome, and slow and faint behind a conversation, o
 ![The chat's animation](docs/welcome.webp)
 
 **Markdown, rendered.** Click a Markdown or `.mmd` file in the Files panel ([markdown-files](mods/markdown-files/RECIPE.md))
-and it opens rendered in a floating window, with its images and mermaid diagrams.
+and it opens rendered in a floating window, with its images and mermaid diagrams. The files an agent's reply links to
+sit under it in the chat, and open in the same window.
 
 ![A Markdown file in its floating window](docs/files.png)
 

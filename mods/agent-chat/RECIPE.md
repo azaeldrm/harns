@@ -35,6 +35,11 @@ The chat and the terminal share the stack's place in your layout.
 - **Chat** (a centred column, 740 px wide):
   - your messages as bubbles on the right, with their images above them as 120 px thumbnails;
     the agent's replies on the left as markdown, with code blocks;
+  - under a reply that links to files (`[BACKLOG.md](</srv/notes/BACKLOG.md:188>)`, or a path in the agent's
+    folder), a chip per file (up to four) between its copy button and its turn numbers; a click opens it in the
+    [markdown-files](https://github.com/azaeldrm/harns/tree/main/mods/markdown-files) floating window, on the
+    agent's machine, when that mod is installed. The links in the text can't be clicked: rows of herdr's
+    virtual list take no handlers;
   - tools and thinking folded into one grey line per run ("Ran 3 commands, read 2 files ›"),
     opening to each step with its output;
   - mermaid blocks drawn as diagrams in the reply;
@@ -121,6 +126,7 @@ the terminal itself belongs to the layout. The same mod runs twice: as the chat
 | `harnesses/` | one adapter per agent: label, image style, drafts, prompt options, input box, skills, reader. All agent-specific behaviour lives here |
 | `readers/` | the session reader in Python 3.6+, one file per agent beside `common.py` and `main.py`, joined in `manifest.json` order |
 | `keys.js` | the composer's key bindings, and the layout keys it passes on to `keys.json` |
+| `links.js` | the files a reply links to, and the file a link points at |
 | `terminal.js`, `platform.js` | the target agent and its screen; Windows and Unix differences |
 | `images.js`, `prepare-image.sh` / `.ps1` | image previews: where they go, shrinking, the clipboard |
 | `input-box.py`, `send.ps1` | the agent's own input box through `hc attach` (Linux and macOS); sending on Windows |
