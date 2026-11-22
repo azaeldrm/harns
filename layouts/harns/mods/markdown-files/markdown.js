@@ -38,7 +38,7 @@ function table(id, b, t, onLink) {
   const cell = (text, k, r, head) => div().id(`${id}-${r}-${k}`).flex_1().min_w(0).px(10).py(6)
     .when(k > 0, el => el.border_l(1).border_color(t.border))
     .child(h_flex().w_full().when(b.align[k] === "center", el => el.justify_center()).when(b.align[k] === "right", el => el.justify_end())
-      .child(text ? TextView.markdown(`${id}-${r}-${k}-t`, head ? `**${text}**` : text).selectable(true).on_link_click((url, cx) => onLink(url, cx)) : div()));
+      .child(text ? TextView.markdown(`${id}-${r}-${k}-t`, head ? `**${text}**` : text).selectable(true).min_w(0).on_link_click((url, cx) => onLink(url, cx)) : div()));
   const row = (cells, r, head) => h_flex().id(`${id}-r${r}`).w_full().items_start()
     .when(r > 0, el => el.border_t(1).border_color(t.border)).when(head, el => el.bg(t.surface))
     .children(cells.map((c, k) => cell(c, k, r, head)));
