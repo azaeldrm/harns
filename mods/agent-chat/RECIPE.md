@@ -45,6 +45,7 @@ The chat and the terminal share the stack's place in your layout.
   - mermaid blocks drawn as diagrams in the reply;
   - while the agent works, an accent spark and its live status;
   - a question card above the reply box when the agent asks something;
+  - messages queued with Alt+Enter above the reply box, one line each with × to drop it;
   - a reply box that grows to four lines, with a round send button in the theme's accent (a Stop
     button while the agent works); under it, the model (a menu to switch it), effort, mode and
     context used, or a line naming the terminal it sends to until those are known;
@@ -76,6 +77,11 @@ Colours come from the active theme; icons are the mod's own SVGs in the theme's 
   does in its terminal, and the terminal shows them as if typed. Answers to a waiting prompt,
   `/commands`, `!shell` lines and messages naming a `$skill` are still typed, since only the
   terminal understands them, as is everything in a conversation the daemon has closed.
+- **Queueing:** Alt+Enter while the agent works holds the message (and its images) above the reply box instead of
+  sending it into the running turn. When the agent is idle or done (not while it asks something), the oldest goes
+  through the same send as Enter, one per turn, whichever chat is shown; one that can't be delivered goes back to its
+  session's box. With the agent idle, Alt+Enter sends at once. The queue lives in memory: a restart drops it
+  (`model/queue.js`).
 - **Layout keys:** Alt+Shift+Up and Alt+Shift+Down, which the reply box's text input would otherwise take,
   run what `keys.json` binds them to for the shown layout, else globally (`keys.js`).
 - **Stop:** while the agent works, the send button stops it (also Esc). A message the agent hands
@@ -121,7 +127,7 @@ the terminal itself belongs to the layout. The same mod runs twice: as the chat
 | `header.js` | the terminal pane header with the toggle |
 | `common.js` | session keys, each session's view, `layout.select` |
 | `components/` | `chat-list.js` (rows, measuring, following), `question-card.js`, `composer.js` (reply box, drafts, images, sending), `session-reader.js` (reading and keeping conversations), `skill-menu.js` |
-| `model/` | pure data, free of gpui and herdr imports: transcript folding, session state, prompt parsing, caret, hash |
+| `model/` | pure data, free of gpui and herdr imports: transcript folding, session state, prompt parsing, caret, hash, the queue of Alt+Enter messages |
 | `ui/` | `primitives.js` (icons, buttons, badges, toggle) and `rows.js` (each conversation row) |
 | `harnesses/` | one adapter per agent: label, image style, drafts, prompt options, input box, skills, reader. All agent-specific behaviour lives here |
 | `readers/` | the session reader in Python 3.6+, one file per agent beside `common.py` and `main.py`, joined in `manifest.json` order |
