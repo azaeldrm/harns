@@ -3,7 +3,7 @@ import { v_flex, h_flex, Textarea, TextareaState } from "gpui-base";
 import { switchTo, sessionOf, chatKey } from "../common.js";
 import { onWindows } from "../platform.js";
 import { target, readPrompt, pressKeys, sendMessage, inputBox } from "../terminal.js";
-import { parsePrompt, looksLikePrompt, keysFor, typedAnswer, sameOption, previewKey, fullPreview } from "../model/prompts.js";
+import { parsePrompt, looksLikePrompt, keysFor, typedAnswer, sameOption, previewKey, fullPreview, guessStep, stepName } from "../model/prompts.js";
 import { askDaemon } from "./session-reader.js";
 import { shared } from "herdr";
 import { COLUMN, mono, icon, keyButton, checkbox } from "../ui/primitives.js";
@@ -253,6 +253,7 @@ export class QuestionCard {
         if (key !== "esc" && !(await this.stillCurrent(t))) throw new Error("The prompt changed. Review it again before answering.");
         const r = await pressKeys(t, [key]);
         if (r.code !== 0) throw new Error(r.stderr || "Key send failed");
+        this.moved = key;
       } catch (e) { this.host.note = String(e); }
       finally { this.host.sending = false; cx.notify(); this.lookAgain(cx, t); }
     });
@@ -343,7 +344,7 @@ export class QuestionCard {
         .when(q.steps.length > 0, el => el.child(h_flex().gap(2).items_center().flex_wrap()
           .when(!q.daemon, el => el.child(key("k-back", "←", "left")))
           .children(q.steps.map((s, i) => {
-            const here = q.steps.length === 1 || s.label === this.currentStep;
+            const here = q.steps.length === 1 || stepName(s.label) === stepName(this.currentStep);
             return div().id(`step-${i}`).h(24).px(9).flex().items_center().rounded(6).text_size(12)
               .text_color(here ? t.foreground : s.done ? t.accent : t.muted)
               .when(here, el => el.bg(t.selected))
@@ -458,12 +459,17 @@ export class QuestionCard {
     this.rowSetting = false;
   }
 
-  /** Finds which step a prompt is on when it changes page: the screen's text doesn't show it, only its colours. */
+  /**
+   * Finds which step a prompt is on when it changes page: the screen's text doesn't show it, only its colours. Windows
+   * can't read those, so there it's guessed from the answered steps and the last ← or → pressed here.
+   */
   readStep(cx, t) {
     const sig = JSON.stringify([this.choices?.question, this.choices?.steps]);
     if (sig === this.stepSig) return;
-    this.stepSig = sig; this.currentStep = "";
-    if (!(this.choices?.steps.length > 1) || onWindows()) return;
+    const moved = this.moved, previous = this.currentStep;
+    this.stepSig = sig; this.currentStep = ""; this.moved = null;
+    if (!(this.choices?.steps.length > 1)) return;
+    if (onWindows()) { this.currentStep = guessStep(this.choices.steps, previous, moved); return; }
     cx.spawn(async cx => {
       const r = await inputBox("step", t);
       if (this.stepSig === sig && r.box) { this.currentStep = r.box; cx.notify(); }

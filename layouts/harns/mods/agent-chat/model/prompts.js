@@ -124,6 +124,25 @@ function stepsOf(tabs) {
   return bare.split(/\s+(?=[□☐■☑☒✓✔])/).map(s => ({ label: s.replace(/^[□☐■☑☒✓✔]\s*/, ""), done: /^[■☑☒]/.test(s) }));
 }
 
+/**
+ * A step's label as the colour reader gives it back, with only letters, digits, spaces and dashes: "Saved/Offline" is
+ * "SavedOffline".
+ */
+export function stepName(label) {
+  return label.replace(/[^\w\s-]/g, "").trim();
+}
+
+/**
+ * The step a prompt is probably on when its colours can't be read (on Windows): next to the one it was on after ← or →
+ * (`moved`), else the first one not answered (Submit once all are). `previous` is the label it was on, "" if unknown.
+ */
+export function guessStep(steps, previous, moved) {
+  const at = steps.findIndex(s => s.label === previous);
+  if (at >= 0 && (moved === "left" || moved === "right"))
+    return steps[Math.max(0, Math.min(steps.length - 1, at + (moved === "left" ? -1 : 1)))].label;
+  return (steps.find(s => !s.done) ?? steps.at(-1))?.label ?? "";
+}
+
 export function parseChoices(shown, { byNumber = false, columns = false } = {}) {
   const { screen, preview } = pullPreview(shown);
   const lines = screenLines(screen);
