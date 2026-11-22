@@ -35,7 +35,6 @@ function inputHighlight(cx) {
 }
 
 const BACKDROP_SCENE = "herdr-chat.backdrop", BACKDROP_DIM = 0.3, BACKDROP_CHAT_DIM = 0.07;
-const STIR_MS = 5000;
 
 const SPARK = ["·", "✢", "✶", "✻", "✽", "✻", "✶", "✢"];
 
@@ -54,7 +53,6 @@ export default class HerdrChat extends View {
     this.composer = new Composer(this, cx);
     this.width = 900; this.zoom = 1; this.rootPx = 0;
     if (props()?.backdrop) this.backdrop = cx.new(BackdropView, { dim: BACKDROP_DIM, sceneKey: BACKDROP_SCENE });
-    this.stirAt = 0;
     this.visit = shared("herdr-chat.visit");
     this.refresh(cx);
     cx.timer.every(1500, cx => inputHighlight(cx));
@@ -63,7 +61,6 @@ export default class HerdrChat extends View {
       this.applyView();
       this.noticeStack();
       this.composer.mirrorOnSwitch(cx);
-      this.noticeActivity();
       const t = target();
       if (chatKey(t) !== this.key || this.reader.needsFirstRead || this.composer.pendingDraft) this.refresh(cx);
       this.reader.noticeAgents(cx);
@@ -499,27 +496,10 @@ export default class HerdrChat extends View {
       .when(Boolean(gauge), el => el.child(gauge));
   }
 
-  /** What the backdrop is told: slower and dimmer behind a conversation, and the last stir. */
+  /** What the backdrop is told: slower and dimmer behind a conversation. */
   backdropProps() {
     const slow = Boolean(this.backdropSlow);
-    return { dim: slow ? BACKDROP_CHAT_DIM : BACKDROP_DIM, slow, sceneKey: BACKDROP_SCENE, stir: this.stirAt };
-  }
-
-  /** The chat is in use (the pointer moving over it, a message, typing): keeps the backdrop from resting on its last
-   *  frame, at most once per STIR_MS. Only from an event or a timer, since set_props can't run in a render. */
-  stirBackdrop() {
-    if (!this.backdropShown || Date.now() - this.stirAt < STIR_MS) return;
-    this.stirAt = Date.now();
-    this.backdrop.set_props(this.backdropProps());
-  }
-
-  /** Looks (every 100 ms) for activity that isn't the pointer: a new message, the agent's status changing, typing. */
-  noticeActivity() {
-    if (!this.backdropShown) return;
-    const messages = this.reader.session.messages;
-    const last = messages[messages.length - 1];
-    const sign = `${this.key}|${messages.length}|${String(last?.text ?? "").length}|${target()?.status}|${this.composer.input.value().length}`;
-    if (sign !== this.activitySign) { this.activitySign = sign; this.stirBackdrop(); }
+    return { dim: slow ? BACKDROP_CHAT_DIM : BACKDROP_DIM, slow, sceneKey: BACKDROP_SCENE };
   }
 
   renderInner(cx) {
@@ -572,7 +552,6 @@ export default class HerdrChat extends View {
       .bg(t.background).text_color(t.foreground)
       .when(this.backdropShown, el => el.child(this.backdrop))
       .when(this.backdropShown && empty, el => el.child(this.backdropButton(t)))
-      .on_mouse_move(() => this.stirBackdrop())
       .on_size_change((size, cx) => { this.rootPx = size.width; const w = designPx(size.width, this.zoom); if (w >= 200 && Math.abs(w - this.width) > 8) { this.width = w; cx.notify(); } })
       .child(zoomProbe((zoom, cx) => { if (Math.abs(zoom - this.zoom) > 0.001) { this.zoom = zoom; if (this.rootPx) this.width = designPx(this.rootPx, zoom); cx.notify(); } }))
       .on_drop((e, cx) => this.composer.dropFiles(e.paths ?? [], cx))
