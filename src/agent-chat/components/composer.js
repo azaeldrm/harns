@@ -124,9 +124,13 @@ export class Composer {
     if (!key) return;
     cx.spawn(async cx => {
       await cx.sleep(DRAFT_PAUSE);
-      if (token !== this.draftToken || key !== this.host.key) return;
-      storeDraft(key, { text: this.input.value(), attachments: this.attachments });
+      if (token === this.draftToken && key === this.host.key) this.saveDraft();
     });
+  }
+
+  /** Saves the shown session's draft now: when typing pauses, and when the chat closes. */
+  saveDraft() {
+    if (this.host.key) storeDraft(this.host.key, { text: this.input.value(), attachments: this.attachments });
   }
 
   /** The reply box's draft kept for session `from` (default: the one shown), and `key`'s put in it. */

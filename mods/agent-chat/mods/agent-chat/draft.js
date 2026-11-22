@@ -5,6 +5,12 @@ const drafts = new Kept("drafts", 50);
 /** Where queued messages (Alt+Enter) are kept, for MessageQueue. */
 export const queueStore = new Kept("queue", 50);
 
+/** What's typed in a question card's rows, per session, row and question, until it's sent. */
+export const answerStore = new Kept("answers", 20);
+
+/** The tool groups opened in each session's conversation, as a list of their row keys. */
+export const openedStore = new Kept("opened", 32);
+
 /** The draft kept for session `key`, as { text, attachments }, or null. */
 export function savedDraft(key) {
   const v = drafts.get(key);

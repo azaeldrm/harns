@@ -6,6 +6,7 @@ import { target, agentTargets, readScreen } from "../terminal.js";
 import { supportedNames } from "../harnesses/index.js";
 import { justOpened } from "../opened.js";
 import { Kept } from "../kept.js";
+import { openedStore } from "../draft.js";
 import { blankSession, parseReaderInSlices, applyRead, readerArgs, embeddedReader, readerFromFolder, compressProgram, compressedReader, readerProgram, batchProgram, splitBatch } from "../model/session.js";
 
 const SESSIONS_KEPT = 32;
@@ -137,6 +138,17 @@ export class SessionReader {
     if (machines.size) this.warm(cx, machines);
   }
 
+  /** The tool groups kept open in session `key`'s conversation, as session.open has them. */
+  opened(key) {
+    return Object.fromEntries((openedStore.get(key) ?? []).map(k => [k, true]));
+  }
+
+  /** Keeps which tool groups are open in session `key`'s conversation, so a reload opens them again. */
+  keepOpened(key) {
+    const open = Object.keys(this.session.open).filter(k => this.session.open[k]);
+    openedStore.set(key, open.length ? open : null);
+  }
+
   /** Shows another session: the one on screen kept, the new one restored (or started). */
   switchTo(t, key) {
     this.shownChangedAt = Date.now();
@@ -148,6 +160,7 @@ export class SessionReader {
     else {
       const known = t ? paths.get(sessionOf(t)) : null;
       this.session = blankSession(known?.path ?? "", known?.hint ?? "");
+      this.session.open = this.opened(key);
       this.session.note = !t ? `Select a ${supportedNames()} terminal to see it as a chat.`
         : !known?.path && justOpened(t.address) ? `Waiting for this ${t.label} conversation to start.`
         : `Opening this ${t.label} conversation…`;
@@ -293,7 +306,7 @@ export class SessionReader {
             if (outs[i] == null || x.key === this.key || this.sessions.get(x.key) !== x.s) continue;
             const r = await parseReaderInSlices(outs[i], () => cx.sleep(0));
             if (!r.path || x.key === this.key || this.sessions.get(x.key) !== x.s) continue;
-            const s = x.s ?? blankSession(x.at.path, x.at.hint);
+            const s = x.s ?? { ...blankSession(x.at.path, x.at.hint), open: this.opened(x.key) };
             applyRead(s, r);
             s.readAt = Date.now();
             if (!x.s) this.sessions.set(x.key, s);

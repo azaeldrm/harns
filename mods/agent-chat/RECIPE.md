@@ -135,7 +135,7 @@ the terminal itself belongs to the layout. The same mod runs twice: as the chat
 | `readers/` | the session reader in Python 3.6+, one file per agent beside `common.py` and `main.py`, joined in `manifest.json` order |
 | `keys.js` | the composer's key bindings, and the layout keys it passes on to `keys.json` |
 | `links.js` | the files a reply links to, and the file a link points at |
-| `kept.js`, `draft.js` | what the person made or chose, kept per session in shared state so a reload keeps it: drafts, queued messages, views, log paths |
+| `kept.js`, `draft.js` | what the person made or chose, kept per session in shared state so a reload keeps it: drafts, queued messages, typed answers, opened tool groups, views, log paths |
 | `terminal.js`, `platform.js` | the target agent and its screen; Windows and Unix differences |
 | `images.js`, `prepare-image.sh` / `.ps1` | image previews: where they go, shrinking, the clipboard |
 | `input-box.py`, `send.ps1` | the agent's own input box through `hc attach` (Linux and macOS); sending on Windows |
