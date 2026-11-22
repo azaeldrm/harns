@@ -6,7 +6,7 @@ import { onWindows, modFile, removeFiles, pruneOld } from "../platform.js";
 import { target, agentTargets, sendMessage, pressKeys, inputBox } from "../terminal.js";
 import { MessageQueue } from "../model/queue.js";
 import { imageStyle, canMirror, withImages, draftPastes, textOfBox, readBack, viaDaemon } from "../harnesses/index.js";
-import { savedDraft, storeDraft, keptImages } from "../draft.js";
+import { savedDraft, storeDraft, keptImages, keptImage, queueStore } from "../draft.js";
 import { IMAGE_FILE, attachDir, attachName, ATTACH_DIR, keepSent, sentNames, fetchSent, previewName, previewFile, staleSent, dropSent } from "../images.js";
 import { caretOf, lineMove } from "../model/caret.js";
 import { COLUMN, icon } from "../ui/primitives.js";
@@ -48,7 +48,7 @@ export class Composer {
     this.sent = new Set(); this.fetching = new Set();
     cx.spawn(async cx => { for (const n of await sentNames()) this.sent.add(n); this.sentReady = true; await this.pruneSent(); cx.notify(); });
     cx.timer.every(SENT_PRUNE_EVERY, () => { this.pruneSent(); });
-    this.queued = new MessageQueue();
+    this.queued = new MessageQueue(queueStore);
     cx.timer.every(500, cx => this.drainQueue(cx));
   }
 
@@ -318,7 +318,8 @@ export class Composer {
     const t = target();
     if (!t || this.blank()) return;
     if (t.status !== "working") { this.send(cx); return; }
-    this.queued.add(this.host.key, this.takeBox(cx));
+    const { text, attachments } = this.takeBox(cx);
+    this.queued.add(this.host.key, { text, attachments: attachments.map(keptImage) });
     cx.notify();
   }
 
