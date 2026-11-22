@@ -543,7 +543,7 @@ export default class HerdrChat extends View {
         }
         if (row?.kind === "diagram-tools") { this.diagramTool(key, row, this.diagramButtonAt(this.list.pointerX), cx); return; }
         const opens = row?.kind === "tools" || (row?.kind === "step" && (this.reader.session.open[key] || stepText(row.call, false).more));
-        if (opens) { this.reader.session.open[key] = !this.reader.session.open[key]; cx.notify(); }
+        if (opens) { this.reader.session.open[key] = !this.reader.session.open[key]; this.reader.keepOpened(this.key); cx.notify(); }
       },
       canJump: !this.card.showing && active?.status !== "blocked",
     });
@@ -569,6 +569,12 @@ export default class HerdrChat extends View {
         .when(Boolean(status), el => el.child(status))
         .when(!status, el => el.child(div().w_full().h(24).flex_none()))
         .child(this.composer.render(t, active, this.sessionLine(t, active, this.modelChip(t, active)))));
+  }
+
+  /** Keeps what's typed in the reply box and the question card when the chat goes, past the pause they'd wait for. */
+  close() {
+    this.composer?.saveDraft();
+    this.card?.saveRows();
   }
 }
 

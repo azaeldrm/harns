@@ -8,6 +8,7 @@ import { askDaemon } from "./session-reader.js";
 import { shared } from "herdr";
 import { COLUMN, mono, icon, keyButton, checkbox } from "../ui/primitives.js";
 import { designPx } from "../measure.js";
+import { answerStore } from "../draft.js";
 
 const BODY_HEIGHT = 264;
 const ROW_CHARS = 96;
@@ -60,6 +61,7 @@ export class QuestionCard {
           if (trimmed !== v) box.set_value(trimmed);
         }
         this.rowChanged(kind, cx);
+        this.keepRow(kind, cx);
       });
     }
   }
@@ -156,6 +158,30 @@ export class QuestionCard {
     });
   }
 
+  /** Where a row's text is kept for the question on screen, by session, row and question ("" without one). */
+  rowKey(kind) {
+    const page = this.choices?.question.join("\n");
+    return this.host.key && page ? `${this.host.key}|${kind}|${page.slice(0, 300)}` : "";
+  }
+
+  /** Saves a row's text once typing pauses, so a reload of the chat brings it back. */
+  keepRow(kind, cx) {
+    if (this.rowSetting) return;
+    const token = this.keepToken = (this.keepToken ?? 0) + 1;
+    cx.spawn(async cx => {
+      await cx.sleep(ROW_PAUSE);
+      if (token === this.keepToken) this.saveRows();
+    });
+  }
+
+  /** Saves both rows' text now, for the question on screen. */
+  saveRows() {
+    for (const [kind, box] of Object.entries(this.rowInputs)) {
+      const key = this.rowKey(kind);
+      if (key) answerStore.set(key, box.value().trim() ? box.value() : null);
+    }
+  }
+
   /** Keeps a multi-select's text row on the terminal as it's typed, once typing pauses. */
   rowChanged(kind, cx) {
     const t = target();
@@ -236,6 +262,7 @@ export class QuestionCard {
         await cx.sleep(300);
         const sent = await sendMessage(t, text, true);
         if (sent.code !== 0) throw new Error(sent.stderr || "Send failed");
+        answerStore.set(this.rowKey(kind), null);
         box.set_value("");
         this.choices = null; this.screen = ""; this.unread = false;
       } catch (e) { this.host.note = String(e?.message ?? e); }
@@ -441,7 +468,10 @@ export class QuestionCard {
     });
   }
 
-  /** Shows a multi-select's typed text in its box, and clears the box when the question changes. */
+  /**
+   * Shows a multi-select's typed text in its box, and clears the box when the question changes; a question that comes
+   * back after a reload of the chat gets the text it had in each row.
+   */
   syncRowBox() {
     if (this.rowDirty) return;
     const q = this.choices, page = q?.question.join("\n") ?? "";
@@ -452,10 +482,11 @@ export class QuestionCard {
     this.rowPage = page;
     if (typed === undefined && !moved) return;
     if (!moved && Date.now() - (this.rowEditedAt ?? 0) < ROW_SETTLE) return;
-    const text = typed ?? kept.get(page) ?? "";
-    if (box.value() === text) return;
+    const text = typed ?? kept.get(page) ?? (moved ? answerStore.get(this.rowKey("text")) : null) ?? "";
+    const chat = this.rowInputs.chat, saved = moved && !chat.value() ? answerStore.get(this.rowKey("chat")) : null;
     this.rowSetting = true;
-    box.set_value(text);
+    if (box.value() !== text) box.set_value(text);
+    if (saved) chat.set_value(saved);
     this.rowSetting = false;
   }
 
