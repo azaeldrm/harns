@@ -16,10 +16,14 @@ const frameAt = clip => Math.floor((Date.now() - CLOCK) * clip.fps / 1000) % cli
 let made = 0;
 
 /**
- * One orb as its own view, showing one frame of the sheet scripts/render-orbs.py drew of it (`orbs/<state>-<size>.webp`,
- * carried in the mod's own folder): the sheet sits in a window one frame wide, moved to the frame the shared clock is
- * on. It redraws alone when the clock has reached a new frame, looking every 16 ms (about 30 times a second on Windows,
- * whose timers fire only every 15.6 ms: looking more often redraws the whole window that much more), while it's drawn.
+ * One orb as its own view, showing one frame of the sheets scripts/render-orbs.py drew of it (`orbs/<state>-<size>/
+ * <row>.webp`, one row of frames each, carried in the mod's own folder): the row holding the frame the shared clock is on
+ * sits in a window one frame wide, slid sideways to that frame. A row is a sheet of its own because herdr draws a
+ * picture slid upwards inside its window a little narrower than its size, so on a sheet of several rows an orb drifted
+ * several pixels along every row but the first and jumped back at the next. It redraws alone when the clock has reached
+ * a new frame, looking every 8 ms, about twice a frame, so the redraw lands in the screen refresh the frame falls in
+ * rather than one late (Windows timers fire only every 15.6 ms, so there it looks about once a frame), while it's drawn.
+ * Looking redraws nothing: only a new frame does.
  * Once its redraws stop being drawn (taken off screen, or the window covered or asleep for a moment) it asks only once
  * a second, so it picks up again by itself when shown: a view whose owner seldom redraws (the top bar's logo) would
  * otherwise stay still for good. A redraw chooses a frame and places one picture, nothing more.
@@ -42,7 +46,7 @@ class Clip extends View {
       const want = this.pool.wants[this.slot], now = Date.now();
       const live = now - this.drawn < 500;
       if (want && (live ? frameAt(want.clip) !== this.frame : now - this.asked >= 1000)) { this.asked = now; cx.notify(); }
-      cx.timer.after(want ? 16 : 250, tick);
+      cx.timer.after(want ? 8 : 250, tick);
     };
     cx.timer.after(16, tick);
   }
@@ -60,8 +64,8 @@ class Clip extends View {
         const zoom = zoomFrom(got, size);
         if (Math.abs(Math.round(wanted * zoom) - Math.round(wanted * this.zoom)) >= 1) { this.zoom = zoom; cx.notify(); }
       })
-      .child(image(`${src}.webp`).absolute().left(-(n % clip.cols) * size).top(-Math.floor(n / clip.cols) * size)
-        .w(clip.cols * size).h(clip.rows * size));
+      .child(image(`${src}/${Math.floor(n / clip.cols)}.webp`).absolute().left(-(n % clip.cols) * size).top(0)
+        .w(clip.cols * size).h(size));
   }
 }
 

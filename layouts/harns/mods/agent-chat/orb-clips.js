@@ -1,6 +1,6 @@
 /**
- * Each orb sheet of src/shared/orbs as scripts/render-orbs.py laid it out, by `<state>-<size>`: how many frames it
- * holds, in how many columns and rows, at how many frames a second. Written by that script: don't edit.
+ * Each orb clip of src/shared/orbs as scripts/render-orbs.py laid it out, by `<state>-<size>`: how many frames it
+ * holds, in how many columns and row sheets, at how many frames a second. Written by that script: don't edit.
  */
 export const ORB_CLIPS = {
   "breathing-20": {
