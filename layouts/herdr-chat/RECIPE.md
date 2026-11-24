@@ -40,7 +40,7 @@ status bar) with the chat and the terminal sharing the work area.
     the agent's replies on the left as markdown, with code blocks;
   - under a reply that links to files (`[BACKLOG.md](</srv/notes/BACKLOG.md:188>)`, or a path in the agent's
     folder), a chip per file (up to four) between its copy button and its turn numbers; a click opens it in the
-    [markdown-files](https://github.com/azaeldrm/harns/tree/main/mods/markdown-files) floating window, on the
+    [markdown-files](https://github.com/azaeldrm/harns-layout/tree/main/mods/markdown-files) floating window, on the
     agent's machine, when that mod is installed. The links in the text can't be clicked: rows of herdr's
     virtual list take no handlers;
   - tools and thinking folded into one grey line per run ("Ran 3 commands, read 2 files ›"),
