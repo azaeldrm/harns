@@ -112,11 +112,12 @@ def share_orbs(name, dest):
                      if '.orb(' in line)
     working = re.search(r'WORK_STATES\s*=\s*\[([^\]]*)\]', (SHARED / 'orb-states.js').read_text(encoding='utf-8'))
     states = set(re.findall(r'"([a-z]+)"', working.group(1))) if 'workState(' in code else set()
-    clips = [clip for clip in sorted((SHARED / 'orbs').glob('*.webp'))
-             if clip.stem.rsplit('-', 1)[0] in states or f'"{clip.stem.rsplit("-", 1)[0]}"' in code]
+    clips = [clip for clip in sorted((SHARED / 'orbs').iterdir())
+             if clip.is_dir() and (clip.name.rsplit('-', 1)[0] in states or f'"{clip.name.rsplit("-", 1)[0]}"' in code)]
     (dest / 'orbs').mkdir(exist_ok=True)
-    for path in [*clips, SHARED / 'orbs' / 'LICENSE']:
-        shutil.copy2(path, dest / 'orbs' / path.name)
+    for clip in clips:
+        shutil.copytree(clip, dest / 'orbs' / clip.name, dirs_exist_ok=True)
+    shutil.copy2(SHARED / 'orbs' / 'LICENSE', dest / 'orbs' / 'LICENSE')
 
 
 def build_mod(name, dest):

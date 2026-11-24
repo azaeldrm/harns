@@ -82,6 +82,8 @@ of the live app, set `git -c core.hooksPath=<empty folder>` for those commands.
 - An animated picture (an animated WebP) starts over whenever its mod redraws, an id or a view of its own
   notwithstanding: animate with a sprite sheet stepped by the clock instead (see `orbs.js`).
 - A picture 4096 px wide is drawn a little narrower than the size it's given: keep sprite sheets at most 2048 px wide.
+- A picture slid upwards inside a clipped box is drawn a little narrower than its size: keep a sprite sheet to one row
+  per file and slide it only sideways (see `orbs.js`).
 - A picture slid inside a clipped box lands up to a pixel or two off from one position to the next: fine for a 20 px
   orb, a visible shake for a large one, which is drawn live from round boxes instead (see `live-orb.js`).
 

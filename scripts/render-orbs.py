@@ -1,6 +1,8 @@
 """Renders the orbs Monochrome shows as sprite sheets in src/shared/orbs/: each a loop of 60 frames a second, drawn by
-scripts/orb-frames.mjs from the vendored thinking-orbs engine at twice the size it's shown, laid out left to right and
-top to bottom in one lossless WebP, with src/shared/orb-clips.js telling orbs.js each sheet's frames and columns. A
+scripts/orb-frames.mjs from the vendored thinking-orbs engine at twice the size it's shown, laid out left to right in
+rows, each row a lossless WebP of its own (`<state>-<size>/<row>.webp`: herdr draws a picture slid upwards in its window
+a little narrower than its size, so a sheet of several rows drifted), with src/shared/orb-clips.js telling orbs.js each
+clip's frames and columns. A
 sheet, not an animated WebP: herdr starts an animated picture over whenever its view redraws, while orbs.js shows a
 sheet's frame by the clock, so a redraw can't reset it. Home's large orb is drawn live instead (live-orb.js): herdr
 placed a big sheet a pixel or two off from frame to frame, and it shook. The engine's licence goes with them. Run after
@@ -37,16 +39,15 @@ def frames(state, size, scale, fps):
 
 
 def tile(info, body):
-    """The frames laid out left to right and top to bottom, at most WIDEST wide: the sheet, its columns and rows."""
+    """The frames laid out left to right in rows at most WIDEST wide, every row as wide: the row sheets and the columns."""
     side, count = info['side'], info['frames']
     cols = min(count, WIDEST // side)
-    rows = math.ceil(count / cols)
-    sheet = Image.new('RGBA', (cols * side, rows * side), (0, 0, 0, 0))
+    sheets = [Image.new('RGBA', (cols * side, side), (0, 0, 0, 0)) for _ in range(math.ceil(count / cols))]
     step = side * side * 4
     for n in range(count):
         frame = Image.frombytes('RGBA', (side, side), body[n * step:(n + 1) * step])
-        sheet.paste(frame, ((n % cols) * side, (n // cols) * side))
-    return sheet, cols, rows
+        sheets[n // cols].paste(frame, ((n % cols) * side, 0))
+    return sheets, cols
 
 
 def render(clip, fps=60):
@@ -54,12 +55,16 @@ def render(clip, fps=60):
     OUT.mkdir(parents=True, exist_ok=True)
     state, size = clip.rsplit('-', 1)
     info, body = frames(state, size, SCALE, fps)
-    sheet, cols, rows = tile(info, body)
-    path = OUT / f'{clip}.webp'
-    sheet.save(path, lossless=True, quality=100, method=6)
-    print(f'{clip}: {info["frames"]} frames, {info["loop"]:.2f} s loop, {cols}x{rows} of {info["side"]} px, '
-          f'{path.stat().st_size // 1024} KB')
-    return clip, {'frames': info['frames'], 'cols': cols, 'rows': rows, 'fps': fps}
+    sheets, cols = tile(info, body)
+    folder = OUT / clip
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir()
+    for row, sheet in enumerate(sheets):
+        sheet.save(folder / f'{row}.webp', lossless=True, quality=100, method=6)
+    size = sum(path.stat().st_size for path in folder.iterdir())
+    print(f'{clip}: {info["frames"]} frames, {info["loop"]:.2f} s loop, {cols}x{len(sheets)} of {info["side"]} px, '
+          f'{size // 1024} KB')
+    return clip, {'frames': info['frames'], 'cols': cols, 'rows': len(sheets), 'fps': fps}
 
 
 def write_table(rows):
@@ -70,8 +75,8 @@ def write_table(rows):
     table.update(rows)
     table = {clip: row for clip, row in table.items() if clip in CLIPS}
     body = json.dumps(dict(sorted(table.items())), indent=2)
-    TABLE.write_text('/**\n * Each orb sheet of src/shared/orbs as scripts/render-orbs.py laid it out, by `<state>-<size>`: how many frames it\n'
-                     ' * holds, in how many columns and rows, at how many frames a second. Written by that script: don\'t edit.\n */\n'
+    TABLE.write_text('/**\n * Each orb clip of src/shared/orbs as scripts/render-orbs.py laid it out, by `<state>-<size>`: how many frames it\n'
+                     ' * holds, in how many columns and row sheets, at how many frames a second. Written by that script: don\'t edit.\n */\n'
                      f'export const ORB_CLIPS = {body};\n', encoding='utf-8', newline='\r\n')
 
 

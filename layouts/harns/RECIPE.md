@@ -128,8 +128,11 @@ it needs you a listening orb (the red "Needs you" stays on the right), and while
 done check stays on the right). Classic keeps its icons and shows the orbs as the right-hand marks. The spark
 before a working agent's activity in the chat is that agent's orb, and Home shows a large shaping orb above its heading.
 The logo hop and the logo-carried marks give way to them. Each orb is a loop of 60 frames a second, prerendered into a
-sprite sheet (`orbs/` in each mod that shows them, from `src/shared/orbs`, laid out as `orb-clips.js` says): its own
-small view shows the sheet through a window one frame wide, at the frame one shared clock is on, so drawing a frame is
+sprite sheet of one file per row of frames (`orbs/<clip>/<row>.webp` in each mod that shows them, from
+`src/shared/orbs`, laid out as `orb-clips.js` says): its own small view shows the row through a window one frame wide,
+at the frame one shared clock is on, checked every 8 ms so a new frame lands in the screen refresh it falls in. A row
+is its own file because herdr drew a sheet slid upwards in its window a little narrower than its size, and the orb
+drifted along each row but the first, then jumped back. Drawing a frame is
 placing one picture, and a redraw of the sidebar (a hover) can't set it back, as it would an animated WebP, which herdr
 starts over whenever its view redraws. `scripts/render-orbs.py` draws the sheets from the vendored thinking-orbs engine
 with round antialiased dots at twice the size they're shown: each loop runs to where its orb comes back closest to its

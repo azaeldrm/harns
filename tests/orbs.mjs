@@ -35,13 +35,15 @@ const sheetSize = file => {
   const bits = b.readUInt32LE(21);
   return [(bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1];
 };
-check('each sheet is laid out as orb-clips.js says', Object.entries(ORB_CLIPS).filter(([clip, c]) => {
+check('each clip is one sheet per row, laid out as orb-clips.js says', Object.entries(ORB_CLIPS).filter(([clip, c]) => {
   const side = Number(clip.split('-')[1]) * 2;
-  return JSON.stringify(sheetSize(`${clip}.webp`)) !== JSON.stringify([c.cols * side, c.rows * side]) || c.cols * c.rows < c.frames;
+  const rows = Array.from({ length: c.rows }, (_, r) => JSON.stringify(sheetSize(`${clip}/${r}.webp`)));
+  return rows.some(size => size !== JSON.stringify([c.cols * side, side])) || existsSync(new URL(`../src/shared/orbs/${clip}/${c.rows}.webp`, import.meta.url))
+    || c.cols * c.rows < c.frames || c.cols * (c.rows - 1) >= c.frames;
 }).map(([clip]) => clip), []);
 check('every clip shown has a sheet', [...new Set(Object.values(shows).flat())].filter(c => !ORB_CLIPS[c]), []);
 check('each mod carries a clip of every orb it shows',
-  Object.entries(shows).flatMap(([m, clips]) => clips.filter(c => !carried(m, `${c}.webp`)).map(c => `${m}/${c}`)), []);
+  Object.entries(shows).flatMap(([m, clips]) => clips.filter(c => !carried(m, `${c}/${ORB_CLIPS[c].rows - 1}.webp`)).map(c => `${m}/${c}`)), []);
 
 check("Home's orb is drawn live, so agent-chat carries the engine and there's no sheet of it",
   [existsSync(new URL('../layouts/harns/mods/agent-chat/vendor/thinking-orbs/engine.es.js', import.meta.url)), existsSync(new URL('../src/shared/orbs/shaping-64', import.meta.url)), Boolean(ORB_CLIPS['shaping-64'])], [true, false, false]);
