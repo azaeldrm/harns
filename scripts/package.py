@@ -18,7 +18,7 @@ SHARED = SRC / 'shared'
 
 LISTINGS = {
     'layouts/harns': ['harns-chrome', 'harns-tabs', 'harns-settings', 'markdown-files', 'emulator',
-                      'machine-sidebar', 'harns-status', 'agent-chat'],
+                      'machine-sidebar', 'harns-status', 'harns-toast', 'agent-chat'],
     'layouts/herdr-chat': ['agent-chat'],
     'mods/agent-chat': ['agent-chat'],
     'mods/markdown-files': ['markdown-files'],
@@ -42,21 +42,29 @@ IMPORT = re.compile(r"""(?:from\s*|import\s*\(\s*)["'](\.{1,2}/[^"']+\.js)["']""
 
 def share_imports(dest):
     """Copies in each file of src/shared that the mod imports but doesn't have (`./layout.js`, `../hash.js` from a
-    subfolder: always the mod's own top folder), then what those import, until nothing is missing. So a mod carries
+    subfolder: always the mod's own top folder), then what those import, until nothing is missing; a shared file that
+    imports from `./vendor/<name>/` brings that whole folder of src/shared/vendor, its licence with it. So a mod carries
     exactly the shared code it uses."""
     while True:
-        wanted = set()
+        wanted, vendored = set(), set()
         for js in dest.rglob('*.js'):
             if 'vendor' in js.relative_to(dest).parts:
                 continue
             for rel in IMPORT.findall(js.read_text(encoding='utf-8')):
                 target = (js.parent / rel).resolve()
-                if not target.exists() and target.parent == dest.resolve() and (SHARED / target.name).is_file():
+                if target.exists():
+                    continue
+                if target.parent == dest.resolve() and (SHARED / target.name).is_file():
                     wanted.add(target.name)
-        if not wanted:
+                parts = target.relative_to(dest.resolve()).parts if target.is_relative_to(dest.resolve()) else ()
+                if len(parts) > 2 and parts[0] == 'vendor' and (SHARED / 'vendor' / parts[1]).is_dir():
+                    vendored.add(parts[1])
+        if not wanted and not vendored:
             return
         for name in wanted:
             shutil.copy2(SHARED / name, dest / name)
+        for name in vendored:
+            shutil.copytree(SHARED / 'vendor' / name, dest / 'vendor' / name, dirs_exist_ok=True)
 
 
 def icon_names(template, available):
@@ -96,11 +104,29 @@ def share_icons(name, dest):
         shutil.copy2(icon, dest / 'icons' / icon.name)
 
 
+def share_orbs(name, dest):
+    """Copies into the mod's orbs/ the clips of src/shared/orbs it shows, with the engine's licence: each state named in
+    quotes on a line of its own code showing an orb (`this.orbs.orb("connecting")`), and every working state
+    when such a line picks one with `workState`."""
+    code = '\n'.join(line for js in (SRC / name).rglob('*.js') for line in js.read_text(encoding='utf-8').splitlines()
+                     if '.orb(' in line)
+    working = re.search(r'WORK_STATES\s*=\s*\[([^\]]*)\]', (SHARED / 'orb-states.js').read_text(encoding='utf-8'))
+    states = set(re.findall(r'"([a-z]+)"', working.group(1))) if 'workState(' in code else set()
+    clips = [clip for clip in sorted((SHARED / 'orbs').glob('*.webp'))
+             if clip.stem.rsplit('-', 1)[0] in states or f'"{clip.stem.rsplit("-", 1)[0]}"' in code]
+    (dest / 'orbs').mkdir(exist_ok=True)
+    for path in [*clips, SHARED / 'orbs' / 'LICENSE']:
+        shutil.copy2(path, dest / 'orbs' / path.name)
+
+
 def build_mod(name, dest):
-    """One mod as it ships: its src/ folder, the shared code it imports, and what it takes from src/shared besides."""
+    """One mod as it ships: its src/ folder, the shared code it imports, and what it takes from src/shared besides:
+    the orb clips when it shows orbs."""
     shutil.copytree(SRC / name, dest, ignore=SKIP)
     share_imports(dest)
     share_icons(name, dest)
+    if (dest / 'orbs.js').is_file():
+        share_orbs(name, dest)
     if name == 'machine-sidebar':
         shutil.copytree(SHARED / 'rings', dest / 'stats' / 'rings')
         for icon in ('cpu.svg', 'ram.svg', 'gpu.svg', 'board.svg', 'usage.svg'):

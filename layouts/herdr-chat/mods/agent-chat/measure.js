@@ -2,9 +2,9 @@ import { div } from "gpui-kit";
 
 export const PROBE_PX = 100;
 
-/** The app's zoom, from how many reported pixels a PROBE_PX box takes up. */
-export function zoomFrom(size) {
-  return size && size.width > 0 ? size.width / PROBE_PX : 1;
+/** The app's zoom, from how many reported pixels a box laid out `designWidth` wide (PROBE_PX unless given) takes up. */
+export function zoomFrom(size, designWidth = PROBE_PX) {
+  return size && size.width > 0 && designWidth > 0 ? size.width / designWidth : 1;
 }
 
 /** A reported size (zoomed, from on_size_change) in the unzoomed px that .w(), .h() and v_virtual_list sizes take. */

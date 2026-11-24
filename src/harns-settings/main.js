@@ -5,6 +5,9 @@ import { find } from "./layout.js";
 import { SCENE_NAMES } from "./backdrop-scenes.js";
 import { SCENE_PREVIEWS } from "./scene-previews.js";
 import { usagePlace } from "./token-usage.js";
+import { COLORS_KEY, COLOR_THEMES, colorChoice } from "./harns-colors.js";
+import { rangeColor, rangeCalm } from "./tones.js";
+import { CHAT_FONT_KEY, chatFont, chatFonts } from "./chat-font.js";
 
 const SECTIONS = [
   { id: "general", title: "General", icon: "mods/harns-settings/icons/laptop.svg" },
@@ -13,6 +16,19 @@ const SECTIONS = [
   { id: "status", title: "Status bar", icon: "mods/harns-settings/icons/panel-bottom.svg" },
   { id: "simulator", title: "Simulator", icon: "mods/harns-settings/icons/smartphone.svg" },
 ];
+
+const COLORS = [
+  { id: "harns", name: "harns", about: "The logo's colours: teal for what you pick and where you are, warming through yellow to orange as bars fill and agents need you." },
+  { id: "mono", name: "Monochrome", about: "Grays throughout, agents at work near white. Only signals keep colour: red for a question or a bar near full, green for done." },
+  { id: "lively", name: "Lively", about: "Each agent in its own colours, amber for what you pick, and green through orange to red as bars fill and agents need you." },
+];
+
+/** The colours each choice's preview draws: its theme's accent, selected and working, as in `themes/`. */
+const COLOR_SWATCHES = {
+  harns: { accent: "#5ccfcb", selected: "#10292a", working: "#f8c55e" },
+  mono: { accent: "#c4c8ca", selected: "#24282b", working: "#eceeef" },
+  lively: { accent: "#e9aa35", selected: "#2a2113", working: "#e9aa35" },
+};
 
 const STYLES = [
   { id: "classic", name: "Classic", about: "Each machine boxed with its agents and stats." },
@@ -23,8 +39,8 @@ const PREVIEW_W = 154, PREVIEW_H = 90;
 const BACKGROUNDS = SCENE_NAMES.map(s => ({ id: s.id, name: s.label, about: `${s.about} Dimmed, and slower behind a conversation.` }));
 
 const CONTEXT_BARS = [
-  { id: "fill", name: "Fill", about: "Fills up as a session uses its context window: gray, amber past 75%, red past 90%." },
-  { id: "health", name: "Health bar", about: "Drains as a session uses its context window: green, amber below 45% left, red below 25%. The chat's context meter drains with it and says how much is left." },
+  { id: "fill", name: "Fill", about: "Fills up as a session uses its context window, its colour moving along the theme's range from calm to urgent." },
+  { id: "health", name: "Health bar", about: "Drains as a session uses its context window, its colour moving along the theme's range as it empties. The chat's context meter drains with it and says how much is left." },
 ];
 
 const USAGE = [
@@ -49,6 +65,12 @@ export default class HarnessSettings extends View {
       setShared("harness.local-name", value);
       setShared("machine.local-label", value.trim() || shared("harness.local-hostname") || "This computer");
     });
+    const font = chatFont(shared(CHAT_FONT_KEY));
+    this.font = InputState.new({ placeholder: "Any installed font, by name" });
+    this.font.set_value(font && !chatFonts(window()?.platform).some(f => f.id === font) ? font : "");
+    this.font.on("change", (_e, cx) => { setShared(CHAT_FONT_KEY, chatFont(this.font.value())); cx.notify(); });
+    this.font.on("focus", (_e, cx) => { this.fontTyping = true; cx.notify(); });
+    this.font.on("blur", (_e, cx) => { this.fontTyping = false; cx.notify(); });
     this.name.on("focus", (_e, cx) => { this.typing = true; cx.notify(); });
     this.name.on("blur", (_e, cx) => { this.typing = false; cx.notify(); });
   }
@@ -80,9 +102,15 @@ export default class HarnessSettings extends View {
     return this.row(t, title, about, this.toggle(t, `flag-${key}`, on, () => { setShared(key, !on); onChange?.(!on); }));
   }
 
-  /** This computer's name in the sidebar and the status bar. */
+  /** General: the colours harns wears (a theme each), then this computer's name in the sidebar and the status bar. */
   general(t) {
     return v_flex().w_full()
+      .child(this.heading(t, "Colours"))
+      .child(this.cards(t, COLORS, colorChoice(shared(COLORS_KEY)), id => this.colorPreview(t, id), id => {
+        setShared(COLORS_KEY, id);
+        run("app.theme", { name: COLOR_THEMES[id] });
+      }))
+      .child(div().h(18))
       .child(this.heading(t, "This computer"))
       .child(this.row(t, "Name", "How this computer is called in the sidebar and the status bar. Empty: its hostname.",
         div().id("local-name").w(200).h(30).px(10).flex().items_center().rounded(7).border_1()
@@ -92,7 +120,7 @@ export default class HarnessSettings extends View {
 
   /**
    * One option as Herdr's settings show layouts: a picture of it, its name under it with a check when it's the one in
-   * use, the chosen card outlined in amber. With `bleed` the picture fills its box to the edges. `disabled` greys it
+   * use, the chosen card outlined in the accent. With `bleed` the picture fills its box to the edges. `disabled` greys it
    * and takes away its click, for a choice that does nothing while the chat is off.
    */
   card(t, id, name, chosen, preview, onClick, bleed = false, disabled = false) {
@@ -116,6 +144,21 @@ export default class HarnessSettings extends View {
       .when(Boolean(now?.about) && !disabled, el => el.child(div().px(2).text_size(12.5).line_height("18px").text_color(t.dim).child(now.about)));
   }
 
+  /**
+   * A sidebar and tab bar drawn small in a choice's colours: the selected agent on its tint with an accent edge, an
+   * agent at work with its dot, the shown tab underlined, and its range from empty to full.
+   */
+  colorPreview(t, id) {
+    const c = COLOR_SWATCHES[id];
+    const line = (w, color) => div().h(3).w(w).flex_none().rounded_full().bg(color);
+    const row = (w, dot, extra) => h_flex().h(14).px(5).gap(5).items_center().rounded(3).child(div().size(5).flex_none().rounded_full().bg(dot)).child(line(w, t.dim)).when(Boolean(extra), extra);
+    return v_flex().gap(6)
+      .child(h_flex().gap(8).items_end().child(v_flex().gap(3).child(line(28, t.muted)).child(div().h(2).w(28).bg(c.accent))).child(line(22, t.dim)))
+      .child(row(58, t.muted, el => el.bg(c.selected).border_l(2).border_color(c.accent)))
+      .child(row(46, c.working))
+      .child(h_flex().mt(2).gap(1).children(Array.from({ length: 12 }, (_, i) => div().h(5).flex_1().bg(rangeColor({ accent: c.accent }, i / 11 * rangeCalm({ accent: c.accent }))))));
+  }
+
   /** A machine with three agents, drawn small in a style: Classic boxed with its rings, Tree hanging from lines. */
   stylePreview(t, id) {
     const line = (w, c) => div().h(3).w(w).flex_none().rounded_full().bg(c);
@@ -136,10 +179,9 @@ export default class HarnessSettings extends View {
 
   /** Three sessions' context bars as a style draws them: early, halfway, nearly full. */
   barPreview(t, id) {
-    const crit = "#d88179";
     const bars = id === "health"
-      ? [[80, t.ansi2 ?? t.done], [40, t.working], [18, crit]]
-      : [[30, t.muted], [80, t.working], [94, crit]];
+      ? [[80, rangeColor(t, 0.2)], [40, rangeColor(t, 0.6)], [18, rangeColor(t, 0.82)]]
+      : [[30, rangeColor(t, 0.3)], [80, rangeColor(t, 0.8)], [94, rangeColor(t, 0.94)]];
     return v_flex().gap(11)
       .children(bars.map(([share, color]) => h_flex().gap(7).items_center()
         .child(div().size(5).flex_none().rounded(1.5).bg(t.muted))
@@ -229,10 +271,22 @@ export default class HarnessSettings extends View {
     const scene = SCENE_NAMES.some(s => s.id === shared("herdr-chat.backdrop")) ? shared("herdr-chat.backdrop") : SCENE_NAMES[0].id;
     const chat = shared("herdr-chat.chat") !== false;
     const view = shared("herdr-chat.default-view") === "terminal" ? "terminal" : "chat";
+    const font = chatFont(shared(CHAT_FONT_KEY));
+    const fonts = chatFonts(window()?.platform);
     return v_flex().w_full()
       .child(this.heading(t, "Chat"))
       .child(this.flag(t, "herdr-chat.chat", "Open agents as a chat", "Off: agents' tabs show their terminal, without the Chat and Terminal switch.",
         on => { if (!on && find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" }); }))
+      .child(div().h(18))
+      .child(this.heading(t, "Font"))
+      .child(this.cards(t, fonts, fonts.some(f => f.id === (font ?? "default")) ? font ?? "default" : null, id => this.fontPreview(t, id), id => {
+        setShared(CHAT_FONT_KEY, id === "default" ? null : id);
+        this.font.set_value("");
+      }))
+      .child(this.row(t, "Other font", "Any font installed on this computer, by its name. It applies as you type; empty goes back to the cards.",
+        div().id("chat-font").w(220).h(30).px(10).flex().items_center().rounded(7).border_1()
+          .border_color(this.fontTyping ? t.accent : t.border).bg(t.background).cursor_text()
+          .child(Input.new(this.font).h_full().text_size(13).text_color(t.foreground))))
       .child(div().h(18))
       .child(this.heading(t, "New sessions"))
       .when(!chat, el => el.child(div().px(2).pb(10).text_size(12.5).line_height("18px").text_color(t.dim)
@@ -246,6 +300,13 @@ export default class HarnessSettings extends View {
         setShared("herdr-chat.animation", true);
         setShared("herdr-chat.backdrop", id);
       }, true));
+  }
+
+  /** A few lines of a conversation in font `id` (herdr's own for "default"), as the chat would show them. */
+  fontPreview(t, id) {
+    return v_flex().gap(5).when(id !== "default", el => el.font_family(id))
+      .child(div().text_size(13).text_color(t.foreground).child("Readable at a glance."))
+      .child(div().text_size(11.5).line_height("16px").text_color(t.muted).child("3 files changed, 12 tests passed."));
   }
 
   /** The status bar at the bottom, and what it shows. */

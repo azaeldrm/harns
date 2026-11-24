@@ -8,9 +8,10 @@ const python = [['python3'], ['python'], ['py', '-3']].find(([exe, ...args]) =>
 
 const node = ['usage', 'token-usage', 'turns', 'probes', 'snapshots', 'markdown', 'simulator', 'os-icons', 'assets',
   'sweep', 'backdrop', 'diagrams', 'copy', 'caret', 'retracted', 'runs-with', 'codex-daemon', 'previews', 'skills', 'sessions',
-  'read-cue', 'fold', 'measure', 'drafts', 'focus', 'prompts', 'harnesses', 'structure', 'views', 'links', 'queue', 'kept'];
+  'read-cue', 'fold', 'measure', 'drafts', 'focus', 'prompts', 'harnesses', 'structure', 'views', 'links', 'queue', 'kept',
+  'session-title', 'home-plan', 'harns-colors', 'tones', 'chat-font', 'orbs', 'agent-menu', 'toast-tone', 'past-sessions'];
 const scripts = ['steering', 'codex-logs', 'opencode', 'session-pick', 'images', 'reader_names', 'process-tree',
-  'claude-config-dir', 'codex-daemon', 'skills', 'step-row', 'prompt-keys', 'demo'];
+  'claude-config-dir', 'codex-daemon', 'skills', 'step-row', 'prompt-keys', 'demo', 'past-sessions'];
 
 const unixOnly = new Set(['steering.py', 'images.py', 'codex-daemon.py', 'skills.py', 'step-row.py', 'sessions.mjs']);
 const here = name => process.platform !== 'win32' || !unixOnly.has(name);

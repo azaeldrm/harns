@@ -1,3 +1,5 @@
+import { backdropAccents } from "../tones.js";
+
 const quant = v => { const q = Math.round(v * 0.25) * 4; return q < 0 ? 0 : q > 252 ? 252 : q; };
 
 const hex = c => {
@@ -12,7 +14,7 @@ export class Palette {
     this.base = hex(t.background ?? "#080a0b");
     this.fish = hex(t.foreground ?? "#dededb");
     this.wake = hex(t.done ?? "#10a7a7");
-    this.accents = [t.accent ?? "#e9aa35", t.done ?? "#10a7a7", "#d88179", "#8eafc2"].map(hex);
+    this.accents = backdropAccents(t).map(hex);
     this.cache = new Map();
   }
 

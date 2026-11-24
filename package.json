@@ -5,13 +5,15 @@
   "type": "module",
   "description": "harns: Herdr layouts and mods (harns, herdr-chat, and the mods they share as listings). npm is tooling only: Pele is pinned here and copied into src/harness-files/vendor/pele and src/herdr-chat/vendor/pele by `npm run vendor:pele`.",
   "devDependencies": {
-    "pele": "1.13.0"
+    "pele": "1.13.0",
+    "thinking-orbs": "0.3.2"
   },
   "scripts": {
     "test": "node scripts/test.mjs",
     "vendor:pele": "node scripts/vendor-pele.mjs",
     "check:pele": "node scripts/vendor-pele.mjs --check",
     "package": "python scripts/package.py",
-    "previews": "node scripts/scene-previews.mjs"
+    "previews": "node scripts/scene-previews.mjs",
+    "vendor:orbs": "node scripts/vendor-orbs.mjs"
   }
 }

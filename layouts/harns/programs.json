@@ -8,6 +8,7 @@
                                     "tint":  true
                                 },
                      "pi":  {
+                                "icon":  "brand-assets/pi.svg",
                                 "tint":  true
                             }
                  }

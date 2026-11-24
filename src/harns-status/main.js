@@ -3,6 +3,7 @@ import { h_flex } from "gpui-base";
 import { spaces, agents, panes, focused, theme, run, window, shared } from "herdr";
 
 import MachineData from "./machine-data.js";
+import { rangeColor } from "./tones.js";
 import { current } from "./usage.js";
 import { pullRequest } from "./pull-request.js";
 import { openUrl } from "./open-url.js";
@@ -41,7 +42,7 @@ export default class WorkspaceStatus extends MachineData {
           .tooltip(`${name} ${label}: ${known ? `${Math.round(percent)}% used` : `unavailable${usage[name]?.error ? ` · ${usage[name].error.toLowerCase()}` : ''}`}${limit?.resetsAt ? ` · resets ${clock(limit.resetsAt)}` : ''}`)
           .child(div().w(14).flex_none().text_size(9).text_color(t.dim).child(label))
           .child(div().w(44).h(4).rounded(2).bg(t.border)
-            .when(known, el => el.child(div().w(`${percent}%`).h(4).rounded(2).bg(percent > 90 ? '#d88179' : t.accent).opacity(percent > 90 ? 1 : opacity))));
+            .when(known, el => el.child(div().w(`${percent}%`).h(4).rounded(2).bg(rangeColor(t, percent / 100)).opacity(percent > 90 ? 1 : opacity))));
       };
       const weekly = this.usageHover === name;
       return h_flex().id(`bottom-usage-${name.toLowerCase()}`).flex_none().gap(8).items_center()

@@ -1,18 +1,37 @@
 import { View, div, image, svg } from "gpui-kit";
-import { v_flex, h_flex, Popup, ScrollHandle } from "gpui-base";
-import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, nextCommand, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder, exec } from "herdr";
+import { v_flex, h_flex, Popup, ScrollHandle, Textarea, TextareaState } from "gpui-base";
+import { machines, agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, nextCommand, openOverlay, closeOverlay, props, layout, hc, notify, home, watchFolder, exec, pickFolder, knownAgents, appHome } from "herdr";
+import { readFile } from "fs/promises";
 
 import { machineMetrics } from "./machine-metrics.js";
 import { refreshContext } from "./context.js";
 import { machineDetails } from "./details.js";
 import { osOf } from "./os.js";
 import { look, changedHosts, machinesChanged } from "./turns.js";
-import { agentFolder } from "./sessions.js";
-import { NewMenu } from "./new-menu.js";
+import { agentFolder, sessionOf } from "./sessions.js";
+import { PAST_STORE, LINKS_STORE, PAST_PER_MACHINE, PAST_SHOWN, PAST_HARNESSES, pastKey, openKey, listProgram, parseListing, keepListing, sinceFor, pastSessions, pastRows, noteLinks, matchLinks, dayGroups, resumeArgv } from "./past-sessions.js";
+import { base64Utf8, python } from "./python.js";
+import { menuItems, actionOf, machineMenuItems, machineActionOf, homeTerminal } from "./agent-menu.js";
+import { Home } from "./home.js";
+import { showHome, showWork, atHome } from "./open-home.js";
+import { KEPT_FOLDERS, folderChoices, openFolders, remember, startCommand } from "./home-plan.js";
 import { find, narrow } from "./layout.js";
+import { sessionTitle } from "./session-title.js";
+import { folderName } from "./paths.js";
+import { alertColors, rangeColor, brandIcons, monochrome } from "./tones.js";
+import { OrbPool, orbsOn, workState } from "./orbs.js";
 import { collectUsage, readMachineUsage, usageDays, usageDue, usagePlace } from "./token-usage.js";
 import { usageDetails, usageRailMark, usageStrip } from "./usage-card.js";
 import { contextText, healthBars, healthFill } from "./context-bar.js";
+
+/** How far the work area's window sits from the sidebar (the layout's padding there), where the details cards line up. */
+const WORK_INSET = 12;
+
+/** The title colour of an agent or sub-agent at work, in Monochrome. */
+const WHITE = "#ffffff";
+
+/** The shared state key holding each remote machine's home folder, learnt once, for its menu's New terminal. */
+const MACHINE_HOMES = "harness.machine.homes";
 
 const localMachineLabel = () => shared("machine.local-label") ?? "This computer";
 const statsFor = (machine, t) => machineMetrics(machine, false, t);
@@ -47,43 +66,22 @@ const underMachine = (t, rows, last, elbowAt) => {
 };
 
 /**
- * The context window as harns's Settings chose: filling with what's used (gray, amber past 75%, red past 90%), or
- * as the health bar draining to what's left (`healthFill`, shared with the chat's meter).
+ * The context window as harns's Settings chose: filling with what's used, coloured along the theme's range (tones.js),
+ * or as the health bar draining to what's left (`healthFill`, shared with the chat's meter). Its track is the tree lines'
+ * gray, a step above a selected or hovered card, so it stays visible on either.
  */
 function contextBar(t, used, width, height = 3) {
-  const { share, color } = healthFill(t, used) ?? { share: used, color: used > 90 ? "#d88179" : used > 75 ? t.working : t.muted };
-  return div().w(width).h(height).flex_none().rounded_full().bg(t.border)
+  const { share, color } = healthFill(t, used) ?? { share: used, color: rangeColor(t, used / 100) };
+  return div().w(width).h(height).flex_none().rounded_full().bg(treeColor(t))
     .when(share > 0, el => el.child(div().h_full().rounded_full().w(Math.max(2, Math.round(width * share / 100))).bg(color)));
 }
-
-const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
 function lead(tab, all = panes()) {
   const mine = all.filter(p => p.tab === tab.id && p.terminal);
   return mine.find(p => p.program?.agent) ?? mine.find(p => p.focused) ?? mine[0];
 }
 
-function harnessSessionTitle(l) {
-  const prog = l?.program?.name;
-  const live = clean(l?.title);
-  const prefixes = [prog, l?.program?.key, l?.app === "pi" ? "\u03c0" : null].filter(Boolean);
-  const separators = [" - ", " \u2014 ", " \u2013 ", " | ", ": "];
-  let session = live;
-  for (const prefix of prefixes) {
-    const start = session.toLowerCase();
-    const name = prefix.toLowerCase();
-    const separator = separators.find(s => start.startsWith(`${name}${s}`));
-    if (separator) { session = session.slice(prefix.length + separator.length).trim(); break; }
-  }
-  const folder = folderName(l?.cwd);
-  const suffix = folder && separators.find(s => session.endsWith(`${s}${folder}`));
-  if (suffix) session = session.slice(0, -(suffix.length + folder.length)).trim();
-  else if ((l?.app === "codex" || l?.program?.key === "codex") && session.includes(" | ")) session = session.slice(0, session.lastIndexOf(" | ")).trim();
-  const telling = session && session !== prog && !/^[~/]|^[A-Za-z]:\\/.test(session) && !session.includes("@") && session.toLowerCase() !== l?.program?.key && session !== folder;
-  return telling ? session : "";
-}
 const paneBranch = a => panes().find(p => p.pane === a.pane)?.branch ?? spaces().find(s => s.id === a.space)?.branch ?? null;
-const folderName = path => String(path ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? "";
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
 /** A sub-agent without a pane isn't in agents(): its raw word, error counting as blocked. */
 const kidStatus = (k, listed) => {
@@ -102,7 +100,7 @@ function duration(ms) {
 /** The agent's icon from the app's program table: a one-color glyph or a picture. */
 function icon(p, size, color) {
   if (!p?.icon) return null;
-  return p.icon.endsWith('.svg') ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
+  return p.icon.endsWith('.svg') && !brandIcons(theme(), p) ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
 const HOP_MS = 700, FEET = 8.8 / 12;
@@ -115,7 +113,7 @@ const HALO = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 
  */
 function badgeOf(p, size, color, ring) {
   if (!p?.icon) return null;
-  if (!p.icon.endsWith('.svg')) return div().p(1).rounded_full().bg(ring).child(image(p.icon).w(size).h(size).flex_none());
+  if (!p.icon.endsWith('.svg') || brandIcons(theme(), p)) return div().p(1).rounded_full().bg(ring).child(image(p.icon).w(size).h(size).flex_none());
   return haloed(p.icon, size, color, ring);
 }
 
@@ -131,14 +129,20 @@ function haloed(src, size, color, ring) {
  * The agent icon (a sub-agent's: the same bot without its antenna), with its program's icon small at its bottom right
  * on a halo of the row's color (badgeOf). `hop` (working; its own place in its hops, { n, up, go, ripple }, from
  * hopFor): that logo hops in amber from side to side over the bot, its halo masking the bot as it passes, a ripple
- * spreading where it lands.
+ * spreading where it lands. `orb` (Monochrome, from orbFor) stands in for the bot; the program's icon stays on it only
+ * where it's given (the rail), as a full card shows it in its bottom line, before the folder, and a sub-agent's row
+ * beside its name.
  */
-function agentPic(t, p, size, color, ring, sub = false, hop = false, tint = null, corner = null) {
+function agentPic(t, p, size, color, ring, sub = false, hop = false, tint = null, corner = null, orb = null) {
   const bot = svg(`mods/machine-sidebar/icons/${sub ? "bot-small" : "bot"}.svg`).size(size).flex_none().text_color(color);
   const badge = badgeOf(p, Math.round(size * 0.65), hop ? t.working : tint ?? color, ring);
-  const mark = corner === "ask" ? ["mods/machine-sidebar/icons/question.svg", "#d88179"]
-    : corner === "done" ? ["mods/machine-sidebar/icons/circle-check.svg", t.ansi2 ?? t.done] : null;
+  const mark = corner === "ask" ? ["mods/machine-sidebar/icons/question.svg", t.blocked]
+    : corner === "done" ? ["mods/machine-sidebar/icons/circle-check.svg", alertColors(t).done] : null;
   const cornerMark = () => haloed(mark[0], Math.round(size * 0.6), mark[1], ring).absolute().right(-5).top(-3);
+  if (orb) return div().relative().size(size).mr(2).flex_none()
+    .child(div().absolute().left((size - 20) / 2).top((size - 20) / 2).child(orb))
+    .when(Boolean(badge), el => el.child(badge.absolute().right(-5).bottom(-4)))
+    .when(Boolean(mark), el => el.child(cornerMark()));
   if (!hop || !badge) return div().relative().size(size).flex_none().child(bot)
     .when(Boolean(badge), el => el.child(badge.absolute().right(-5).bottom(-4)))
     .when(Boolean(mark), el => el.child(cornerMark()));
@@ -172,8 +176,20 @@ const READ_AFTER = [1000, 4000];
 export default class Agents extends View {
   init(_props, cx) {
     if (props()?.loginBar) return;
-    if (props()?.newMenu) { this.menu = new NewMenu(); this.menu.init(cx); return; }
+    if (props()?.agentMenu || props()?.machineMenu) return;
+    if (props()?.agentMessage) { this.initMessage(cx); return; }
+    if (props()?.home) {
+      this.menu = new Home();
+      this.menu.init(cx, { form: "space", icons: "mods/machine-sidebar/icons", onStart: () => closeOverlay(props().overlay) });
+      return;
+    }
+    this.orbs = new OrbPool(cx, "machine-sidebar", 32);
     this.folded = new Set();
+    this.past = { open: false, shown: PAST_SHOWN, read: 0, busy: new Set(), unfolded: new Set() };
+    try { this.pastLinks = JSON.parse(localStorage.getItem(LINKS_STORE) ?? "{}"); } catch { this.pastLinks = {}; }
+    try { this.pastKept = JSON.parse(localStorage.getItem(PAST_STORE) ?? "{}"); } catch { this.pastKept = {}; }
+    this.pastQuery = TextareaState.new({ placeholder: "Search past sessions", rows: 1 });
+    this.pastQuery.on("change", (_e, cx) => { this.past.shown = PAST_SHOWN; cx.notify(); });
     this.hosts = {};
     this.retrying = {};
     this.refreshHosts(cx);
@@ -198,6 +214,10 @@ export default class Agents extends View {
       this.noticeTurns(cx);
       if (this.detailsWanted && Date.now() < this.detailsWanted.until) this.readDetails(this.detailsWanted.name, cx);
       this.readUsage(cx);
+      this.notePastLinks();
+      const live = new Set(agents().map(a => a.address)), gone = [...(this.past.live ?? [])].some(a => !live.has(a));
+      this.past.live = live;
+      if (this.past.open && (gone || Date.now() - this.past.read > 30000)) this.readPast(cx);
       cx.notify();
     });
     this.noticeTurns(cx);
@@ -407,7 +427,7 @@ export default class Agents extends View {
   }
 
   detailsEnter(key, cx) {
-    const OPEN_AFTER = 450, LIVE = 400;
+    const OPEN_AFTER = 900, LIVE = 400;
     this.hot = key;
     if (this.muted === key) return;
     this.detailsTimer?.cancel();
@@ -426,11 +446,12 @@ export default class Agents extends View {
 
   /**
    * The card, hung from the row's top-right corner (the row must be relative), while it's the one up: `edge` px
-   * further, the row's distance from the sidebar's edge, so the card sits right against the sidebar.
+   * further (the row's distance from the sidebar's edge) and then WORK_INSET, so the card lines up with the work
+   * area's window beside the sidebar.
    */
   hang(key, card, edge = 8) {
     return Popup.new(`details-${key}`, div()).absolute().top(-1).right(-1).size(1)
-      .when(this.detailsKey === key && !this.drag?.moved && !this.mdrag?.moved, pop => pop.content(div().id(`details-hover-${key}`).pl(edge)
+      .when(this.detailsKey === key && !this.drag?.moved && !this.mdrag?.moved, pop => pop.content(div().id(`details-hover-${key}`).pl(edge + WORK_INSET)
         .on_hover((on, cx) => { if (on) this.overCard = key; else { if (this.overCard === key) this.overCard = null; this.detailsLeave(key, cx); } })
         .child(card)));
   }
@@ -446,6 +467,16 @@ export default class Agents extends View {
         if (on) { this.wantDetails(machine.name, cx); this.detailsEnter(key, cx); }
         else { if (this.muted === key) this.muted = null; this.detailsLeave(key, cx); }
       })
+      .when(machine.layout === "ready", el => el.on_mouse_down("right", (_e, cx) => {
+        cx.stop_propagation();
+        this.detailsTimer?.cancel();
+        this.muted = key;
+        this.detailsKey = null;
+        cx.notify();
+        this.learnHome(machine.name ?? null, cx);
+        openOverlay({ mod: "machine-sidebar", kind: "popup", at: "pointer", width: 250, height: this.machineMenuHeight(machine.name ?? null),
+          props: { machineMenu: machine.name ?? "@local" } });
+      }))
       .child(trigger)
       .child(this.hang(key, this.detailsCard(t, machine), edge));
   }
@@ -462,7 +493,7 @@ export default class Agents extends View {
     const GB = 1024 ** 3;
     const gb = b => b == null ? "?" : (b / GB >= 100 ? Math.round(b / GB) : (b / GB).toFixed(1));
     const ok = v => Number.isFinite(v);
-    const WARN = "#e8823a", CRIT = "#d88179";
+    const { warn: WARN, crit: CRIT } = alertColors(t);
     const level = (v, warn, crit) => v >= crit ? CRIT : v >= warn ? WARN : t.accent;
     const BAR = 148, LABEL = 44, VALUE = 90;
     const row = (label, fill, color, value) => h_flex().w_full().pl(18).gap(8).items_center().h(18)
@@ -480,7 +511,7 @@ export default class Agents extends View {
       .children(rows.filter(Boolean));
     const note = text => div().pl(18).text_size(11).text_color(t.dim).truncate().child(text);
     const up = sec => { if (!ok(sec)) return ""; const m = Math.floor(sec / 60), h = Math.floor(m / 60), dd = Math.floor(h / 24); return dd ? `up ${dd}d ${h % 24}h` : h ? `up ${h}h ${m % 60}m` : `up ${m}m`; };
-    const card = v_flex().w(340).p(12).gap(10).rounded(10).border_1().border_color(t.border).bg(t.popover ?? t.raised).text_size(12).shadow_md()
+    const card = v_flex().w(340).p(12).gap(10).rounded(10).border_1().border_color(t.border).bg(t.surface).text_size(12).shadow_md()
       .child(h_flex().gap(10).items_center()
         .child(svg(this.machineIcon(machine)).size(26).flex_none().text_color(t.muted))
         .child(v_flex().flex_1().min_w(0).gap(1)
@@ -516,7 +547,7 @@ export default class Agents extends View {
     const term = all.find(x => x.address === a.address);
     const since = term?.status_ms ?? this.since(a);
     const word = { working: "Working", blocked: "Needs you", done: "Finished \u00b7 not yet seen", idle: "Idle" };
-    const color = { working: t.working, blocked: t.blocked, done: t.ansi2 ?? t.done }[a.status] ?? t.muted;
+    const color = { working: t.working, blocked: t.blocked, done: alertColors(t).done }[a.status] ?? t.muted;
     const machine = a.address.includes("/") ? a.address.split("/")[0] : localMachineLabel();
     const tab = spaces().flatMap(s => s.tabs).find(x => x.id === a.tab);
     const folder = agentFolder(a, tab ? lead(tab) : null, all);
@@ -528,7 +559,7 @@ export default class Agents extends View {
       .child(div().w(LABEL).flex_none().text_size(11).text_color(t.dim).child(label))
       .child(div().flex_1().min_w(0).whitespace_normal().text_color(t.muted).child(value));
     const kids = this.tree(all, a.address);
-    return v_flex().w(340).p(12).gap(8).rounded(10).border_1().border_color(t.border).bg(t.popover ?? t.raised).text_size(12).shadow_md()
+    return v_flex().w(340).p(12).gap(8).rounded(10).border_1().border_color(t.border).bg(t.surface).text_size(12).shadow_md()
       .child(h_flex().w_full().gap(10).items_center()
         .child(icon(a.program, 26, t.muted) ?? svg("mods/machine-sidebar/icons/bot.svg").size(26).flex_none().text_color(t.muted))
         .child(v_flex().flex_1().min_w(0).gap(1)
@@ -766,13 +797,14 @@ export default class Agents extends View {
     const k = s.t;
     const st = kidStatus(k, this.listed);
     const on = k.address === shown;
-    const hops = !classic() && healthBars() && Boolean(k.program?.icon) && st === "working";
+    const hops = !classic() && healthBars() && Boolean(k.program?.icon) && st === "working" && !orbsOn(t);
     const bright = on || (st !== "idle" && !hops);
     const color = on ? t.accent : compact && bright ? t.foreground : t.muted;
     const ring = this.hoveredSub === k.address ? t.hover : on ? t.raised : t.surface;
     if (hops) this.hopping = true;
+    const orb = classic() ? null : this.orbFor(t, k.address, st);
     const pic = classic() ? icon(k.program, 14, color)
-      : agentPic(t, k.program, 14, color, ring, true, hops ? this.hopFor(k.address) : null);
+      : agentPic(t, orb ? null : k.program, 14, color, ring, true, hops ? this.hopFor(k.address) : null, null, null, orb);
     const name = k.name || k.template || k.program?.name || k.address;
     const box = h_flex().id(`sub-${k.address}`).relative().h(26).flex_none().items_center().rounded(8)
       .when(on, (el) => el.bg(t.raised)).hover((s) => s.bg(t.hover)).cursor_pointer()
@@ -780,7 +812,8 @@ export default class Agents extends View {
         if (over) this.hoveredSub = k.address; else if (this.hoveredSub === k.address) this.hoveredSub = null;
         cx.notify();
       })
-      .on_click(() => this.peek(k.address));
+      .on_click(() => this.peek(k.address))
+      .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.openAgentMenu(k.address, true, cx); });
     if (compact) return box.justify_center().tooltip(name).child(pic ?? this.status(t, { status: st }, true));
     return box
       .pl(classic() ? 17 * s.lines.length + 17 : 23 * s.lines.length + 9)
@@ -791,8 +824,9 @@ export default class Agents extends View {
           .when(l === "└", el => el.h(13)).when(l !== "└", el => el.bottom(0))] : [])
         : s.lines.flatMap((l, j) => treeLines(t, 15 + 23 * j, 13, l === "│" || l === "├", l === "├" || l === "└")))
       .when(Boolean(pic), el => el.child(div().mr(classic() ? 8 : 10).child(pic)))
-      .child(div().flex_1().truncate().text_color(bright ? t.foreground : t.muted).child(name))
-      .child(hops ? div().size(14).flex_none() : this.status(t, { status: st }));
+      .when(Boolean(orb) && Boolean(k.program?.icon), el => el.child(div().mr(6).flex_none().tooltip(k.program?.name ?? "").child(icon(k.program, 11, t.dim))))
+      .child(div().flex_1().truncate().text_color(st === "working" && monochrome(t) ? WHITE : on ? t.foreground : t.muted).child(name))
+      .child(hops ? div().size(14).flex_none() : this.status(t, { status: st, address: k.address, orbed: Boolean(orb) }));
   }
 
   /** The machine's panes that aren't agents: a shell, a dev server, lazygit. */
@@ -810,12 +844,13 @@ export default class Agents extends View {
    * the rail (compact) just the icon, centred as the agents' are, with the rest in its tooltip.
    */
   terminalRows(t, machine, compact = false) {
-    const shown = focused()?.pane;
+    const shown = atHome(layout) ? null : focused()?.pane;
     return this.plainTerminals(machine).map((p) => {
       const on = p.pane === shown, name = p.program?.name || p.title || "shell", where = folderName(p.cwd);
       const pic = icon(p.program, 16, on ? t.accent : t.muted) ?? svg("mods/machine-sidebar/icons/terminal.svg").size(15).flex_none().text_color(on ? t.accent : t.muted);
       const open = () => {
         run("pane.focus", { pane: p.pane });
+        showWork(run, layout);
         if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: "terminal-panel" });
       };
       const box = h_flex().id(`term-${p.pane}`).h(28).flex_none().items_center().rounded(6).border_l(2)
@@ -832,8 +867,18 @@ export default class Agents extends View {
   }
 
   /**
+   * The orb that stands in for an agent's bot in Monochrome (Tree): its own while it works, listening while it needs
+   * you, and breathing while it's idle or done. Null outside Monochrome, or once the pool is handed out.
+   */
+  orbFor(t, address, status) {
+    if (!orbsOn(t) || !address) return null;
+    return this.orbs.orb(status === "working" ? workState(address) : status === "blocked" ? "listening" : "breathing");
+  }
+
+  /**
    * An agent's status mark (compact: a ! for blocked, under a "Needs you" header); hovering any of them gives the
-   * context window used.
+   * context window used. In Monochrome a working agent's mark is its orb and one that needs you leads with a listening
+   * orb, while the pool lasts (orbs.js); with `orbed` the bot already carries it, so the mark leaves it out.
    */
   status(t, a, compact = false) {
     const context = a.address ? (shared('agents.context') ?? {})[a.address] : null;
@@ -842,26 +887,216 @@ export default class Agents extends View {
     const state = { working: "Working", done: "Finished · not yet viewed", blocked: "Needs you" }[a.status];
     const tip = a.address ? `Context: ${known ? contextText(percent) : "unavailable"}${state ? ` · ${state}` : ""}` : state;
     const mark = el => div().size(14).flex_none().flex().items_center().justify_center().when(Boolean(tip), d => d.tooltip(tip)).child(el);
+    if (a.orbed && a.status === "working") return mark(div());
+    const orb = orbsOn(t) && !a.orbed && a.address && (a.status === "working" || a.status === "blocked")
+      ? this.orbs.orb(a.status === "working" ? workState(a.address) : "listening") : null;
+    if (a.status === "working" && orb) return mark(orb);
     if (a.status === "working") return mark(svg("mods/machine-sidebar/icons/spinner.svg").size(15).flex_none().text_color(t.working).spin(900));
-    if (a.status === "done") return mark(svg("mods/machine-sidebar/icons/circle-check.svg").size(13).flex_none().text_color(t.ansi2 ?? t.done));
+    if (a.status === "done") return mark(svg("mods/machine-sidebar/icons/circle-check.svg").size(13).flex_none().text_color(alertColors(t).done));
+    if (a.status === "blocked" && compact && orb) return mark(orb);
     if (a.status === "blocked" && compact) return mark(div().size(14).rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!"));
+    if (a.status === "blocked" && orb) return h_flex().flex_none().gap(6).items_center().child(mark(orb))
+      .child(div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
+        .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you"));
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center()
       .when(Boolean(tip), d => d.tooltip(tip)).child("Needs you");
     if (compact) return (known ? contextBar(t, percent, 14) : div().w(14).h(3).flex_none().rounded_full().bg(t.border)).when(Boolean(tip), d => d.tooltip(tip));
     return div().size(14).flex_none();
   }
 
+  /** A machine's folders the menu lists for a new terminal: Home's choices there (open ones, then remembered). */
+  machineFolders(machine) {
+    return folderChoices(machine, spaces(), panes(), shared(KEPT_FOLDERS));
+  }
+
+  /** A machine's home folder: this computer's at once, another's as learnt by learnHome, null until then. */
+  machineHome(machine) {
+    return machine === null ? home() : (shared(MACHINE_HOMES) ?? {})[machine] ?? null;
+  }
+
+  /** Asks a machine for its home folder once (`hc exec`), keeping it in shared state for its menu's New terminal. */
+  learnHome(machine, cx) {
+    if (machine === null || this.machineHome(machine)) return;
+    cx.spawn(async () => {
+      const r = await hc(["exec", "--on", machine, 'printf %s "$HOME"']).catch(() => null);
+      const path = (r?.stdout ?? "").trim();
+      if (path.startsWith("/")) setShared(MACHINE_HOMES, { ...(shared(MACHINE_HOMES) ?? {}), [machine]: path });
+    });
+  }
+
+  /** A machine's right-click menu (props `{ machineMenu }`: its name, "@local" for this computer). */
+  machineMenu(t, machine) {
+    const folders = this.machineFolders(machine);
+    const item = it => it.heading
+      ? div().h(22).flex_none().px(8).pt(4).text_size(11).text_color(t.dim).child(it.label)
+      : h_flex().id(`menu-${it.id}`).h(28).flex_none().px(8).gap(9).items_center().rounded(6).cursor_pointer()
+        .hover(s => s.bg(t.hover)).text_size(12.5).text_color(t.foreground)
+        .when(Boolean(it.tip), el => el.tooltip(it.tip))
+        .on_click(() => this.carryOutMachine(it.id, machine, folders))
+        .child(svg(`mods/machine-sidebar/icons/${it.glyph}.svg`).size(13).flex_none().text_color(t.muted))
+        .child(div().flex_1().truncate().child(it.label));
+    const groups = machineMenuItems({ folders, local: machine === null });
+    return v_flex().size_full().p(5).bg(t.popover ?? t.surface).text_color(t.foreground)
+      .children(groups.flatMap((g, i) => [...(i ? [div().h(1).mx(4).my(4).flex_none().bg(t.border)] : []), ...g.map(item)]));
+  }
+
+  /** How tall a machine's menu is: its items, its folders' heading and the rule between its groups. */
+  machineMenuHeight(machine) {
+    const groups = machineMenuItems({ folders: this.machineFolders(machine), local: machine === null });
+    return groups.flat().reduce((sum, it) => sum + (it.heading ? 22 : 28), 0) + (groups.length - 1) * 9 + 12;
+  }
+
+  /** Carries out a machine menu item (agent-menu.js's machineActionOf), closing the menu. */
+  carryOutMachine(id, machine, folders) {
+    const plan = machineActionOf(id, machine, folders);
+    if (!plan) return;
+    const terminal = where => {
+      const [command, args] = where
+        ? startCommand({ machine, folder: where, agent: null }, spaces(), panes())
+        : homeTerminal(machine, this.machineHome(machine), spaces());
+      run(command, args);
+      showWork(run, layout);
+    };
+    if (plan.pick) {
+      pickFolder({ prompt: "Where should the terminal start?" }).then(f => { closeOverlay(props().overlay); if (f) terminal(f); });
+      return;
+    }
+    closeOverlay(props().overlay);
+    if (plan.start) showHome(run, layout, setShared, { machine });
+    if (plan.terminal) terminal(plan.terminal.folder);
+  }
+
+  /** What the agent menu and message box know of an agent or sub-agent: its name, tab, folder and whether it's pinned. */
+  menuTarget(address) {
+    const a = agents().find(x => x.address === address) ?? terminals().find(x => x.address === address);
+    if (!a) return null;
+    const tab = spaces().flatMap(s => s.tabs).find(x => x.id === a.tab);
+    const pane = tab ? lead(tab) : null;
+    const name = sessionTitle(pane ?? a) || a.name || a.title || a.program?.name || address;
+    const folder = agentFolder(a, pane) || a.cwd || null;
+    const pinned = JSON.parse(localStorage.getItem("pins") ?? "[]").includes(address);
+    return { agent: { address, name, tab: tab?.id ?? null }, folder, pinned, tabPanes: tab ? panes().filter(p => p.tab === tab.id).length : 0 };
+  }
+
+  /**
+   * Opens an agent's right-click menu at the pointer, sized to its items, closing the row's details card and keeping it
+   * shut until the pointer leaves the row, so the two never overlap.
+   */
+  openAgentMenu(address, sub, cx) {
+    this.detailsTimer?.cancel();
+    this.muted = address;
+    this.detailsKey = null;
+    cx.notify();
+    const target = this.menuTarget(address);
+    if (!target) return;
+    const groups = menuItems({ sub, pinned: target.pinned, tab: target.agent.tab, folder: target.folder });
+    const height = groups.reduce((sum, g) => sum + g.length * 28, 0) + (groups.length - 1) * 9 + 12;
+    openOverlay({ mod: "machine-sidebar", kind: "popup", at: "pointer", width: 250, height, props: { agentMenu: address, sub } });
+  }
+
+  /** The right-click menu itself (props `{ agentMenu, sub }`): its groups of items, each carrying out its plan. */
+  agentMenu(t, address, sub) {
+    const target = this.menuTarget(address);
+    if (!target) return div();
+    const groups = menuItems({ sub, pinned: target.pinned, tab: target.agent.tab, folder: target.folder });
+    const item = it => h_flex().id(`menu-${it.id}`).h(28).flex_none().px(8).gap(9).items_center().rounded(6).cursor_pointer()
+      .hover(s => s.bg(t.hover)).text_size(12.5).text_color(it.danger ? t.blocked : t.foreground)
+      .on_click((_e, cx) => this.carryOut(it.id, target, cx))
+      .child(svg(`mods/machine-sidebar/icons/${it.glyph}.svg`).size(13).flex_none().text_color(it.danger ? t.blocked : t.muted))
+      .child(div().flex_1().child(it.label))
+      .when(Boolean(it.keys), el => el.child(div().text_size(11).text_color(t.dim).child(it.keys)));
+    return v_flex().size_full().p(5).bg(t.popover ?? t.surface).text_color(t.foreground)
+      .children(groups.flatMap((g, i) => [...(i ? [div().h(1).mx(4).my(4).flex_none().bg(t.border)] : []), ...g.map(item)]));
+  }
+
+  /** Carries out an agent menu item's plan (agent-menu.js's actionOf), closing the menu first. */
+  carryOut(id, target, cx) {
+    const plan = actionOf(id, target.agent, target);
+    closeOverlay(props().overlay);
+    if (!plan) return;
+    for (const [command, args] of plan.run ?? []) run(command, args);
+    if (plan.view) {
+      showWork(run, layout);
+      if (find(layout(), "chat-view")) run("layout.select", { stack: "chat-view", child: plan.view });
+    }
+    if (plan.hc) hc(plan.hc).catch(() => notify({ title: "Couldn't interrupt it", level: "error" }));
+    if (plan.pin !== undefined) {
+      const pins = JSON.parse(localStorage.getItem("pins") ?? "[]").filter(p => p !== target.agent.address);
+      localStorage.setItem("pins", JSON.stringify(plan.pin ? [...pins, target.agent.address] : pins));
+    }
+    if (plan.copy) cx.write_to_clipboard(plan.copy);
+    if (plan.start) showHome(run, layout, setShared, plan.start);
+    if (plan.confirm) openOverlay({ mod: "confirm", kind: "dialog", width: 380, height: 170, props: plan.confirm });
+    if (plan.form === "message")
+      openOverlay({ mod: "machine-sidebar", kind: "popup", at: "pointer", width: 340, height: 120, props: { agentMessage: target.agent.address } });
+  }
+
+  /** The message box's input (props `{ agentMessage }`), focused, sending on Enter. */
+  initMessage(cx) {
+    this.message = TextareaState.new({ placeholder: "Message it without leaving here", rows: 1 });
+    this.message.set_auto_grow(1, 3);
+    this.message.set_soft_wrap(true);
+    this.message.on("change", (_e, cx) => cx.notify());
+    this.message.on("submit", () => this.sendMessage());
+    this.message.focus();
+  }
+
+  /** Sends the box's text to the agent, as if typed in its terminal and Enter pressed, and closes the box. */
+  sendMessage() {
+    const text = (this.message?.value() ?? "").trim();
+    if (!text) return;
+    const address = props().agentMessage;
+    closeOverlay(props().overlay);
+    hc(["send", address, text]).catch(() => notify({ title: "Couldn't send the message", level: "error" }));
+  }
+
+  /** The message box: who it goes to, the input and a send button. Esc closes it, as any popup. */
+  agentMessage(t, address) {
+    const name = this.menuTarget(address)?.agent.name ?? address;
+    const ready = Boolean((this.message?.value() ?? "").trim());
+    return v_flex().size_full().p(10).gap(8).bg(t.popover ?? t.surface).text_color(t.foreground)
+      .child(div().text_size(11.5).text_color(t.muted).truncate().child(`Message ${name}`))
+      .child(h_flex().px(10).py(6).gap(8).items_center().rounded(8).bg(t.background).border_1().border_color(t.accent)
+        .child(div().flex_1().min_w(0).text_size(12.5).child(Textarea.new(this.message).w_full().text_size(12.5)))
+        .child(div().id("send-message").size(22).flex_none().rounded_full().bg(ready ? t.foreground : t.border).cursor_pointer()
+          .flex().items_center().justify_center().on_click(() => this.sendMessage())
+          .child(svg("mods/machine-sidebar/icons/arrow-up.svg").size(12).text_color(t.background))))
+      .child(div().text_size(11).text_color(t.dim).child("Enter sends · Esc cancels"));
+  }
+
+  /**
+   * Remembers, in shared state, the folders open on each machine (its terminals' and spaces'), so Home still offers
+   * them once everything there is closed. Shared state is written only when a machine has a folder not yet remembered.
+   */
+  rememberFolders() {
+    const all = spaces(), open = panes();
+    let kept = shared(KEPT_FOLDERS) ?? {}, changed = false;
+    for (const machine of new Set(all.map(s => s.machine ?? null))) {
+      const next = remember(kept, machine, openFolders(machine, all, open));
+      if (next) { kept = next; changed = true; }
+    }
+    if (changed) setShared(KEPT_FOLDERS, kept);
+  }
+
   render(cx) {
     const t = theme();
     if (props()?.loginBar) return this.loginBar(t);
-    if (this.menu) return this.menu.render();
+    if (props()?.agentMenu) return this.agentMenu(t, props().agentMenu, Boolean(props().sub));
+    if (props()?.machineMenu) return this.machineMenu(t, props().machineMenu === "@local" ? null : props().machineMenu);
+    if (props()?.agentMessage) return this.agentMessage(t, props().agentMessage);
+    this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
+    if (this.menu) return v_flex().size_full().bg(theme().background).px(24).pt(20).pb(16).child(this.menu.render());
+    this.rememberFolders();
+    this.orbs.begin();
+    const home = atHome(layout);
+    if (!spaces().length && !home) showHome(run, layout, setShared);
     const collapsed = narrow();
     this.hopping = false;
     this.hopSeen = new Set();
     let list = agents();
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
-    const shown = focused()?.agent;
+    const shown = home ? null : focused()?.agent;
     const now = Date.now();
     this.track(list, now);
     const at = new Map(this.order.map((x, i) => [x, i]));
@@ -910,7 +1145,7 @@ export default class Agents extends View {
       const tab = tabs.find(tab => tab.id === a.tab);
       const pane = tab ? lead(tab) : null;
       const source = pane ?? { title: a.title, program: a.program, app: a.app };
-      return harnessSessionTitle(source) || source.program?.name || folderName(pane?.cwd) || tab?.name || "";
+      return sessionTitle(source) || source.program?.name || folderName(pane?.cwd) || tab?.name || "";
     };
 
     /**
@@ -919,34 +1154,17 @@ export default class Agents extends View {
      * spinner, check and "Needs you" badge go, and on the rail its second line is always the health bar.
      */
     const row = (a, i, subs = []) => {
-      const logoStatus = !classic() && healthBars() && Boolean(a.program?.icon);
+      const on = a.focused && !home;
+      const logoStatus = !classic() && healthBars() && Boolean(a.program?.icon) && !orbsOn(t);
       const hops = logoStatus && a.status === "working", finished = logoStatus && a.status === "done", asks = logoStatus && a.status === "blocked";
-      const ring = this.hovered === a.address ? t.hover : a.focused ? t.selected : t.surface;
-      const iconColor = logoStatus ? (a.focused ? t.foreground : t.muted) : a.focused ? t.accent : t.muted;
+      const ring = this.hovered === a.address ? t.hover : on ? t.selected : t.surface;
+      const iconColor = logoStatus ? (on ? t.foreground : t.muted) : on ? t.accent : t.muted;
       if (hops) this.hopping = true;
-      const pic = classic() ? icon(a.program, 16, a.focused ? t.accent : t.muted)
-        : agentPic(t, a.program, 16, iconColor, ring, false, hops ? this.hopFor(a.address) : null, asks ? t.working : null, asks ? "ask" : finished ? "done" : null);
-      const idle = logoStatus ? !a.focused : a.status === "idle" && !a.focused;
+      const orb = classic() ? null : this.orbFor(t, a.address, a.status);
+      const pic = classic() ? icon(a.program, 16, on ? t.accent : t.muted)
+        : agentPic(t, orb && !collapsed ? null : a.program, 16, iconColor, ring, false, hops ? this.hopFor(a.address) : null, asks ? t.working : null, asks ? "ask" : finished ? "done" : null, orb);
+      const idle = logoStatus ? !on : a.status === "idle" && !on;
       const isPinned = this.pins.includes(a.address);
-      const pin = div()
-        .id(`pin-${a.address}`)
-        .size(14)
-        .flex_none()
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(4)
-        .text_color(t.dim)
-        .cursor_pointer()
-        .hover((s) => s.bg(t.hover).text_color(t.foreground))
-        .tooltip(isPinned ? "Unpin" : "Pin to the top")
-        .on_click((_e, cx) => {
-          cx.stop_propagation();
-          this.setPins(isPinned ? this.pins.filter((p) => p !== a.address) : [...this.pins, a.address]);
-          this.hovered = null;
-          cx.notify();
-        })
-        .child(svg(`mods/machine-sidebar/icons/${isPinned ? "pin-off" : "pin"}.svg`).size(12));
       const full = isPinned;
       const name = label(a) || a.space_name || "";
       const tab = tabs.find(x => x.id === a.tab);
@@ -971,14 +1189,14 @@ export default class Agents extends View {
         .gap(2)
         .flex_none()
         .rounded(6)
-        .border_l(2).border_color(a.focused ? t.accent : t.surface)
-        .when(a.focused, (el) => el.bg(t.selected))
+        .border_l(2).border_color(on ? t.accent : t.surface)
+        .when(on, (el) => el.bg(t.selected))
         .when(dragging, (el) => el.opacity(0.45))
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
         .on_hover((on, cx) => {
           if (on) { this.hovered = a.address; this.detailsEnter(a.address, cx); }
-          else { if (this.hovered === a.address) this.hovered = null; this.detailsLeave(a.address, cx); }
+          else { if (this.hovered === a.address) this.hovered = null; if (this.muted === a.address) this.muted = null; this.detailsLeave(a.address, cx); }
           cx.notify();
         })
         .child(this.hang(a.address, this.agentDetails(t, a, all, name)))
@@ -1004,7 +1222,9 @@ export default class Agents extends View {
         .on_click(() => {
           if (this.dragged) { this.dragged = false; return; }
           run("pane.focus", { pane: a.pane });
+          showWork(run, layout);
         })
+        .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.openAgentMenu(a.address, false, cx); })
         .when(dropHere, el => el.child(div().absolute().left(6).right(6).h(2).rounded_full().bg(t.accent).when(this.drop.after, d => d.bottom(-1)).when(!this.drop.after, d => d.top(-1))));
       if (collapsed) {
         return card.pr(2)
@@ -1014,7 +1234,7 @@ export default class Agents extends View {
             .when(subs.length > 0 || (a.status === "blocked" && !asks), el => el.child(div().w(0).h(18).flex_none())))
           .child(div().relative().w_full().text_size(11.5).child(div().w(0).overflow_hidden().child(" "))
             .child(h_flex().absolute().top(0).bottom(0).left(0).right(0).items_center().justify_center()
-              .child(this.status(t, logoStatus ? { ...a, status: "idle" } : a, true))));
+              .child(this.status(t, logoStatus ? { ...a, status: "idle" } : { ...a, orbed: Boolean(orb) }, true))));
       }
       return card.px(8)
         .child(h_flex().w_full().gap(8).items_center()
@@ -1024,12 +1244,14 @@ export default class Agents extends View {
               this.folded.has(a.address) ? this.folded.delete(a.address) : this.folded.add(a.address);
               cx.notify();
             })).child(pic)))
-          .child(div().flex_1().min_w(0).truncate().text_color(idle ? t.muted : t.foreground).child(name))
+          .child(div().flex_1().min_w(0).truncate().text_color(a.status === "working" && monochrome(t) ? WHITE : idle ? t.muted : t.foreground).child(name))
           .when(subs.length > 0, el => el.child(fold(a, subs)))
-          .child(this.hovered === a.address ? pin : hops || finished || asks ? div().size(14).flex_none() : this.status(t, a)))
+          .when(!(hops || finished || asks || a.status === "idle" || (orb && a.status === "working")),
+            el => el.child(this.status(t, { ...a, orbed: Boolean(orb) }))))
         .child(h_flex().w_full().gap(8).items_center().text_size(11.5).text_color(t.dim)
           .when(Boolean(pic), el => el.child(h_flex().w(16).flex_none().ml(-2).mr(2).justify_center().when(Boolean(bar), c => c.child(bar))))
           .child(h_flex().flex_1().min_w(0).gap(10).items_center().overflow_hidden()
+            .when(Boolean(orb) && Boolean(a.program?.icon), el => el.child(div().flex_none().tooltip(a.program?.name ?? "").child(icon(a.program, 11, t.dim))))
             .children(where.map(([text, glyph]) => h_flex().gap(4).items_center()
               .when(glyph === "folder", el => el.flex_none()).when(glyph !== "folder", el => el.min_w(0))
               .child(svg(`mods/machine-sidebar/icons/${glyph}.svg`).size(11).flex_none().text_color(t.dim))
@@ -1111,26 +1333,6 @@ export default class Agents extends View {
         .when(isMachine, el => el.child(div().size(14).flex_none().flex().items_center().justify_center()
           .tooltip(open ? "Fold this machine's agents" : "Show this machine's agents")
           .child(svg(`mods/machine-sidebar/icons/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim))))
-        .when(isMachine && g.machine?.layout === "ready", el => el.child(div()
-          .id(`add-${g.id}`)
-          .size(14)
-          .flex_none()
-          .rounded(5)
-          .flex()
-          .items_center()
-          .justify_center()
-          .text_color(t.dim)
-          .hover(s => s.bg(t.hover).text_color(t.foreground))
-          .tooltip(`Add an agent on ${g.label}`)
-          .on_click((_e, cx) => {
-            cx.stop_propagation();
-            this.muted = `m:${g.machine.name ?? "@local"}`;
-            this.detailsTimer?.cancel();
-            if (this.detailsKey === this.muted) { this.detailsKey = null; this.detailsClosed = 0; }
-            cx.notify();
-            openOverlay({ mod: "machine-sidebar", kind: "popup", width: 280, height: 500, props: { newMenu: true, machine: g.machine.name } });
-          })
-          .child(svg("mods/machine-sidebar/icons/plus.svg").size(12))))
         .when(isMachine && Boolean(g.machine?.name) && g.machine?.layout !== "ready", el => {
           const name = g.machine.name;
           const busy = Boolean(this.retrying[name]?.busy);
@@ -1196,6 +1398,7 @@ export default class Agents extends View {
             .flatMap(([rows, at], n, all) => collapsed ? rows : underMachine(t, rows, n === all.length - 1, at)))(this.terminalRows(t, g.machine, collapsed)),
         ]),
       ]));
+    if (!collapsed) rows.push(...this.pastRows(t));
 
     return v_flex()
       .size_full()
@@ -1208,6 +1411,208 @@ export default class Agents extends View {
       )
       .child(this.scrollArea(t, collapsed, rows))
       .when(collapsed || usagePlace(shared("harness.usage")) === "strip", el => el.child(this.usageRow(t, collapsed)));
+  }
+
+  /**
+   * Past sessions, below the machines: one row, closed by default, that opens to every machine's sessions not open as
+   * agents now, the last written first, under the day it was, each tagged with its machine and folder. It shows the
+   * lists kept from the last read at once; opening it reads them again, and so does every 30 s and each agent closing
+   * while it's open, each machine reading only the logs written since (readPast). A closed agent's session already kept
+   * shows the moment it's gone from agents(). A machine that can't be reached keeps its last list, dimmed.
+   * A click reopens the session on its machine, in its folder. Sub-agents' sessions fold under the session that started
+   * them (pastGroup). Nothing on the rail.
+   */
+  pastRows(t) {
+    const now = Date.now(), open = this.past.open;
+    const online = new Set([pastKey(null), ...machines().filter(m => m.name && m.layout === "ready").map(m => m.name)]);
+    const all = pastSessions(this.pastKept, online, this.openLogs());
+    const found = open ? pastRows(this.pastKept, online, this.openLogs(), this.pastLinks, terminals(), this.pastQuery.value()) : [];
+    const busy = this.past.busy.size > 0;
+    const head = h_flex().id("past-head").h(30).pl(10).pr(8).gap(8).flex_none().items_center().rounded(6).cursor_pointer()
+      .text_size(12.5).font_medium().hover(s => s.bg(t.hover))
+      .on_click((_e, cx) => {
+        this.past.open = !open;
+        this.past.shown = PAST_SHOWN;
+        if (this.past.open) this.readPast(cx);
+        cx.notify();
+      })
+      .child(svg("mods/machine-sidebar/icons/clock.svg").size(14).flex_none().text_color(t.muted))
+      .child(div().flex_1().text_color(t.muted).child("Past sessions"))
+      .when(open && busy, el => el.child(svg("mods/machine-sidebar/icons/spinner.svg").size(12).flex_none().text_color(t.dim).spin(900)))
+      .when(!open && all.length > 0, el => el.child(div().text_size(11).text_color(t.dim).child(String(all.length))))
+      .child(svg(`mods/machine-sidebar/icons/chevron-${open ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim));
+    const rows = [div().h(1).mx(10).mt(14).mb(6).flex_none().bg(t.border), head];
+    if (!open) return rows;
+    rows.push(h_flex().mx(6).mt(2).mb(4).h(26).px(8).gap(6).flex_none().items_center().rounded(6).border_1().border_color(t.border)
+      .text_size(11.5)
+      .child(svg("mods/machine-sidebar/icons/search.svg").size(12).flex_none().text_color(t.dim))
+      .child(div().flex_1().min_w(0).child(Textarea.new(this.pastQuery).w_full().text_size(11.5))));
+    const note = text => div().h(26).pl(10).flex_none().flex().items_center().text_size(11.5).text_color(t.dim).child(text);
+    if (!found.length) return [...rows, note(busy ? "Reading sessions…" : all.length ? "No session matches" : "No past sessions")];
+    const shown = found.slice(0, this.past.shown);
+    for (const g of dayGroups(shown, now)) {
+      rows.push(div().h(22).pl(10).pt(5).flex_none().text_size(11).text_color(t.dim).child(g.label));
+      for (const r of g.items) rows.push(...(r.kind === "group" ? this.pastGroup(t, r, now) : [this.pastRow(t, r.s, now)]));
+    }
+    if (found.length > shown.length) {
+      rows.push(note(`Show ${Math.min(PAST_SHOWN, found.length - shown.length)} more`).id("past-more").cursor_pointer()
+        .hover(s => s.text_color(t.foreground))
+        .on_click((_e, cx) => { this.past.shown += PAST_SHOWN; cx.notify(); }));
+    }
+    return rows;
+  }
+
+  /** A harness's logo for Past sessions, at `size`, or a bot when this computer doesn't know the harness. */
+  pastMark(t, a, size) {
+    return icon(this.pastPrograms?.[a], size, t.muted) ?? svg("mods/machine-sidebar/icons/bot.svg").size(size).flex_none().text_color(t.muted);
+  }
+
+  /** The chip naming a past session's machine, saying when it's offline. */
+  pastChip(t, machine, offline) {
+    const where = machine ?? localMachineLabel();
+    return h_flex().flex_none().h(16).px(5).gap(3).items_center().rounded(4).bg(t.hover).text_size(10.5).text_color(t.dim)
+      .child(svg(this.headerIcon({ name: machine })).size(10).flex_none().text_color(t.dim))
+      .child(offline ? `${where} · offline` : where);
+  }
+
+  /**
+   * A group of sub-agents' sessions (pastRows' group): the session that started them, or while it runs its terminal,
+   * tagged running, with how many sub-agents; a chevron unfolds them, each reopenable on its own. Clicking the group
+   * reopens that session, or shows it while it runs. Folded unless unfolded by hand or opened by a search.
+   */
+  pastGroup(t, g, now) {
+    const h = g.head ?? { a: g.live.a, title: g.live.title, machine: g.live.machine, cwd: g.live.cwd };
+    const unfolded = g.opened || this.past.unfolded.has(g.key);
+    const n = g.kids.length, plural = k => (k === 1 ? "" : "s");
+    const tag = (text, color) => div().flex_none().h(16).px(5).rounded(4).bg(t.hover).text_size(10.5).text_color(color ?? t.dim)
+      .flex().items_center().child(text);
+    const tags = g.live
+      ? [tag("running", t.working ?? t.foreground), tag(`${n} closed sub-agent${plural(n)}`)]
+      : [this.pastChip(t, h.machine, h.offline), tag(`${n} sub-agent${plural(n)}${g.running ? `, ${g.running} running` : ""}`)];
+    const show = () => {
+      const pane = agents().find(a => a.address === g.live.address)?.pane;
+      run("pane.focus", pane ? { pane } : { terminal: g.live.address });
+      showWork(run, layout);
+    };
+    const head = v_flex().id(`past-group-${g.key}`).px(10).py(5).gap(3).flex_none().rounded(6).cursor_pointer()
+      .hover(el => el.bg(t.hover)).when(unfolded, el => el.bg(t.hover))
+      .when(Boolean(h.offline), el => el.opacity(0.55))
+      .tooltip(g.live ? "Show it: it's still running" : h.offline ? `${h.machine} is offline` : `Reopen in ${h.cwd}`)
+      .on_click(() => (g.live ? show() : this.reopen(h)))
+      .child(h_flex().gap(8).items_center()
+        .child(h_flex().size(14).flex_none().items_center().justify_center()
+          .child(g.live ? svg("mods/machine-sidebar/icons/spinner.svg").size(13).flex_none().text_color(t.working ?? t.foreground).spin(900) : this.pastMark(t, h.a, 14)))
+        .child(div().flex_1().min_w(0).truncate().text_size(12.5).text_color(t.foreground).child(h.title))
+        .child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - g.at)))
+        .child(div().id(`past-fold-${g.key}`).size(16).flex_none().rounded(4).flex().items_center().justify_center()
+          .hover(el => el.bg(t.selected ?? t.raised)).tooltip(unfolded ? "Fold its sub-agents" : "Show its sub-agents")
+          .on_click((_e, cx) => {
+            cx.stop_propagation();
+            this.past.unfolded.has(g.key) ? this.past.unfolded.delete(g.key) : this.past.unfolded.add(g.key);
+            cx.notify();
+          })
+          .child(svg(`mods/machine-sidebar/icons/chevron-${unfolded ? "down" : "right"}.svg`).size(12).flex_none().text_color(t.dim))))
+      .child(h_flex().pl(22).gap(6).items_center().min_w(0).children(tags));
+    if (!unfolded) return [head];
+    return [head, ...g.kids.map((s, i) => h_flex().id(`past-kid-${pastKey(s.machine)}-${s.id}`).h(26).pl(20).pr(10).gap(8).flex_none()
+      .items_center().rounded(6).cursor_pointer().hover(el => el.bg(t.hover)).when(s.offline, el => el.opacity(0.55))
+      .tooltip(s.offline ? `${s.machine} is offline` : `Reopen in ${s.cwd}`)
+      .on_click(() => this.reopen(s))
+      .child(div().w(12).h(26).flex_none().relative()
+        .child(div().absolute().left(0).top(0).w(1).h(i === g.kids.length - 1 ? 13 : 26).bg(t.border))
+        .child(div().absolute().left(0).top(13).w(10).h(1).bg(t.border)))
+      .child(this.pastMark(t, s.a, 12))
+      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.foreground).child(s.title))
+      .child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - s.at))))];
+  }
+
+  /**
+   * Writes down which live terminal started which (noteLinks) and finds each one's session log (matchLinks), kept in
+   * localStorage LINKS_STORE, so Past sessions can group sub-agents under the session that started them.
+   */
+  notePastLinks() {
+    const noted = noteLinks(this.pastLinks, terminals(), Date.now());
+    if (noted) this.pastLinks = noted;
+    const matched = matchLinks(this.pastLinks, this.pastKept, shared("herdr-chat.paths"));
+    if (matched) this.pastLinks = matched;
+    if (noted || matched) try { localStorage.setItem(LINKS_STORE, JSON.stringify(this.pastLinks)); } catch {}
+  }
+
+  /** One past session: its harness, title and when, then its machine and folder; dimmed while its machine is offline. */
+  pastRow(t, s, now) {
+    const where = s.machine ?? localMachineLabel();
+    const mark = this.pastMark(t, s.a, 14);
+    const chip = this.pastChip(t, s.machine, s.offline);
+    return v_flex().id(`past-${pastKey(s.machine)}-${s.a}-${s.id}`).px(10).py(5).gap(3).flex_none().rounded(6).cursor_pointer()
+      .hover(el => el.bg(t.hover))
+      .when(s.offline, el => el.opacity(0.55))
+      .tooltip(s.offline ? `${where} is offline: listed as of ${duration(now - s.seen)} ago` : `Reopen in ${s.cwd}`)
+      .on_click(() => this.reopen(s))
+      .child(h_flex().gap(8).items_center()
+        .child(h_flex().size(14).flex_none().items_center().justify_center().child(mark))
+        .child(div().flex_1().min_w(0).truncate().text_size(12.5).text_color(t.foreground).child(s.title))
+        .child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - s.at))))
+      .child(h_flex().pl(22).gap(6).items_center().min_w(0)
+        .child(chip)
+        .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(s.cwd) || s.cwd || "")));
+  }
+
+  /** The logs of the sessions open as agents now, as past-sessions.js's openKey, so Past sessions leaves them out. */
+  openLogs() {
+    const all = terminals();
+    return new Set(agents().map(a => {
+      const log = sessionOf(a.address, all)?.path;
+      return log ? openKey(a.address.includes("/") ? a.address.split("/")[0] : null, log) : null;
+    }).filter(Boolean));
+  }
+
+  /**
+   * Lists the sessions on this computer and on every machine that can be reached, each with past_sessions.py run there
+   * from where its kept list ends (sinceFor), into the kept lists (localStorage PAST_STORE) as each answers. The first
+   * time, it also learns the harnesses' icons from this computer's knownAgents().
+   */
+  readPast(cx) {
+    this.past.read = Date.now();
+    const names = [null, ...machines().filter(m => m.name && m.layout === "ready").map(m => m.name)];
+    cx.spawn(async cx => {
+      if (!this.pastPrograms) {
+        const known = await knownAgents().catch(() => []);
+        this.pastPrograms = Object.fromEntries(known.filter(k => PAST_HARNESSES[k.key]).map(k => [k.key, k]));
+      }
+      if (!this.pastSource) this.pastSource = base64Utf8(await readFile(`${appHome()}/mods/machine-sidebar/past_sessions.py`, "utf8"));
+      await Promise.all(names.map(async name => {
+        if (this.past.busy.has(pastKey(name))) return;
+        this.past.busy.add(pastKey(name));
+        cx.notify();
+        const opts = name ? { on: name, timeout: 20000 } : { timeout: 20000 };
+        const since = String(sinceFor(this.pastKept, name));
+        const r = await python(["-c", listProgram(this.pastSource), String(PAST_PER_MACHINE), since], opts).catch(() => null);
+        this.past.busy.delete(pastKey(name));
+        const items = r?.code === 0 ? parseListing(r.stdout) : null;
+        if (items) {
+          this.pastKept = keepListing(this.pastKept, name, items, Date.now());
+          try { localStorage.setItem(PAST_STORE, JSON.stringify(this.pastKept)); } catch {}
+        }
+        cx.notify();
+      }));
+    });
+  }
+
+  /**
+   * Reopens past session `s` on its machine, in its folder, with its harness's resume command (as that machine's
+   * knownAgents() starts the harness), in a tab of a space already there or a new one, as Home starts an agent.
+   */
+  reopen(s) {
+    if (s.offline) {
+      notify({ title: `${s.machine} is offline`, body: "Its sessions reopen once it's back.", level: "warning", timeout: 4000 });
+      return;
+    }
+    (async () => {
+      const known = await knownAgents(s.machine ? { on: s.machine } : undefined).catch(() => []);
+      const [command, args] = startCommand({ machine: s.machine, folder: s.cwd, agent: { run: resumeArgv(s, known) } }, spaces(), panes());
+      run(command, args);
+      showWork(run, layout);
+    })();
   }
 
   /**

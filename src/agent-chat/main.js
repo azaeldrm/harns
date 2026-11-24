@@ -1,6 +1,6 @@
 import { View, div, image } from "gpui-kit";
 import { set_theme, v_flex, h_flex, Popup } from "gpui-base";
-import { panes, focused, props, hc, theme, shared, setShared, appHome, openOverlay, window as appWindow } from "herdr";
+import { panes, focused, props, hc, theme, shared, setShared, appHome, openOverlay, run, layout, spaces, window as appWindow } from "herdr";
 import { exists } from "fs/promises";
 import { switchTo, showView, shownView, adoptView, preferredView, sessionOf, chatKey, chatOn } from "./common.js";
 import { target, inputBox, interruptAgent, sendMessage, pressKeys, readScreen } from "./terminal.js";
@@ -19,10 +19,18 @@ import { Composer } from "./components/composer.js";
 import { SessionReader } from "./components/session-reader.js";
 import { isDiagramViewer, openDiagram, DiagramViewer } from "./components/diagram-viewer.js";
 import { BackdropView } from "./backdrop/view.js";
-import { sceneFor, nextScene } from "./backdrop/scenes/index.js";
+import { sceneFor } from "./backdrop/scenes/index.js";
+import { NO_BACKDROP, nextBackdrop } from "./backdrop-scenes.js";
 import { noticeTerminals } from "./opened.js";
 import { contextText, healthFill } from "./context-bar.js";
 import { fileLink, fileLinks } from "./links.js";
+import { Home } from "./home.js";
+import { HOME_SHOWN, HOME_WHERE, showWork } from "./open-home.js";
+import { homeStart } from "./home-plan.js";
+import { rangeColor } from "./tones.js";
+import { CHAT_FONT_KEY, chatFont } from "./chat-font.js";
+import { OrbPool, orbsOn, workState } from "./orbs.js";
+import { LiveOrb } from "./live-orb.js";
 
 function inputHighlight(cx) {
   const t = theme(), th = cx.theme();
@@ -36,7 +44,13 @@ function inputHighlight(cx) {
 
 const BACKDROP_SCENE = "herdr-chat.backdrop", BACKDROP_DIM = 0.3, BACKDROP_CHAT_DIM = 0.07;
 
+/** How much room beside the reply's column the background button needs, so it shows in a conversation only beside it. */
+const BUTTON_ROOM = 150;
+
 const SPARK = ["·", "✢", "✶", "✻", "✽", "✻", "✶", "✢"];
+
+/** The tab shown now, the active space's active tab, or null with no space open. */
+const shownTab = () => spaces().find(s => s.active)?.tabs?.find(t => t.active)?.id ?? null;
 
 export default class HerdrChat extends View {
   init(_props, cx) {
@@ -47,7 +61,9 @@ export default class HerdrChat extends View {
   initInner(cx) {
     if (isHeader(props())) { this.asHeader = true; this.hovered = false; return; }
     if (isDiagramViewer(props())) { this.diagram = new DiagramViewer(cx); return; }
+    if (props()?.role === "home") { this.initHome(cx); return; }
     this.list = new ChatList();
+    this.orbs = new OrbPool(cx, "agent-chat", 1);
     this.reader = new SessionReader(this);
     this.card = new QuestionCard(this);
     this.composer = new Composer(this, cx);
@@ -185,15 +201,61 @@ export default class HerdrChat extends View {
       .child(div().max_w(420).text_center().text_size(13).text_color(t.muted).child(`Send a message to start this conversation with ${active.label}.`));
   }
 
-  /** The scene's name, at the bottom right over the backdrop; a click shows the next one. */
+  /** Home's screen (props `{ role: "home" }`): starting work over the backdrop, which the sidebar and tabs leave. */
+  initHome(cx) {
+    this.home = new Home();
+    this.home.init(cx, { form: "full", icons: "mods/agent-chat/icons", onStart: () => showWork(run, layout) });
+    if (props()?.backdrop) this.backdrop = cx.new(BackdropView, { dim: BACKDROP_DIM, sceneKey: BACKDROP_SCENE });
+    this.homeStamp = shared(HOME_SHOWN);
+    this.homeOrb = cx.new(LiveOrb, { state: "shaping", size: 64 });
+    this.homeTab = shownTab();
+  }
+
+  /**
+   * Home's screen: the box and its choices centred over the backdrop. Asked for again (HOME_SHOWN), it starts over where
+   * it was asked to (HOME_WHERE: a machine's or an agent's menu, its folder chosen), else on the active space's
+   * machine; when another tab is shown meanwhile (a key, a toast, a session it started), it gives the work area back.
+   * In Monochrome a large orb shapes itself above the heading, drawn live (live-orb.js).
+   */
+  homeScreen(cx) {
+    const t = theme();
+    const stamp = shared(HOME_SHOWN), tab = shownTab();
+    if (stamp !== this.homeStamp) {
+      this.homeStamp = stamp;
+      this.homeTab = tab;
+      const start = homeStart(shared(HOME_WHERE), stamp);
+      this.home.reset(cx, start ? start.machine : spaces().find(s => s.active)?.machine ?? null, start?.folder ?? null);
+    }
+    if (tab && tab !== this.homeTab) { this.homeTab = tab; showWork(run, layout); }
+    const backdrop = Boolean(this.backdrop) && shared("herdr-chat.animation") !== false;
+    return v_flex().id("home-root").relative().size_full().min_h(0).rounded(10).border_1().border_color(t.border).overflow_hidden()
+      .bg(t.background).text_color(t.foreground)
+      .when(backdrop, el => el.child(this.backdrop))
+      .child(v_flex().size_full().items_center().justify_center().px(32).pb(32)
+        .when(orbsOn(t), el => el.child(div().size(64).flex_none().mb(18).child(this.homeOrb)))
+        .child(div().w_full().max_w(760).child(this.home.render())))
+      .when(Boolean(this.backdrop), el => el.child(this.backdropButton(t)));
+  }
+
+  /**
+   * The background's name (a scene's, or No background), at the bottom right over it; a click shows the next
+   * (nextBackdrop: each scene, then none, as Settings offers). On Home and every chat, in a conversation only while
+   * the window leaves it room beside the reply's column. Drawn after the page's content, which would take its clicks.
+   */
   backdropButton(t) {
+    const on = shared("herdr-chat.animation") !== false;
     return h_flex().id("backdrop-scene").absolute().bottom(12).right(14).h(26).px(10).gap(6).items_center().rounded(13)
       .border_1().border_color(t.border).bg(t.background).cursor_pointer()
       .text_size(11.5).text_color(t.muted).hover(s => s.text_color(t.foreground).bg(t.hover))
-      .tooltip("Next background animation")
-      .on_click((_e, cx) => { setShared(BACKDROP_SCENE, nextScene(shared(BACKDROP_SCENE)).id); cx.notify(); })
+      .tooltip("Next background")
+      .on_click((_e, cx) => {
+        const next = nextBackdrop(on, sceneFor(shared(BACKDROP_SCENE)).id);
+        setShared("herdr-chat.animation", next.on);
+        setShared(BACKDROP_SCENE, next.id);
+        cx.notify();
+      })
       .child(icon("layers", 12, t.dim))
-      .child(sceneFor(shared(BACKDROP_SCENE)).label);
+      .child(on ? sceneFor(shared(BACKDROP_SCENE)).label : NO_BACKDROP.label);
   }
 
   header(t, active) {
@@ -211,7 +273,9 @@ export default class HerdrChat extends View {
   /**
    * The line over the reply box, set like the line under it (the footer's 11.5 px in a 24 px row: the spark or dot
    * centred where the model's 12 px icon is, 10 px in, and the text 5 px after it, where the model's name starts): what
-   * the agent is doing, a machine that isn't answering, or reading new messages.
+   * the agent is doing, a machine that isn't answering, or reading new messages. In Monochrome the spark is the
+   * agent's orb, the one it wears in the sidebar (orbs.js), in a 20 px slot centred where the spark is, with more room
+   * before the text.
    */
   status(t, active) {
     const card = this.card.render(t, active);
@@ -227,8 +291,10 @@ export default class HerdrChat extends View {
           .border_1().border_color(t.border).text_size(12.5).text_color(t.foreground).hover(s => s.bg(t.hover))
           .on_click((_e, cx) => this.reader.retry(cx)).child("Retry"));
     }
-    if (active?.status === "working") return h_flex().w_full().max_w(COLUMN).h(24).pl(10).gap(5).items_center()
-      .child(div().w(12).flex_none().flex().justify_center().text_size(13).text_color(t.accent).frames(SPARK, 120).child(SPARK[0]))
+    const orb = active?.status === "working" && orbsOn(t) ? this.orbs.begin().orb(workState(active.address)) : null;
+    if (active?.status === "working") return h_flex().w_full().max_w(COLUMN).h(24).pl(orb ? 6 : 10).gap(orb ? 9 : 5).items_center()
+      .child(orb ? div().w(20).h(20).flex_none().flex().items_center().justify_center().child(orb)
+        : div().w(12).flex_none().flex().justify_center().text_size(13).text_color(t.accent).frames(SPARK, 120).child(SPARK[0]))
       .child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.muted)
         .loop("opacity", { from: 0.55, to: 1, period: 1600 })
         .child((active.activity ? `${active.activity}…`.replace(/……$/, "…") : "Working…") + (cue === "checking" ? " · checking for new messages" : "")));
@@ -477,7 +543,7 @@ export default class HerdrChat extends View {
       .when(Boolean(sw.nextMode), el => clickable(el).on_click((_e, cx) => this.cycle("mode", active, look.mode?.key, cx))) : null;
     const c = look.context;
     const health = c?.share == null ? null : healthFill(t, c.share);
-    const bar = c?.share == null ? null : health ?? { share: c.share, color: c.share >= 95 ? "#d88179" : c.share >= 80 ? "#e8823a" : t.accent };
+    const bar = c?.share == null ? null : health ?? { share: c.share, color: rangeColor(t, c.share / 100) };
     const gauge = c ? h_flex().id("session-context").gap(6).items_center().text_size(11.5).text_color(t.muted)
       .tooltip(c.window ? `${c.used.toLocaleString()} of ${c.window.toLocaleString()} tokens of context in use` : `${c.used.toLocaleString()} tokens of context in use`)
       .child(health ? icon("heart-pixel", 13, bar.color) : icon("gauge", 12, t.dim))
@@ -505,6 +571,7 @@ export default class HerdrChat extends View {
   renderInner(cx) {
     if (this.asHeader) return terminalHeader(this);
     if (this.diagram) return this.diagram.render(cx);
+    if (this.home) return this.homeScreen(cx);
     const t = theme();
     const active = target();
     if (chatKey(active) !== this.key) this.switchSession(active, chatKey(active));
@@ -548,10 +615,11 @@ export default class HerdrChat extends View {
       canJump: !this.card.showing && active?.status !== "blocked",
     });
     const status = this.status(t, active);
+    const font = chatFont(shared(CHAT_FONT_KEY));
     return v_flex().id("herdr-chat-root").relative().size_full().min_h(0).rounded(10).border_1().border_color(t.border)
       .bg(t.background).text_color(t.foreground)
+      .when(Boolean(font), el => el.font_family(font))
       .when(this.backdropShown, el => el.child(this.backdrop))
-      .when(this.backdropShown && empty, el => el.child(this.backdropButton(t)))
       .on_size_change((size, cx) => { this.rootPx = size.width; const w = designPx(size.width, this.zoom); if (w >= 200 && Math.abs(w - this.width) > 8) { this.width = w; cx.notify(); } })
       .child(zoomProbe((zoom, cx) => { if (Math.abs(zoom - this.zoom) > 0.001) { this.zoom = zoom; if (this.rootPx) this.width = designPx(this.rootPx, zoom); cx.notify(); } }))
       .on_drop((e, cx) => this.composer.dropFiles(e.paths ?? [], cx))
@@ -568,7 +636,8 @@ export default class HerdrChat extends View {
         .when(this.backdropShown && !empty, el => el.bg(t.background).rounded_b(10))
         .when(Boolean(status), el => el.child(status))
         .when(!status, el => el.child(div().w_full().h(24).flex_none()))
-        .child(this.composer.render(t, active, this.sessionLine(t, active, this.modelChip(t, active)))));
+        .child(this.composer.render(t, active, this.sessionLine(t, active, this.modelChip(t, active)))))
+      .when(Boolean(this.backdrop) && (empty || this.columnLeft() >= BUTTON_ROOM), el => el.child(this.backdropButton(t)));
   }
 
   /** Keeps what's typed in the reply box and the question card when the chat goes, past the pause they'd wait for. */

@@ -79,6 +79,12 @@ const answered = read(claudeCode, "claude-review-answered");
 check("Claude: a review with answers keeps its steps and lists them", answered.steps.length === 4 && answered.review.answers.at(-1).answer === "Small" && answered.review.answers.length === 3);
 const noted = parsePrompt(claudeCode, `${screen("claude-review-answered")}\n[hc] only its screen: it is blocked; history is not scrolled in this state`);
 check("Claude: hc's note under a screen doesn't hide a review", noted?.steps.length === 4 && noted.options.length === 2);
+const bare = read(claudeCode, "claude-review-wrapped");
+check("Claude: a review with nothing under its options is still read", labels(bare) === "Submit answers,Cancel" && bare.steps.length === 3 && bare.question.join() === "Review your answers");
+check("Claude: a review joins wrapped questions and answers", bare.review.answers.length === 2
+  && bare.review.answers[0].question.endsWith("breaks cleaning and backups.") && bare.review.answers[0].answer.endsWith("still point at it.")
+  && bare.review.answers[1].answer === "Move (Recommended)");
+check("Claude: \"Review your answers\" in a reply is no prompt", parseChoices(["Review your answers", "", "Here they are.", "  1. One", "  2. Two"].join("\n")) === null);
 const piSubmit = read(pi, "pi-submit-page");
 check("Pi: the review keeps its steps past the rule", piSubmit.steps.length === 4 && piSubmit.review.warning.startsWith("Answer remaining"));
 check("Pi: the review's title stands as the question", piSubmit.question.join() === "Review your answers");

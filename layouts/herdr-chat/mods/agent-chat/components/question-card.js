@@ -33,7 +33,9 @@ function bodyHeight(q, grown = 0) {
   const shown = q.options.filter(o => !o.next);
   const wrapped = o => q.preview ? (Math.ceil(o.label.length / PREVIEW_LABEL_CHARS) - 1) * 19 : 0;
   const rows = shown.reduce((sum, o) => sum + 34 + wrapped(o) + (stacked(o) ? Math.ceil(o.desc.join(" ").length / DESC_CHARS) * 19 : 0), 0) + (shown.length - 1) * 6;
-  const answers = q.review?.answers.length ? q.review.answers.length * 21 + 24 : 0;
+  const lines = (text, chars) => Math.max(1, Math.ceil(text.length / chars));
+  const answers = q.review?.answers.length
+    ? q.review.answers.reduce((sum, a) => sum + lines(a.question, DESC_CHARS) * 17 + lines(a.answer, ROW_CHARS) * 18 + 10, 18) : 0;
   const preview = q.preview ? q.preview.text.length * 17 + (q.preview.hidden ? 40 : 18) : 0;
   return Math.min(BODY_HEIGHT + grown, Math.max(rows + grown + answers, preview));
 }
@@ -384,10 +386,10 @@ export class QuestionCard {
         .when(Boolean(q.review?.warning), el => el.child(div().text_size(11.5).text_color(t.blocked).child(q.review.warning)))
         .child(h_flex().flex_none().w_full().gap(8).items_start()
         .child(v_flex().id("prompt-body").flex_none().when(!q.preview, el => el.w_full()).when(Boolean(q.preview), el => el.w(COLUMN * PREVIEW_OPTIONS)).h(bodyHeight(q, this.grown(q))).overflow_y_scrollbar().gap(6)
-          .when(Boolean(q.review?.answers.length), el => el.child(v_flex().flex_none().gap(2).px(10).py(6).rounded(8).bg(t.background)
-            .children(q.review.answers.map(a => h_flex().gap(8).items_baseline()
-              .child(div().flex_none().w(150).truncate().text_size(11.5).text_color(t.muted).child(a.question))
-              .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.foreground).child(a.answer || "Not answered"))))))
+          .when(Boolean(q.review?.answers.length), el => el.child(v_flex().flex_none().gap(8).px(10).py(8).rounded(8).bg(t.background)
+            .children(q.review.answers.map(a => v_flex().gap(2)
+              .child(div().text_size(11.5).text_color(t.muted).child(a.question))
+              .child(div().text_size(12).text_color(a.answer ? t.foreground : t.dim).child(a.answer ? `→ ${a.answer}` : "Not answered"))))))
           .children(q.options.map((o, i) => o.next ? null : o.input && q.multi && o.input === "text" && onWindows() ? h_flex().id(`choice-${i}`).flex_none().w_full().px(10).py(5).gap(7).items_center().rounded(7)
           .border_1().border_color(t.border).bg(t.background).cursor_pointer()
           .hover(s => s.bg(t.hover))

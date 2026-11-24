@@ -181,7 +181,8 @@ def main():
         if removed:
             print(f'Removed mods harns no longer uses: {", ".join(removed)}')
         (home / 'themes').mkdir(parents=True, exist_ok=True)
-        shutil.copy2(share / 'themes' / 'harness.json', home / 'themes' / 'harness.json')
+        for theme in sorted((share / 'themes').glob('*.json')):
+            shutil.copy2(theme, home / 'themes' / theme.name)
         copy_tree(share / 'brand-assets', home / 'brand-assets')
 
         layouts = home / 'layouts'

@@ -84,99 +84,118 @@
                                               "window_drag":  true
                                           },
                                           {
-                                              "id":  "work-body",
-                                              "type":  "row",
+                                              "id":  "main-stack",
+                                              "type":  "stack",
+                                              "active":  "work-body",
                                               "children":  [
-                                                               {
-                                                                   "id":  "chat-view",
-                                                                   "type":  "stack",
-                                                                   "children":  [
-                                                                                    {
-                                                                                        "id":  "chat-panel",
-                                                                                        "type":  "block",
-                                                                                        "content":  {
-                                                                                                        "mod": "agent-chat",
-                                                                                                        "props":  {
-                                                                                                                      "role":  "chat",
-                                                                                                                      "backdrop":  true
-                                                                                                                  }
-                                                                                                    }
-                                                                                    },
-                                                                                    {
-                                                                                        "id":  "terminal-panel",
-                                                                                        "type":  "block",
-                                                                                        "content":  {
-                                                                                                        "tab":  "active",
-                                                                                                        "pane":  {
-                                                                                                                     "header":  {
-                                                                                                                                    "content":  {
-                                                                                                                                                    "mod": "agent-chat"
-                                                                                                                                                },
-                                                                                                                                    "reveal":  "always",
-                                                                                                                                    "height":  42,
-                                                                                                                                    "position":  "top"
-                                                                                                                                },
-                                                                                                                     "background":  "background",
-                                                                                                                     "border":  {
-                                                                                                                                    "width":  1,
-                                                                                                                                    "color":  "border"
-                                                                                                                                },
-                                                                                                                     "focus":  {
-                                                                                                                                   "width":  1,
-                                                                                                                                   "color":  "#49402c"
-                                                                                                                               },
-                                                                                                                     "radius":  10,
-                                                                                                                     "gap":  8,
-                                                                                                                     "lone":  true
+                                                  {
+                                                      "id":  "work-body",
+                                                      "type":  "row",
+                                                      "children":  [
+                                                                       {
+                                                                           "id":  "chat-view",
+                                                                           "type":  "stack",
+                                                                           "children":  [
+                                                                                            {
+                                                                                                "id":  "chat-panel",
+                                                                                                "type":  "block",
+                                                                                                "content":  {
+                                                                                                                "mod": "agent-chat",
+                                                                                                                "props":  {
+                                                                                                                              "role":  "chat",
+                                                                                                                              "backdrop":  true
+                                                                                                                          }
+                                                                                                            }
+                                                                                            },
+                                                                                            {
+                                                                                                "id":  "terminal-panel",
+                                                                                                "type":  "block",
+                                                                                                "content":  {
+                                                                                                                "tab":  "active",
+                                                                                                                "pane":  {
+                                                                                                                             "header":  {
+                                                                                                                                            "content":  {
+                                                                                                                                                            "mod": "agent-chat"
+                                                                                                                                                        },
+                                                                                                                                            "reveal":  "always",
+                                                                                                                                            "height":  42,
+                                                                                                                                            "position":  "top"
+                                                                                                                                        },
+                                                                                                                             "background":  "background",
+                                                                                                                             "border":  {
+                                                                                                                                            "width":  1,
+                                                                                                                                            "color":  "border"
+                                                                                                                                        },
+                                                                                                                             "focus":  {
+                                                                                                                                           "width":  1,
+                                                                                                                                           "color":  "#49402c"
+                                                                                                                                       },
+                                                                                                                             "radius":  10,
+                                                                                                                             "gap":  8,
+                                                                                                                             "lone":  true
+                                                                                                                         }
+                                                                                                            }
+                                                                                            }
+                                                                                        ],
+                                                                           "active":  "chat-panel"
+                                                                       },
+                                                                       {
+                                                                           "id":  "panel",
+                                                                           "type":  "column",
+                                                                           "children":  [
+                                                                                            {
+                                                                                                "id":  "panel-body",
+                                                                                                "type":  "stack",
+                                                                                                "children":  [
+                                                                                                                 {
+                                                                                                                     "id":  "files",
+                                                                                                                     "type":  "block",
+                                                                                                                     "content":  {
+                                                                                                                                     "mod":  "markdown-files"
+                                                                                                                                 }
+                                                                                                                 },
+                                                                                                                 {
+                                                                                                                     "id":  "changes",
+                                                                                                                     "type":  "block",
+                                                                                                                     "content":  {
+                                                                                                                                     "mod":  "changes"
+                                                                                                                                 }
+                                                                                                                 },
+                                                                                                                 {
+                                                                                                                     "id":  "simulator",
+                                                                                                                     "type":  "block",
+                                                                                                                     "content":  {
+                                                                                                                                     "mod":  "emulator"
+                                                                                                                                 }
                                                                                                                  }
-                                                                                                    }
-                                                                                    }
-                                                                                ],
-                                                                   "active":  "chat-panel"
-                                                               },
+                                                                                                             ],
+                                                                                                "active":  "files"
+                                                                                            }
+                                                                                        ],
+                                                                           "size":  {
+                                                                                        "px":  368
+                                                                                    },
+                                                                           "min":  280,
+                                                                           "max":  900,
+                                                                           "hidden":  true
+                                                                       }
+                                                                   ],
+                                                      "padding":  12,
+                                                      "gap":  12
+                                                  },
                                                                {
-                                                                   "id":  "panel",
-                                                                   "type":  "column",
-                                                                   "children":  [
-                                                                                    {
-                                                                                        "id":  "panel-body",
-                                                                                        "type":  "stack",
-                                                                                        "children":  [
-                                                                                                         {
-                                                                                                             "id":  "files",
-                                                                                                             "type":  "block",
-                                                                                                             "content":  {
-                                                                                                                             "mod":  "markdown-files"
-                                                                                                                         }
-                                                                                                         },
-                                                                                                         {
-                                                                                                             "id":  "changes",
-                                                                                                             "type":  "block",
-                                                                                                             "content":  {
-                                                                                                                             "mod":  "changes"
-                                                                                                                         }
-                                                                                                         },
-                                                                                                         {
-                                                                                                             "id":  "simulator",
-                                                                                                             "type":  "block",
-                                                                                                             "content":  {
-                                                                                                                             "mod":  "emulator"
-                                                                                                                         }
-                                                                                                         }
-                                                                                                     ],
-                                                                                        "active":  "files"
-                                                                                    }
-                                                                                ],
-                                                                   "size":  {
-                                                                                "px":  368
-                                                                            },
-                                                                   "min":  280,
-                                                                   "max":  900,
-                                                                   "hidden":  true
+                                                                   "id":  "home",
+                                                                   "type":  "block",
+                                                                   "padding":  12,
+                                                                   "content":  {
+                                                                                   "mod":  "agent-chat",
+                                                                                   "props":  {
+                                                                                                 "role":  "home",
+                                                                                                 "backdrop":  true
+                                                                                             }
+                                                                               }
                                                                }
-                                                           ],
-                                              "padding":  12,
-                                              "gap":  12
+                                                           ]
                                           },
                                           {
                                               "id":  "status",
@@ -194,6 +213,7 @@
                  ],
     "background":  "canvas",
     "theme":  "harness",
+    "toast":  "harns-toast",
     "terminal_padding":  [
                              14,
                              12

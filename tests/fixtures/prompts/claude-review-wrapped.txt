@@ -1,0 +1,16 @@
+● I have two questions before I start.
+
+───────────────────────────────────────────────────────────────────────────────────────────────
+←  ☒ Storage  ☒ Move  ✔ Submit  →
+
+Review your answers
+
+ │ ● Where should the data live? The compose file uses a named volume, not a ./data folder. Bind-mounted folders
+ │   are visible, but the database writes them as another user, which breaks cleaning and backups.
+   → named volume, but call it app-data:/data, and keep the old folder until the copy is checked, since the
+   backups still point at it.
+ │ ● The existing data here: move it into the new place, or start fresh?
+   → Move (Recommended)
+
+❯ 1. Submit answers
+  2. Cancel

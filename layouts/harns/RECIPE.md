@@ -1,6 +1,6 @@
 # harns
 
-A dark, amber-accented herdr window organized by machine. The sidebar lists every
+A dark, gray-accented herdr window organized by machine. The sidebar lists every
 connected machine (hover it for a card of all its details; the Classic style adds live CPU, RAM
 and per-GPU load rings) and the agents running on it, each a two-line card with its session title, status,
 folder and branch, and context used. Agent tabs open as a
@@ -22,13 +22,13 @@ Left to right: a sidebar, then the work column. There's no system title bar.
 - **Sidebar** (268 px, `surface` `#0e1012`; drag 44–480 px, or fold to a 52 px rail, twice its 26 px icon axis so what the rail centres lines up with the open sidebar's icons;
   76 px on macOS):
   - **Brand** (46 px, drags the window): the animated harns logo (28 px), "harns"
-    (16 px semibold), then Search and the sidebar toggle.
+    (16 px semibold), then the home button, which shows Home. The logo folds the sidebar to the rail and back.
   - **Agents:** grouped by machine, with no heading. Each group has its system's icon (Windows, macOS, or the Linux
     distribution: os-release's ID, else its family, else Tux; Omarchy by its `~/.local/share/omarchy`; the BSDs by
     `uname`; Windows only when `cmd.exe /c ver` says so), asked each machine once a run and kept for the next, which shows
     it until the machine answers again (a drive or a screen before it ever has); the machine's name (this computer's own
     name, or a nickname; 13 px and gray like the icons, starting where its agents' titles do), a + to start an agent
-    there, a row of CPU, RAM and GPU rings (one per GPU, amber), then its agents. Each agent is a two-line card: the program icon, the
+    there, a row of CPU, RAM and GPU rings (one per GPU, in the accent), then its agents. Each agent is a two-line card: the program icon, the
     session's own title (without the harness's prefix, and the folder Pi and Codex add after it; else the
     program's name) and its status; under it, in 11.5 px dim, a 14 × 3 px bar of its context window under the icon, as on the
     rail, then its folder (the session's, from the log agent-chat found for it,
@@ -49,12 +49,35 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     drawn before it, so a hovered band covers both and only the icon stays. The icon's centre is where the rail centres
     it, so it doesn't move as the sidebar folds. In both, machines can be dragged into an order by their bands (kept in
     the mod's localStorage, `machines.order`).
+  - **Past sessions**, below the machines: one row (a clock, "Past sessions", how many, a chevron), closed by default
+    and closed again after a reload. Open, it's a search field, then every machine's Claude Code, Codex, Pi and OpenCode
+    sessions not open as agents now, the last written first, under Today, Yesterday, This week and Earlier, 50 at first
+    and "Show 50 more" after. Each is two lines: the harness's logo, the title (set by hand, else the harness's own, else
+    the first typed message) and how long ago; then a chip with the machine (its icon and name) and the folder. Search
+    looks for every word in the title, folder, machine and harness. Sub-agents (agents another one started with `hc run`)
+    fold under the session that started them, or the one that started that: one entry, its title and `N sub-agents`
+    (`, N running` while some still are), a chevron unfolding them, each reopenable on its own, and a click on the entry
+    reopens that session. While that session still runs, its closed sub-agents wait under its name, tagged `running`
+    and `N closed sub-agents`, and a click shows it. A search matching a sub-agent opens its group to the matches. The
+    sidebar writes down which live terminal started which (hc's `parent`), in its localStorage `past.links`, kept 30
+    days, and finds each one's log: the one the chat read for it, else the session that started in its folder soonest
+    after it, within 2 minutes. Sub-agents from before this was written down stand alone. A click reopens it on its machine, in its folder,
+    with the harness's resume command (`claude --resume <id>`, `codex resume <id>`, `pi --session <log>`, `opencode
+    --session <id>`) after the program as that machine's `knownAgents()` starts it, as Home starts an agent: a tab in a
+    space already there, else a new space. Each machine lists its newest 100, kept in the mod's localStorage (`past`),
+    so the list shows at once, a reload included. An agent that closes joins the list as soon as it's gone, when its
+    session was already kept. Opening the row reads the lists again, and so does every 30 s and each agent closing while
+    it's open: `past_sessions.py` runs on this computer and every machine that's connected (`python3 -c`, standard
+    library only, the start and end of each log), reading only the logs written since the newest one already kept;
+    the rest come back as their path and time, and keep what was read of them before. Search looks through all of
+    them, not just the ones shown. A machine that can't be reached keeps its last list, dimmed, its chip saying
+    `offline`; clicking one says so. Nothing on the rail.
   - **Token usage** (shared `harness.usage`, Settings → Sidebar → Token usage): every harness's tokens on every machine,
     by day, in the time zone the app runs in. Fresh tokens (input, output, cache writes) make the numbers and columns;
     tokens read from the cache are in the card only. `strip` (the default): a row under the list, "Usage" with the token
     icon (coins) and today's tokens in gray over 14 columns, today's in the accent at the right. `footer`: no row; seven
     4 px columns, the token icon and today's tokens in gray at the footer's right end. Resting on either hangs a 320 px
-    card right against the sidebar: the last 14 days, newest first, each a bar split by harness (Claude Code `#d97757`,
+    card beside the sidebar, in line with the work area: the last 14 days, newest first, each a bar split by harness (Claude Code `#d97757`,
     Codex `#8b9cf7`, OpenCode `#6cc4a1`, Pi `#d4b85c`) with its fresh and cached tokens, then the totals, the daily
     average, and any machine that couldn't be read. On the rail, with either setting, the bottom of the list shows the
     token icon and today's tokens in gray on top, as the Strip's, over five columns as tall as the Strip's (24 px)
@@ -63,53 +86,93 @@ Left to right: a sidebar, then the work column. There's no system title bar.
     outside or Escape closes it (`Popover`). `machine-sidebar` reads every connected machine every 5 minutes, and at
     once when one connects unread, into shared `usage.tokens` (`token-usage.js`); a machine that fails or goes away
     keeps its last reading. The footer draws from the same reading.
-  - **Footer** (44 px): Settings (a gear, with an amber dot when an update is ready), Add machine (a server), and
+  - **Footer** (44 px): Settings (a gear, with an accent dot when an update is ready), Add machine (a server), and
     harns's Settings (the logo, a 760 px dialog from `harns-settings`: General, Sidebar, Chat, Status bar, Simulator,
-    which write shared `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `harness.usage`,
-    `herdr-chat.chat`, `herdr-chat.default-view`, `herdr-chat.animation`, `herdr-chat.backdrop`,
+    which write shared `harness.colors`, `harness.local-name`, `harness.sidebar`, `harness.context-bar`, `harness.usage`,
+    `herdr-chat.chat`, `herdr-chat.font`, `herdr-chat.default-view`, `herdr-chat.animation`, `herdr-chat.backdrop`,
     `harness.status`, `harness.quota.claude`, `harness.quota.codex`, `harness.commands-hint` and
-    `harness.simulator`). A choice between options (the sidebar's style, its context bars, where token usage
+    `harness.simulator`). A choice between options (the colours, the sidebar's style, its context bars, where token usage
     shows, where a new agent session starts, the chat's background) is a row of picture cards, as Herdr's
-    settings show layouts: each a small live drawing of what it gives, the chosen one outlined in amber with a check,
+    settings show layouts: each a small live drawing of what it gives, the chosen one outlined in the accent with a check,
     and what it does under them. Where a new agent session starts is grayed, its cards unclickable, while Open
     agents as a chat is off. On/off settings are switches. The chat's background is a switch (Animated background)
     over a card per scene; each card's picture is a real frame of the scene, saved by `scripts/scene-previews.mjs` (`npm
     run previews`) into `harns-settings/scene-previews.js`, and the scenes' names come from
     `src/shared/backdrop-scenes.js`, which agent-chat plays from too. Picking a scene turns the background on.
-- **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels
-  with the program icon, the active one underlined in amber (2 px) with a close button;
+- **Tab bar** (42 px, `chrome` `#0b0d0e`, drags the window): the space's tabs as labels (the name given to the tab,
+  else the conversation title its agent sets, else the program's name) with the program icon, the active one underlined in the accent (2 px) with a close button;
   then +, Files, Changes, Simulator (Windows and Linux), and the window buttons on Windows and Linux.
 - **Work area** (12 px padding): the shown tab, as a chat (where a new agent session starts unless its default
   view is Terminal) or as terminal cards (10 px radius, 1 px `border`, a 42 px header with the Chat / Terminal
   toggle). Files, Changes or Simulator open in a 368 px panel on the right.
 - **Status bar** (42 px, `surface`): the shown space's machine, the focused pane's folder and its branch, that
-  branch's open pull request (an amber PR icon, `#number` and its title, cut short), "N needs you" when agents on
+  branch's open pull request (a PR icon in the accent, `#number` and its title, cut short), "N needs you" when agents on
   that machine are blocked, then Claude Code and Codex quota bars (44 × 4 px)
   and "Ctrl Shift P commands" (each can be turned off in harns's Settings, and the bar hidden).
 
-The theme is `harness`: background `#080a0b`, canvas `#060708`, text `#dededb`, accent and
-working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are herdr's.
+Three themes share background `#080a0b`, canvas `#060708`, text `#dededb`, idle `#80868b` and borders `#25282b`,
+and harns's Settings → General → Colours picks one (shared `harness.colors`, applied with `app.theme`):
+- **harns** (`harness-color`): the logo, teal to orange. Accent teal `#5ccfcb`, selected `#10292a`, working yellow
+  `#f8c55e`, needing you orange `#ffa422`, done mint `#72cabf`.
+- **Monochrome** (`harness`, the default): grays throughout, accent `#c4c8ca`, selected `#24282b`, working near white
+  `#eceeef`. Only signals keep colour: needing you (a question) red `#d88179`, done (a check, a finish) green `#6cc48a`.
+- **Lively** (`harness-lively`): green to red, each agent in its own colours. Accent amber `#e9aa35`, selected
+  `#2a2113`, working amber, needing you red `#d88179`, done green `#6cc48a`.
+
+In Monochrome, animated orbs take the place of the logo, the agents' bots and the spinners: the brand bar's logo is a
+listening wave. In the sidebar (Tree) an orb stands in for each agent's bot, and its program's logo moves off it to
+the start of the card's bottom line, before the folder (on the rail, which has no such line, it stays on the orb; a
+sub-agent's row shows it before its name):
+while it works its own orb (one of working, searching, solving, connecting or weaving, picked from its address), while
+it needs you a listening orb (the red "Needs you" stays on the right), and while it's idle or done a breathing one (the
+done check stays on the right). Classic keeps its icons and shows the orbs as the right-hand marks. The spark
+before a working agent's activity in the chat is that agent's orb, and Home shows a large shaping orb above its heading.
+The logo hop and the logo-carried marks give way to them. Each orb is a loop of 60 frames a second, prerendered into a
+sprite sheet (`orbs/` in each mod that shows them, from `src/shared/orbs`, laid out as `orb-clips.js` says): its own
+small view shows the sheet through a window one frame wide, at the frame one shared clock is on, so drawing a frame is
+placing one picture, and a redraw of the sidebar (a hover) can't set it back, as it would an animated WebP, which herdr
+starts over whenever its view redraws. `scripts/render-orbs.py` draws the sheets from the vendored thinking-orbs engine
+with round antialiased dots at twice the size they're shown: each loop runs to where its orb comes back closest to its
+start (once round, for a motion that repeats), and crossfades its last second into its first frame. Home's large
+shaping orb is drawn live instead (`live-orb.js`, agent-chat carrying the engine): its 24 dots are round boxes placed
+where the engine puts them, redrawn every 16 ms, since herdr placed a large sheet a pixel or two off from frame to
+frame and the orb shook.
+
+What a theme file can't hold comes from `tones.js`, by the family a theme's accent names (the logo's teal is harns, a
+gray is Monochrome, any other is Lively, so a mod outside harns keeps its colours): the range bars blend along from
+empty to full (context, health and quota bars, the chat's context meter: harns teal → mint → yellow → orange,
+Monochrome gray climbing to its whitest white `#eceeef` at 85% and only then turning red, Lively green → amber →
+orange → red), the machine card's warn and full marks, the token-usage series (the logo's panels, grays, or each
+agent's own) and today's column in the usage sparkline (Monochrome's whitest, else the accent), the chat backdrop's
+highlights, and whether program icons show their own colours (Lively) or one tint. Settings' Monochrome card previews
+only its grays, the red being an alarm rather than part of its scale. Terminal contents and code syntax keep the terminal palette.
+
+herdr keeps the pick in `layouts/.state/`, across restarts and installs; at start the brand bar also swaps one harns
+theme for the other when it doesn't match the choice (`harns-colors.js`), leaving a theme from herdr's own menu alone.
+Fonts are herdr's, set in its Settings; the conversation alone can take another in harns's Settings → Chat →
+Font (shared `herdr-chat.font`, `chat-font.js`): Default (herdr's), the three fonts herdr ships, a few readable ones the
+system has (Segoe UI, Verdana and Georgia on Windows), or any installed font typed by name.
 
 ## How it behaves
 
-- **Agent status**, in the sidebar: working is an amber ring spinning once every 900 ms;
-  blocked is a "Needs you" badge (a "!" in the rail); done is a green check (the theme's
-  `ansi2`); idle shows nothing open (the card's bar under the icon shows its context) and, on the rail, the same
-  14 × 3 px context bar. It fills with the share used (gray, amber above 75%, red `#d88179` above 90%), or, with shared
-  `harness.context-bar` `health` (Settings → Sidebar → Context bar), drains like a health bar to the share left (green,
-  amber below 45% left, red below 25%); hovering it gives the percentage either way. The chat's context meter under the
+- **Agent status**, in the sidebar: working is a ring in the theme's working colour spinning once every 900 ms;
+  blocked is a "Needs you" badge (a "!" in the rail); done is a check in the theme's done
+  colour; idle shows nothing open (the card's bar under the icon shows its context) and, on the rail, the same
+  14 × 3 px context bar. It fills with the share used, coloured along the theme's range, or, with shared
+  `harness.context-bar` `health` (Settings → Sidebar → Context bar), drains like a health bar to the share left, coloured
+  the same way; hovering it gives the percentage either way. The chat's context meter under the
   reply box follows the same choice (`context-bar.js`, shared by both): with the health bar it shows a pixel heart
   (`heart-pixel.svg`, 7 × 6 squares) in the bar's color and "N% left", and drains in those colors, its tooltip keeping
-  the tokens in use; with the fill, tokens used of the window, filling (accent, orange from 80%, red from 95%). On the
+  the tokens in use; with the fill, tokens used of the window, filling along the theme's range. On the
   rail the mark sits on the row's second line, under the icon.
-  With the Health bar (Tree), the program logo carries the status instead: working, it hops in amber from side to side
-  over the bot in a round arc (even pace across, easing up and down), an amber ripple ring spreading where it lands
+  With the Health bar (Tree), the program logo carries the status instead: working, it hops in the working colour from side to side
+  over the bot in a round arc (even pace across, easing up and down), a ripple ring of that colour spreading where it lands
   (`harns-chrome/ripple.svg`, an oval stretched as it grows). The sidebar drives it, one beat per half hop, each step
   a native transition and a fresh ring each landing, so ring and landing never drift apart. Each logo counts its hops
   from the beat it started working on, so logos that started on different beats land on alternate beats and head
   different ways. Above the logo, on its own
-  halo: the green check (done, until it's looked at) or a red question mark (`harns-chrome/question.svg`, blocked; the
-  logo stays amber). So there's no spinner, check or "Needs you" badge; on the rail every agent's second line is its
+  halo: the done check (until it's looked at) or a question mark in the needing-you colour (`harns-chrome/question.svg`,
+  blocked; the logo keeps the working colour). So there's no spinner, check or "Needs you" badge; on the rail every agent's second line is its
   context bar; names and icons are gray but for the agent in front's, white. A working sub-agent's logo hops over its
   bot too, and its name stays gray; the hop's places scale with the icon (16 px agents, 14 px sub-agents).
   Tabs show the same spinner, or a dot for blocked and done.
@@ -122,7 +185,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   unavailable.
 - **Logo:** it fades in and out while any agent is working and bobs up and down otherwise.
   Clicking it folds or unfolds the sidebar.
-- **Sidebar:** clicking an agent focuses it; hovering a card shows a pin, and pinned
+- **Sidebar:** clicking an agent focuses it; its right-click menu pins it (Pin to top), and pinned
   agents sit in a Pinned group on top. Each machine keeps its own order: an agent that finishes, starts needing you or is new
   moves to the top, and dragging a card onto another of the same machine puts it there.
   A card that changes place slides there (280 ms, ease-out), and the ones it passes slide too.
@@ -133,11 +196,21 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   `layouts/harns.keys.json`; the installer adds each to keys.json's `layout:harns` section unless that keystroke is
   bound there already, and keeps the old file as `keys.json.before-install-<time>` when it changes. Without a
   keys.json (Herdr not opened yet) it adds none and says so.
-  A machine's whole band (its name, and in Classic its rings) folds its agents; parents with sub-agents fold too. A machine's + opens the agents
-  installed there.
-- **Details cards** (an agent's, a machine's) hang from the row's top-right corner, right against the
-  sidebar: the first opens after 450 ms, and while one is up (or was, under 400 ms ago) moving to
+  A machine's whole band (its name, and in Classic its rings) folds its agents; parents with sub-agents fold too. Right-clicking a connected machine's
+  band opens its menu: New chat… (Home, on that machine) and New terminal, in its home folder (a tab
+  in its active space; a machine's home is asked once with `hc exec` and kept in shared state, `harness.machine.homes`),
+  then under New terminal in, its folders (the open ones, then the remembered ones, at most 8) and, on this computer,
+  Browse… for any other.
+- **Details cards** (an agent's, a machine's, the token usage) hang from the row's top-right corner, 12 px out from the
+  sidebar, in line with the work area's window, on the sidebar's background (`surface`): the first opens after 900 ms, and while one is up (or was, under 400 ms ago) moving to
   another row opens its card at once. A card closes 150 ms after the pointer leaves the row and the card.
+- **Agent menu:** right-clicking an agent opens a menu at the pointer (`agent-menu.js` says what each item does): Open
+  chat, Open terminal, Peek; Send a message… (a small box at the pointer: Enter sends it with `hc send`, as if typed in
+  its terminal, and you stay where you are) and Interrupt (`hc interrupt`); Pin to top, Rename… (its tab), Copy folder
+  path and New session here (Home, on its machine with its folder chosen); and Close
+  session…, which closes a tab the agent has to itself (herdr
+  asks) or else asks, then ends it and its sub-agents. A sub-agent's menu has Peek, the two to talk to it, and Close.
+  Opening it closes the row's details card, which stays shut until the pointer leaves the row.
 - **Agent card:** resting on an agent's card opens a 340 px card beside the
   sidebar, level with it: the agent's name, program and machine; its status, for how long
   and its turn; its space and tab, full folder and branch; the context used as a bar; and
@@ -147,7 +220,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   value, in fixed columns: CPU load and temperature (cores, threads and load averages under
   them), memory used, each GPU's load, VRAM, temperature and power against its limit (NVIDIA,
   through `nvidia-smi`; a GPU with no live readings is left out), each disk's use, and the
-  motherboard. Bars are amber, orange (`#e8823a`) when high and red (`#d88179`) when near
+  motherboard. Bars are the accent, then the theme's warn and full colours (`tones.js`) when high and when near
   full: use from 80% and 95%, temperatures from 70 and 85 °C, power from 85% and 98% of its
   limit. It's read on the machine when the card opens and every 3 s while it's in use
   (Python 3 on Linux and macOS, PowerShell on Windows, where the CPU temperature needs
@@ -165,7 +238,26 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   everywhere says so in the tooltip.
 - **Tab bar:** click selects, double-click renames, drag reorders, right-click opens the
   tab menu, the scroll wheel moves between tabs. Files, Changes and Simulator toggle the right
-  panel, remembered per space.
+  panel, remembered per space. + opens the new session dialog. Clicking a tab, or a row in the sidebar, leaves Home.
+- **Home** (the work area's `home` screen, from the brand bar's home button, and shown by itself while no space is
+  open): the chat's backdrop scene with its scene button, and centred over it "What should we work on?" (34 px),
+  then a 680 px card (radius 10, 1 px `border`, `surface` at 95%): the box (13 px, "Describe a task or ask a
+  question"), and under it a bordered + (New worktree… and Open worktree…, the shipped `worktree` dialog, for the active
+  space), the agent pill (its icon and name; a menu of the agents `knownAgents({on})` finds installed there, herdr's
+  most picked first, then a plain Terminal, which swaps the box for a dimmed note since a terminal gets no message,
+  keeping what was typed for the next agent) and a round send button in the accent. Under the card, two bordered chips open
+  menus: the machine (`machines()`; one not connected is disabled) and the folder (where that machine's terminals are,
+  the focused one first, then its spaces' folders, then the ones remembered there; Choose… opens the system picker on
+  this computer only). Each showing starts over on the active space's machine. Enter or the send button runs
+  one `tab.new` (in the space on that machine that holds the folder) or `space.new` with the agent as `argv` and the
+  message as `task`: herdr hands the agent its first message, the tab stays unnamed so the agent titles it, and the
+  work area comes back. So does any other tab being shown.
+- **New session dialog** (the tab bar's +): Home's quick form, the same card and command in a dialog.
+  The tab bar's starts in the active space's machine and focused folder, with only the agent to choose; a machine's
+  starts on that machine, with its folders and agent to choose.
+- **Remembered folders:** shared `harness.home.folders`, up to 8 per machine (`@local` for this computer). The sidebar
+  adds each folder it sees open on a machine, Home and the dialog move the folder they start in to the front, and the
+  oldest not open goes first; `shared.json` keeps them across restarts.
 - **Simulator** (Windows and Linux; setup below): one Android emulator per session (tab), shared by its sub-agents.
   On Windows and on Linux under Hyprland, the panel shows the focused session's emulator's own window over its screen
   area; on other Linux desktops each emulator has its own window, with the panel's controls the same. Docked, it's at the
@@ -190,7 +282,7 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Status bar:** the pull request comes from the GitHub CLI (`gh pr view` in the focused pane's folder, on its machine),
   kept per machine, folder and branch and asked again when one changes or after 3 minutes; it shows only while open,
   and not where gh is missing or not signed in. Hovering it gives its full title; a click opens it in the browser.
-  Each quota bar shows the 5-hour window and switches to 7 days while hovered, red above 90%; the tooltip gives the
+  Each quota bar shows the 5-hour window and switches to 7 days while hovered, coloured along the theme's range; the tooltip gives the
   reset time. The last item opens the command palette.
 
 ## Built from
@@ -198,16 +290,20 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
 - **Layout** `layouts/harns.json`, cloned from `main`: root `row` (`titlebar:
   none`, theme `harness`, `terminal_padding [14, 12]`) → `sidebar` column [`brand`
   block, `sidebar-lists` column with the `agents` block, `sidebar-footer` block] and `work` column [`tabs` block,
-  `work-body` row [`chat-view` stack of `chat-panel` and `terminal-panel`, hidden
-  `panel` column with a `panel-body` stack of `files`, `changes` and `simulator`], `status` block].
+  `main-stack` stack of the `work-body` row [`chat-view` stack of `chat-panel` and `terminal-panel`, hidden
+  `panel` column with a `panel-body` stack of `files`, `changes` and `simulator`] and the `home` block (agent-chat
+  with props `{ role: "home", backdrop: true }`), `status` block].
 - **Mods:**
   - `harns-chrome`: the brand bar, or the footer with props `{footer: true}`. Folds
-    the sidebar with `layout.resize` and opens the shipped `picker` and `machine-add`.
+    the sidebar with `layout.resize`, shows Home (`open-home.js`) and opens the shipped `machine-add`.
   - `machine-sidebar`: the agents list, its machine cards and context bars. Calls `setAgentOrder`, `pane.focus` and
-    `terminal.peek`. Opened as a popup with props `{ newMenu: true, machine }` it is a machine's + menu instead
-    (`new-menu.js`, from `knownAgents({on})`), and with `{ loginBar }` the bar for logging in to a machine. Its ring
+    `terminal.peek`. Opened as a dialog with props `{ home: true, machine? }` (`open-home.js`) it is the new session
+    dialog instead (Home's `home.js` from `src/shared`, which agent-chat's `{ role: "home" }` draws full screen; what
+    it offers and runs is `home-plan.js`), trusting `knownAgents({on})`'s `installed`, which herdr
+    checks in the shell agents start in, so tools on an interactive-only `PATH` count; and with `{ loginBar }` the
+    bar for logging in to a machine. Its ring
     row (`machine-metrics.js`), probes, icons and rings (`stats/`) are built in from the repository's `src/shared`.
-  - `harns-tabs`: the tab bar; uses the shipped `new-menu` and `menu`.
+  - `harns-tabs`: the tab bar; opens the new session dialog and uses the shipped `menu`.
   - `emulator`: the Simulator panel. herdr draws with DirectComposition, which covers
     child windows, so `harns-dock` (built once from `dock.cs` with Windows' own `csc.exe` into
     `cache/emulator/`) makes each emulator's window a borderless popup owned by
@@ -229,14 +325,19 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
     socket says an overlay is open. `quit` turns the rule off and gives the windows back.
   - `harns-status`: the status bar. It also collects the stats: a built copy of the shared machine code
     (`machine-data.js`) publishes shared `machine.stats`, `machine.usage` and `machine.local-label`.
+  - `harns-toast`: the notifications (the layout's `toast`), herdr's own toast with its dot in the alert's colour: green
+    when an agent finished, red when one needs you (`tone.js`: from the title, else the status of the agent it goes
+    to, else the level), the theme's colours for the rest.
   - `agent-chat` ([the herdr-chat layout](../herdr-chat/RECIPE.md) too): the chat panel and the pane header with the
     toggle. The chat block passes it `backdrop: true`: an animated scene plays behind the chat, dimmed (sharks,
     jellyfish, a night sky, rain), one for every conversation. Over an empty chat (a new session's welcome, or no agent
-    in view) it plays at 30 fps with a button at its bottom right that switches the scene; behind a conversation, at 8
-    fps and dimmer. The header and the area around the reply box are solid `background`, and the list fades into them
+    in view, and on Home) it plays at 30 fps; behind a conversation, at 8
+    fps and dimmer. A button at the bottom right of Home and every chat (in a conversation, while the window leaves it
+    150 px beside the reply's column) steps through the scenes, then No background (the animation off, the button
+    staying), then the first again, as Settings offers. The header and the area around the reply box are solid `background`, and the list fades into them
     over 32 px, a step of `background` per pixel (herdr's `bg` takes flat colors only): at the bottom always, at the top
     while messages are out of sight above. The list's end leaves the fade's 32 px empty, so the newest line clears it.
-  - Shipped: the `changes` block; `picker`, `machine-add`, `new-menu`, `menu` and
+  - Shipped: the `changes` block; `machine-add`, `menu` and
     `worktree` as overlays; icons from `pane`, `files` and `changes`.
 - **Programs it runs** through `exec(..., {on: machine})`: per platform
   (`platforms.js`) a PowerShell or Python 3 stats probe every second, the
@@ -250,11 +351,14 @@ working `#e9aa35`, done `#10a7a7`, idle `#80868b`, borders `#25282b`. Fonts are 
   growth of `total_token_usage`, `CODEX_HOME` honored), OpenCode's `opencode.db` `message` table and Pi's
   `~/.pi/agent/sessions`, over the last 15 days, into quarter-hour UTC slots the app splits into local days. What it
   read is kept in `~/.cache/harns/token-usage.json` by file size and time, so later runs read only changed logs.
-- **Art:** `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources) in `harns-chrome`; monochrome SVG icons
+- **Art:** Monochrome's orbs from thinking-orbs 0.3.2 by Jakub Antalik (MIT; `src/shared/vendor/thinking-orbs`, rendered
+  to `src/shared/orbs`, its LICENSE travelling with each mod that shows them); `harness-logo-fade` and `harness-logo-bob` (WebP, SVG sources) in `harns-chrome`; monochrome SVG icons
   (Lucide, and harns's own: the bots, ripple, question mark, padded spinner) in each mod's `icons/`, from the
   repository's one set in `src/shared/icons`; the stats icons and rings in `machine-sidebar/stats`; system icons in `machine-sidebar/os` (Simple Icons, CC0; see its
   SOURCES.md), a generated spinner, Windows
-  window buttons among the icons, program icons in `brand-assets/` and `programs.json`.
+  window buttons among the icons, program icons in `brand-assets/` and `programs.json`. `brand-assets/pi.svg` is Pi's
+  own logo, `apps/p2/public/icons/favicon.svg` from `badlogic/pi-mono` (MIT) unchanged: tinted where harns tints
+  program icons, in its colours on Home.
 
 ## Simulator setup
 
@@ -371,6 +475,9 @@ and the other `harness-*` are `harns-*`), then removes the old copies (one anoth
   emulator.
 - Each connected machine has a group with its agents under it (in Classic, with live CPU, RAM and GPU rings),
   and dragging a band reorders the machines; a working agent spins and the logo fades.
+- Past sessions, opened, lists every machine's sessions newest first, without the ones open as agents; clicking one
+  reopens it on its machine, in its folder, and a machine that went offline keeps its list, dimmed. Sub-agents started
+  with `hc run` fold under the session that started them once they close.
 - Folding the sidebar leaves icons, rings and statuses centered in the rail, each level with its row in the open list.
 - The status bar names the focused pane's machine, folder and branch, links the branch's open PR, and fills the quota
   bars.
