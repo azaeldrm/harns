@@ -22,7 +22,7 @@ names:
 
 Add `"backdrop": true` to the chat's props for the dimmed animation behind it. Each machine with agents needs Python 3:
 `python3`, or `py -3` / `python` on Windows. For a whole layout built around it, see
-[the herdr-chat layout](https://github.com/azaeldrm/harns/tree/main/layouts/herdr-chat).
+[the herdr-chat layout](https://github.com/azaeldrm/harns-layout/tree/main/layouts/herdr-chat).
 
 ## What you see
 
@@ -37,7 +37,7 @@ The chat and the terminal share the stack's place in your layout.
     the agent's replies on the left as markdown, with code blocks;
   - under a reply that links to files (`[BACKLOG.md](</srv/notes/BACKLOG.md:188>)`, or a path in the agent's
     folder), a chip per file (up to four) between its copy button and its turn numbers; a click opens it in the
-    [markdown-files](https://github.com/azaeldrm/harns/tree/main/mods/markdown-files) floating window, on the
+    [markdown-files](https://github.com/azaeldrm/harns-layout/tree/main/mods/markdown-files) floating window, on the
     agent's machine, when that mod is installed. The links in the text can't be clicked: rows of herdr's
     virtual list take no handlers;
   - tools and thinking folded into one grey line per run ("Ran 3 commands, read 2 files ›"),
