@@ -2,6 +2,9 @@ import { View, div, image, svg } from "gpui-kit";
 import { h_flex, v_flex, Popup, Popover } from "gpui-base";
 import { theme, run, props, window, shared, setShared, updates, layout, agents, openOverlay } from "herdr";
 import { find, narrow } from "./layout.js";
+import { showHome } from "./open-home.js";
+import { COLORS_KEY, themeToApply } from "./harns-colors.js";
+import { OrbPool, orbsOn } from "./orbs.js";
 import { usageDays, usagePlace } from "./token-usage.js";
 import { usageDetails, usageSpark } from "./usage-card.js";
 
@@ -20,6 +23,25 @@ function toggleSidebar() {
 }
 
 export default class WorkspaceChrome extends View {
+  /**
+   * Puts the chosen colours back on at start: an install writes the layout with the Monochrome theme, so the brand bar
+   * switches to the colour theme when that's the choice in harns's settings.
+   */
+  init(_props, cx) {
+    if (props()?.footer) return;
+    const name = themeToApply(shared(COLORS_KEY), layout()?.theme);
+    if (name) run("app.theme", { name });
+    this.orbs = new OrbPool(cx, "harns-chrome", 1);
+  }
+
+  /**
+   * The harns logo, animated while agents work; in Monochrome an orb instead, a listening wave.
+   */
+  logo(t) {
+    const orb = orbsOn(t) && this.orbs?.begin().orb("listening");
+    return orb ? h_flex().size(28).items_center().justify_center().child(orb) : image(logoSrc()).size(28).rounded(5);
+  }
+
   button(id, label, action, size = 26, tip = null) {
     const t = theme();
     return div().id(id).size(size).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.muted).hover(s => s.bg(t.hover).text_color(t.foreground))
@@ -97,12 +119,11 @@ export default class WorkspaceChrome extends View {
         .when(usagePlace(shared("harness.usage")) === "footer", el => el.child(div().flex_1()).child(this.usage(t, 12)));
     }
     return h_flex().size_full().bg(t.surface).pl(collapsed ? 6 : 12).pr(10).gap(4).items_center().text_size(13.5)
-      .when(collapsed, el => el.pl(0).pr(0).justify_center().child(this.button("sidebar-expand", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Expand sidebar").cursor_pointer()))
+      .when(collapsed, el => el.pl(0).pr(0).justify_center().child(this.button("sidebar-expand", this.logo(t), toggleSidebar, 28, "Expand sidebar").cursor_pointer()))
       .when(window()?.platform === "macos" && !collapsed, el => el.pl(76))
       .when(!collapsed, el => el.child(h_flex().flex_1().gap(8).items_center()
-        .child(this.button("sidebar-collapse-logo", image(logoSrc()).size(28).rounded(5), toggleSidebar, 28, "Collapse sidebar"))
+        .child(this.button("sidebar-collapse-logo", this.logo(t), toggleSidebar, 28, "Collapse sidebar"))
         .child(div().text_size(16).font_semibold().text_color(t.foreground).child("harns"))))
-      .when(!collapsed, el => el.child(this.button("search", svg("mods/harns-chrome/icons/search.svg").size(15), () => run("mod.open", { name: "picker" }))))
-      .when(!collapsed, el => el.child(this.button("sidebar-toggle", svg("mods/harns-chrome/icons/sidebar.svg").size(15), toggleSidebar)));
+      .when(!collapsed, el => el.child(this.button("home", svg("mods/harns-chrome/icons/home.svg").size(15), () => showHome(run, layout, setShared), 26, "Home")));
   }
 }

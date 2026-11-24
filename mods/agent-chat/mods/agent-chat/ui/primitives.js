@@ -1,17 +1,18 @@
 import { div, svg, image } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { settings, run } from "herdr";
+import { settings, run, theme } from "herdr";
 import { ICONS } from "../common.js";
+import { brandIcons } from "../tones.js";
 
 export const COLUMN = 740;
 
 export function icon(name, size, color) { return svg(`${ICONS}/${name}.svg`).size(size).flex_none().text_color(color); }
 export function mono() { return settings().font_family || settings().font || "JetBrains Mono"; }
 
-/** A program's icon, as herdr's program table says to draw it. */
+/** A program's icon, as herdr's program table says to draw it, in its own colours under a theme that shows them. */
 export function programIcon(p, size, color) {
   if (!p?.icon) return null;
-  return p.tint ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).size(size).flex_none();
+  return p.tint && !brandIcons(theme(), p) ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).size(size).flex_none();
 }
 
 /** A pane's split right, split down, zoom and close buttons, for a header shown while it's hovered. */

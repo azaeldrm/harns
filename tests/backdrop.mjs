@@ -48,7 +48,8 @@ const runs = frameRuns(cells);
 check(runs.length, cells.rows, "a list of runs per row");
 check(runs.flat().every(u => u.text.length === u.len && u.len > 0), true, "every run's text fills its cells");
 
-const { SCENES, sceneFor, nextScene } = await s.load("backdrop/scenes/index.js");
+const { SCENES, sceneFor } = await s.load("backdrop/scenes/index.js");
+const { nextBackdrop, NO_BACKDROP } = await s.load("backdrop-scenes.js");
 for (const entry of SCENES) {
   const scene = entry.make();
   scene.resize(1200, 640, cw, ch); scene.setDim(0.3);
@@ -58,7 +59,10 @@ for (const entry of SCENES) {
   const ok = frameRuns(g).flat().every(u => u.text.length === u.len && u.len > 0);
   check([drawn > 20, ok, g.cols * g.rows === g.glyph.length], [true, true, true], `${entry.label}: draws on the whole grid, as runs that fill their cells`);
 }
-check(SCENES.map(() => 0).reduce(id => nextScene(id).id, "sharks"), "sharks", "the button steps through every scene and back to the first");
+const steps = [{ on: true, id: "sharks" }];
+for (let i = 0; i < SCENES.length + 1; i++) steps.push(nextBackdrop(steps.at(-1).on, steps.at(-1).id));
+check(steps.map(x => x.on ? x.id : NO_BACKDROP.id), [...SCENES.map(x => x.id), "none", "sharks"], "the button steps through every scene, then no background, then the first again");
+check(nextBackdrop(true, "nope"), { on: true, id: SCENES[1].id }, "an unknown scene steps on as the first");
 check([sceneFor("nope").id, sceneFor(undefined).id], ["sharks", "sharks"], "an unknown or missing scene is the sharks");
 
 s.cleanup();

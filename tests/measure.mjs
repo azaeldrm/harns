@@ -12,6 +12,7 @@ const near = (a, b) => Math.abs(a - b) < 1e-6;
 
 check("the probe reads zoom 0.9 from a 100px box laid out at 90", near(zoomFrom({ width: PROBE_PX * 0.9, height: 90 }), 0.9), true);
 check("an unmeasured probe means zoom 1", zoomFrom(undefined), 1);
+check("any box gives the zoom from the width it was laid out at", near(zoomFrom({ width: 83.2, height: 83.2 }, 64), 1.3), true);
 check("reported pixels convert back to design px", near(designPx(864, 0.9), 960), true);
 check("a row measured at zoom 0.9 gets its full slot back", near(designHeight({ width: 666, height: 1561.68 }, 740), 1735.2), true);
 check("at zoom 1 a row's height is unchanged", designHeight({ width: 740, height: 400 }, 740), 400);

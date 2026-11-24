@@ -9,7 +9,7 @@ what it is.
 
 | Listing | Folder | Mods |
 |---|---|---|
-| harns (layout) | `layouts/harns/` | `harns-chrome`, `harns-tabs`, `harns-settings`, `harns-status`, `machine-sidebar`, `markdown-files`, `emulator`, `agent-chat` |
+| harns (layout) | `layouts/harns/` | `harns-chrome`, `harns-tabs`, `harns-settings`, `harns-status`, `harns-toast`, `machine-sidebar`, `markdown-files`, `emulator`, `agent-chat` |
 | herdr-chat (layout) | `layouts/herdr-chat/` | `agent-chat` |
 | agent-chat (mod) | `mods/agent-chat/` | `agent-chat` |
 | markdown-files (mod) | `mods/markdown-files/` | `markdown-files` |
@@ -18,7 +18,8 @@ what it is.
 ## Structure
 
 - `src/<mod>/`: each mod's source, the place to edit mod code.
-- `src/shared/`: code and art several mods use, including the one icon set (`icons/`).
+- `src/shared/`: code and art several mods use, including the one icon set (`icons/`) and vendored engines
+  (`vendor/`), which a mod gets whole, licence included, when shared code it carries imports from them.
 - `layouts/<listing>/`: a listing's `RECIPE.md`, `preview.png`, layout files, theme and program icons, plus `mods/`,
   built from `src/`.
 - `scripts/package.py`: builds every listing's `mods/`. A mod gets each shared file it imports (`./layout.js`) and each
@@ -37,6 +38,8 @@ python scripts/install.py --no-switch --no-relays   # install into the live app
 python scripts/demo.py [--on <machine>] [--branch <b>]   # build the demo project in ~/.cache/harns-demo
 herdr-app status                                 # what the app shows, and errors
 npm install && npm run vendor:pele               # update the vendored Pele (mermaid)
+npm install && npm run vendor:orbs               # update the vendored thinking-orbs engine (Monochrome's orbs)
+python scripts/render-orbs.py [state-size ...]   # redraw the orb sprite sheets (src/shared/orbs) from that engine
 ```
 
 ## Workflow
@@ -76,6 +79,11 @@ of the live app, set `git -c core.hooksPath=<empty folder>` for those commands.
 - A dialog opens once other overlays close; `herdr-app status` lists the open ones.
 - herdr keeps an element's animation state by its id across the view: two animated elements sharing an id (the same
   ripple name in two rows) take each other's position and transitions. Give them ids unique to what they belong to.
+- An animated picture (an animated WebP) starts over whenever its mod redraws, an id or a view of its own
+  notwithstanding: animate with a sprite sheet stepped by the clock instead (see `orbs.js`).
+- A picture 4096 px wide is drawn a little narrower than the size it's given: keep sprite sheets at most 2048 px wide.
+- A picture slid inside a clipped box lands up to a pixel or two off from one position to the next: fine for a 20 px
+  orb, a visible shake for a large one, which is drawn live from round boxes instead (see `live-orb.js`).
 
 ## Git and PRs
 

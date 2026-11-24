@@ -24,12 +24,20 @@ machine connections.
 
 **Organized by machine.** Each machine in the sidebar lists its agents with their folders, branches and context, and
 its plain terminals, hanging from it on lines; the Classic style boxes each machine with its system (Windows, macOS or
-the Linux distribution) and its CPU, RAM and GPU load, which the machine's card shows in either. Its **+**
-starts an agent there from the ones installed on it, or a terminal, a new space or a worktree. Alt+Up and Alt+Down
+the Linux distribution) and its CPU, RAM and GPU load, which the machine's card shows in either. Right-click a
+machine to start an agent or a terminal there, or an agent to message, interrupt, pin, rename or close it without
+leaving where you are. Alt+Up and Alt+Down
 walk the agents; Alt+Shift+Up and Alt+Shift+Down jump to the next machine's. Alt+Left and Alt+Right
 switch an agent's tab between Chat and Terminal.
 
 ![Starting an agent on a machine](docs/new-agent.png)
+
+**Home.** The logo's house button (and the tab bar's +) opens Home: type the first message, pick the machine, folder
+and agent, and it starts there, the agent naming its own tab.
+
+**Past sessions.** Under the machines, a folded list of every machine's closed Claude Code, Codex, Pi and OpenCode
+sessions, newest first, each tagged with its machine and folder, searchable; a click reopens one where it ran.
+Sessions an agent started through `hc` fold under the one that started them.
 
 **Details on hover.** Rest on an agent for its status, space, folder, branch and context window, or on a machine for
 its system, CPU, memory, GPUs and disks.
@@ -62,11 +70,13 @@ the agent runs on (below).
 The status bar shows where you are (machine, folder, branch, and the branch's open pull request, a click away) and the
 Claude Code and Codex quota left.
 
-**Settings of its own.** The harns logo in the sidebar's footer opens harns's Settings: this computer's name, the
+**Settings of its own.** The harns logo in the sidebar's footer opens harns's Settings: its colours (harns's teal,
+Monochrome, whose agents wear animated orbs, or Lively), this computer's name, the
 sidebar's style (Tree, agents hanging from their machine on lines, or Classic, each machine boxed with its agents and
 stats), where token usage shows (a strip of daily columns under the agents, or a small one in the footer; rest on it for
 two weeks by day and harness, across every machine), whether agents open as a chat, where a new agent session starts
-(Chat or its terminal), the chat's animated background (on or off, and which scene), what the status bar shows, and
+(Chat or its terminal), the chat's font and animated background (on or off, and which scene), what the status bar
+shows, and
 whether the tab bar offers the Simulator. Drag a machine's band to reorder the machines in the sidebar.
 
 ## Install

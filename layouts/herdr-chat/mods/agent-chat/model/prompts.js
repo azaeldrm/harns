@@ -40,10 +40,16 @@ function pullPreview(screen) {
   return { screen: lines.join("\n"), preview: { text, hidden } };
 }
 
-/** The line that closes a prompt, or -1. The review step has no footer, so its question closes it. */
+/**
+ * The line that closes a prompt, or -1. The review step has no footer, so its question closes it, or, where Claude
+ * Code leaves that out too, its title with the cursor on an option below it.
+ */
 function findFooter(lines, end) {
   for (let y = end; y >= Math.max(0, end - 6); y--) if (FOOTER.test(lines[y])) return y;
   for (let y = end; y >= Math.max(0, end - 6); y--) if (REVIEW.test(lines[y])) return lines.length;
+  let title = end;
+  while (title >= 0 && !REVIEW_TITLE.test(lines[title])) title--;
+  if (title >= 0 && end - title < 40 && lines.slice(title, end + 1).some(l => /^\s*[❯›>▸➤]\s+\d+[.)]\s/.test(l))) return lines.length;
   return -1;
 }
 
@@ -102,17 +108,22 @@ export function typedAnswer(harness, prompt, index) {
   return { before: notes ? [...to, "tab"] : to };
 }
 
-/** What a review page lists between two lines: its answers and any warning, or null on other pages. */
+/**
+ * What a review page lists between two lines: its answers and any warning, or null on other pages. A question or an
+ * answer too long for one line goes on in the indented lines under it, which are joined back on.
+ */
 function reviewOf(lines, top, bottom) {
   const from = lines.slice(top, bottom).findIndex(l => REVIEW_TITLE.test(l));
   if (from < 0 && !lines.slice(top, bottom + 1).some(l => REVIEW.test(l))) return null;
   const answers = [];
-  let warning = "";
+  let warning = "", into = null;
   for (const line of lines.slice(top, bottom)) {
     const asked = /^\s*●\s+(.+)$/.exec(line), given = /^\s*→\s+(.+)$/.exec(line), warned = /^\s*⚠\s*(.+)$/.exec(line);
-    if (asked) answers.push({ question: asked[1].trim(), answer: "" });
-    else if (given && answers.length) answers.at(-1).answer = given[1].trim();
-    else if (warned) warning = warned[1].trim();
+    if (asked) { answers.push({ question: asked[1].trim(), answer: "" }); into = "question"; }
+    else if (given && answers.length) { answers.at(-1).answer = given[1].trim(); into = "answer"; }
+    else if (warned) { warning = warned[1].trim(); into = null; }
+    else if (into && answers.length && /^\s+\S/.test(line) && !REVIEW.test(line)) answers.at(-1)[into] += ` ${line.trim()}`;
+    else into = null;
   }
   return { answers, warning };
 }

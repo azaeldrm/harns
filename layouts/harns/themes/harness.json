@@ -16,11 +16,11 @@
     "border": "#25282b",
     "input": "#1d2124",
     "hover": "#181c1f",
-    "selected": "#2a2113",
-    "accent": "#e9aa35",
-    "working": "#e9aa35",
-    "blocked": "#e9aa35",
-    "done": "#10a7a7",
+    "selected": "#24282b",
+    "accent": "#c4c8ca",
+    "working": "#eceeef",
+    "blocked": "#d88179",
+    "done": "#6cc48a",
     "idle": "#80868b"
   }
 }
