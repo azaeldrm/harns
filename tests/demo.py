@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory() as tmp:
     dest = os.path.join(tmp, "trailhead")
     r = demo("--into", dest, "--branch", "feat/elevation-chart")
     check("builds the checkout", r.returncode == 0 and os.path.isdir(os.path.join(dest, ".git")))
-    check("main and both branches", git(dest, "branch", "--format=%(refname:short)").split() == ["feat/elevation-chart", "fix/gpx-import", "main"])
+    check("main and both branches", sorted(git(dest, "branch", "--format=%(refname:short)").split()) == ["feat/elevation-chart", "fix/gpx-import", "main"])
     check("three commits on main, one on each branch", git(dest, "rev-list", "--count", "main") == "3"
           and git(dest, "rev-list", "--count", "main..fix/gpx-import") == "1")
     check("the chosen branch is checked out", git(dest, "branch", "--show-current") == "feat/elevation-chart")
